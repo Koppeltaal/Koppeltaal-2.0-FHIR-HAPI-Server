@@ -1,5 +1,7 @@
 package ca.uhn.fhir.jpa.starter;
 
+import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration;
+import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.JwtSecurityInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
@@ -11,6 +13,9 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
   @Autowired
   AppProperties appProperties;
 
+  @Autowired
+  FhirServerSecurityConfiguration fhirServerSecurityConfiguration;
+
   private static final long serialVersionUID = 1L;
 
   public JpaRestfulServer() {
@@ -21,7 +26,10 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
   protected void initialize() throws ServletException {
     super.initialize();
 
-    // Add your own customization here
+	  // Add your own customization here
+	  if(fhirServerSecurityConfiguration.isEnabled()) {
+		  registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
+	  }
 
   }
 

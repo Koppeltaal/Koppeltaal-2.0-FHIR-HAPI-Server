@@ -391,8 +391,6 @@ public class BaseJpaRestfulServer extends RestfulServer {
 
     daoConfig.getModelConfig().setIndexOnContainedResources(appProperties.getEnable_index_contained_resource());
 
-    // custom Koppeltaal 2
-	 registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
   }
 
 }

@@ -152,3 +152,12 @@ hapi:
 #  protocol: 'http'
 #  schema_management_strategy: CREATE
 #  username: SomeUsername
+
+fhir:
+  server:
+    security:
+      enabled: true
+      issuer: "koppeltaal"
+      audience: "fhir-server"
+      authorizationEndpoint: "http://127.0.0.1:5001/oauth2/authorize"
+      tokenEndpoint: "http://127.0.0.1:5001/oauth2/token"

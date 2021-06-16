@@ -21,6 +21,7 @@ public class FhirServerSecurityConfiguration {
 	String authorizationEndpoint;
 	String tokenEndpoint;
 	String audience;
+	boolean enabled = true;
 	long tokenValidationLeeway;
 
 	public String getAudience() {
@@ -55,4 +56,11 @@ public class FhirServerSecurityConfiguration {
 		this.tokenValidationLeeway = tokenValidationLeeway;
 	}
 
+	public boolean isEnabled() {
+		return enabled;
+	}
+
+	public void setEnabled(boolean enabled) {
+		this.enabled = enabled;
+	}
 }
