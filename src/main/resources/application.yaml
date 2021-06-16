@@ -1,11 +1,10 @@
 spring:
   datasource:
-    url: 'jdbc:h2:file:./target/database/h2'
-    #url: jdbc:h2:mem:test_mem
-    username: sa
-    password: null
-    driverClassName: org.h2.Driver
-    max-active: 15
+    url: 'jdbc:mysql://host/database'
+    username:
+    password:
+    driverClassName: com.mysql.jdbc.Driver
+#    max-active: 15
 
     # database connection pool size
     hikari:
@@ -42,7 +41,7 @@ hapi:
 ### alternatively, it may be set using the X-Forwarded-Proto header.
 #   use_apache_address_strategy_https: false
 ### enable to set the Server URL
-#    server_address: http://hapi.fhir.org/baseR4
+    server_address: http://localhost:8080/fhir/
 #    defer_indexing_for_codesystems_of_size: 101
 #    implementationguides:
 ###    example from registry (packages.fhir.org)
@@ -57,23 +56,23 @@ hapi:
 #    supported_resource_types:
 #      - Patient
 #      - Observation
-#    allow_cascading_deletes: true
-#    allow_contains_searches: true
-#    allow_external_references: true
-#    allow_multiple_delete: true
-#    allow_override_default_search_params: true
+    allow_cascading_deletes: true
+    allow_contains_searches: true
+    allow_external_references: true
+    allow_multiple_delete: true
+    allow_override_default_search_params: true
 #    auto_create_placeholder_reference_targets: false
 #    cql_enabled: true
-#    default_encoding: JSON
-#    default_pretty_print: true
-#    default_page_size: 20
-#    enable_repository_validating_interceptor: false
-#    enable_index_missing_fields: false
+    default_encoding: JSON
+    default_pretty_print: true
+    default_page_size: 20
+    enable_repository_validating_interceptor: true
+    enable_index_missing_fields: false
 #    enable_index_contained_resource: false
-#    enforce_referential_integrity_on_delete: false
-#    enforce_referential_integrity_on_write: false
-#    etag_support_enabled: true
-#    expunge_enabled: true
+    enforce_referential_integrity_on_delete: false
+    enforce_referential_integrity_on_write: false
+    etag_support_enabled: true
+    expunge_enabled: true
 #    daoconfig_client_id_strategy: null
 #    client_id_strategy: ALPHANUMERIC
 #    fhirpath_interceptor_enabled: false
@@ -104,9 +103,9 @@ hapi:
 #      log_exceptions: true
 #      name: fhirtest.access
 #    max_binary_size: 104857600
-#    max_page_size: 200
-#    retain_cached_searches_mins: 60
-#    reuse_cached_search_results_millis: 60000
+    max_page_size: 200
+    retain_cached_searches_mins: 60
+    reuse_cached_search_results_millis: 0
     tester:
         home:
           name: Local Tester
@@ -122,9 +121,9 @@ hapi:
 #      requests_enabled: true
 #      responses_enabled: true
 #    binary_storage_enabled: true
-#    bulk_export_enabled: true
-#    subscription:
-#      resthook_enabled: false
+    bulk_export_enabled: true
+    subscription:
+      resthook_enabled: true
 #      websocket_enabled: false
 #      email:
 #        from: some@test.com
