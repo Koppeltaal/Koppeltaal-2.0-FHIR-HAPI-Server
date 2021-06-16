@@ -23,6 +23,8 @@ import ca.uhn.fhir.jpa.provider.SubscriptionTriggeringProvider;
 import ca.uhn.fhir.jpa.provider.TerminologyUploaderProvider;
 import ca.uhn.fhir.jpa.provider.dstu3.JpaConformanceProviderDstu3;
 import ca.uhn.fhir.jpa.search.DatabaseBackedPagingProvider;
+import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.JwtSecurityInterceptor;
+import ca.uhn.fhir.jpa.starter.koppeltaal.service.Oauth2AccessTokenService;
 import ca.uhn.fhir.jpa.subscription.util.SubscriptionDebugLogInterceptor;
 import ca.uhn.fhir.narrative.DefaultThymeleafNarrativeGenerator;
 import ca.uhn.fhir.narrative.INarrativeGenerator;
@@ -99,6 +101,8 @@ public class BaseJpaRestfulServer extends RestfulServer {
   ApplicationContext myApplicationContext;
   @Autowired(required = false)
   IRepositoryValidationInterceptorFactory factory;
+  @Autowired
+  Oauth2AccessTokenService oauth2AccessTokenService;
   // These are set only if the features are enabled
   private CqlProviderLoader cqlProviderLoader;
 	@Autowired
@@ -385,6 +389,10 @@ public class BaseJpaRestfulServer extends RestfulServer {
 
     daoConfig.getModelConfig().setNormalizedQuantitySearchLevel(appProperties.getNormalized_quantity_search_level());
 
-		daoConfig.getModelConfig().setIndexOnContainedResources(appProperties.getEnable_index_contained_resource());
+    daoConfig.getModelConfig().setIndexOnContainedResources(appProperties.getEnable_index_contained_resource());
+
+    // custom Koppeltaal 2
+	 registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
   }
+
 }
