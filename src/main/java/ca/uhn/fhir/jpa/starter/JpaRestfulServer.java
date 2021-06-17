@@ -35,7 +35,7 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 	  registerInterceptor(new Oauth2UrisStatementInterceptorForR4(fhirServerSecurityConfiguration));
 
 	  // Register our custom  structured definitions
-	  interceptorService.registerInterceptor(factory.build());
+//	  interceptorService.registerInterceptor(factory.build());
 
   }
 
