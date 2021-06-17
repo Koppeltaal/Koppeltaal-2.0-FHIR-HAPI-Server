@@ -1,7 +1,11 @@
+service:
+  internalPort: 8080
+  externalPort: 8080
+
 livenessProbe:
   path: "/fhir/metadata"
-  initialDelaySeconds: 120
+  initialDelaySeconds: 80
 
 readinessProbe:
   path: "/fhir/metadata"
-  initialDelaySeconds: 120
+  initialDelaySeconds: 80
