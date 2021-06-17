@@ -31,6 +31,9 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 		  registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
 	  }
 
+	  // Register our custom  structured definitions
+	  interceptorService.registerInterceptor(factory.build());
+
   }
 
 }
