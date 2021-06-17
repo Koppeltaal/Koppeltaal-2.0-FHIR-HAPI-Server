@@ -1,7 +1,7 @@
 livenessProbe:
-  path: "/health"
+  path: "/fhir/metadata"
   initialDelaySeconds: 120
 
 readinessProbe:
-  path: "/health"
+  path: "/fhir/metadata"
   initialDelaySeconds: 120
