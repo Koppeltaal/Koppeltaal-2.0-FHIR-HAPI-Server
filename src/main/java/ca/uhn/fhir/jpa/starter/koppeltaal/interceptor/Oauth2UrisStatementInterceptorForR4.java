@@ -23,7 +23,7 @@ import org.hl7.fhir.r4.model.Extension;
 import org.hl7.fhir.r4.model.UriType;
 
 /**
- * Interceptor that adds the
+ * Interceptor that adds the http://hl7.org/fhir/restful-security-service coding
  */
 public class Oauth2UrisStatementInterceptorForR4 {
 
@@ -35,7 +35,6 @@ public class Oauth2UrisStatementInterceptorForR4 {
 
 	@Hook(Pointcut.SERVER_OUTGOING_RESPONSE)
 	public void hookOutgoingResponse(IBaseResource resource, Pointcut pointcut) {
-
 
 		if (resource instanceof CapabilityStatement) {
 			CapabilityStatement capabilityStatement = (CapabilityStatement) resource;

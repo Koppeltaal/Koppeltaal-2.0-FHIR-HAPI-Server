@@ -2,6 +2,7 @@ package ca.uhn.fhir.jpa.starter;
 
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.JwtSecurityInterceptor;
+import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.Oauth2UrisStatementInterceptorForR4;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
@@ -30,6 +31,8 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 	  if(fhirServerSecurityConfiguration.isEnabled()) {
 		  registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
 	  }
+
+	  registerInterceptor(new Oauth2UrisStatementInterceptorForR4(fhirServerSecurityConfiguration));
 
 	  // Register our custom  structured definitions
 	  interceptorService.registerInterceptor(factory.build());
