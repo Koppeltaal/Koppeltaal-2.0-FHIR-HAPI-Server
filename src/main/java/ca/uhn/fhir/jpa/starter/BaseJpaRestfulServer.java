@@ -26,6 +26,7 @@ import ca.uhn.fhir.jpa.search.DatabaseBackedPagingProvider;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.JwtSecurityInterceptor;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.Oauth2AccessTokenService;
 import ca.uhn.fhir.jpa.subscription.util.SubscriptionDebugLogInterceptor;
+import ca.uhn.fhir.mdm.provider.MdmProviderLoader;
 import ca.uhn.fhir.narrative.DefaultThymeleafNarrativeGenerator;
 import ca.uhn.fhir.narrative.INarrativeGenerator;
 import ca.uhn.fhir.narrative2.NullNarrativeGenerator;
@@ -47,19 +48,19 @@ import ca.uhn.fhir.rest.server.util.ISearchParamRegistry;
 import ca.uhn.fhir.validation.IValidatorModule;
 import ca.uhn.fhir.validation.ResultSeverityEnum;
 import com.google.common.base.Strings;
-import org.hl7.fhir.r4.model.Bundle.BundleType;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationContext;
-import org.springframework.http.HttpHeaders;
-import org.springframework.web.cors.CorsConfiguration;
-
-import javax.servlet.ServletException;
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.servlet.ServletException;
+import org.hl7.fhir.r4.model.Bundle.BundleType;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.cors.CorsConfiguration;
 
 public class BaseJpaRestfulServer extends RestfulServer {
   private static final org.slf4j.Logger ourLog = org.slf4j.LoggerFactory.getLogger(BaseJpaRestfulServer.class);
@@ -74,7 +75,7 @@ public class BaseJpaRestfulServer extends RestfulServer {
   @Autowired
   IFhirSystemDao fhirSystemDao;
   @Autowired
-  ResourceProviderFactory resourceProviders;
+  ResourceProviderFactory resourceProviderFactory;
   @Autowired
   IJpaSystemProvider jpaSystemProvider;
   @Autowired
@@ -104,9 +105,13 @@ public class BaseJpaRestfulServer extends RestfulServer {
   @Autowired
   Oauth2AccessTokenService oauth2AccessTokenService;
   // These are set only if the features are enabled
-  private CqlProviderLoader cqlProviderLoader;
-	@Autowired
-	private IValidationSupport myValidationSupport;
+  @Autowired
+  Optional<CqlProviderLoader> cqlProviderLoader;
+  @Autowired
+  Optional<MdmProviderLoader> mdmProviderProvider;
+
+  @Autowired
+  private IValidationSupport myValidationSupport;
 
   public BaseJpaRestfulServer() {
   }
@@ -130,7 +135,14 @@ public class BaseJpaRestfulServer extends RestfulServer {
 
     setFhirContext(fhirSystemDao.getContext());
 
-    registerProviders(resourceProviders.createProviders());
+    /*
+     * Order matters - the MDM provider registers itself on the resourceProviderFactory - hence the loading must be done
+     * ahead of provider registration
+     */
+    if(appProperties.getMdm_enabled())
+    	mdmProviderProvider.get().loadProvider();
+
+    registerProviders(resourceProviderFactory.createProviders());
     registerProvider(jpaSystemProvider);
 
     /*
@@ -369,12 +381,16 @@ public class BaseJpaRestfulServer extends RestfulServer {
     if (appProperties.getImplementationGuides() != null) {
       Map<String, AppProperties.ImplementationGuide> guides = appProperties.getImplementationGuides();
       for (Map.Entry<String, AppProperties.ImplementationGuide> guide : guides.entrySet()) {
-			packageInstallerSvc.install(new PackageInstallationSpec()
+			PackageInstallationSpec packageInstallationSpec = new PackageInstallationSpec()
 				.setPackageUrl(guide.getValue().getUrl())
 				.setName(guide.getValue().getName())
 				.setVersion(guide.getValue().getVersion())
-				.setInstallMode(PackageInstallationSpec.InstallModeEnum.STORE_AND_INSTALL));
-
+				.setInstallMode(PackageInstallationSpec.InstallModeEnum.STORE_AND_INSTALL);
+			if(appProperties.getInstall_transitive_ig_dependencies()) {
+				packageInstallationSpec.setFetchDependencies(true);
+				packageInstallationSpec.setDependencyExcludes(ImmutableList.of("hl7.fhir.r2.core", "hl7.fhir.r3.core", "hl7.fhir.r4.core", "hl7.fhir.r5.core"));
+			}
+			packageInstallerSvc.install(packageInstallationSpec);
       }
     }
 

@@ -46,6 +46,7 @@ hapi:
 ### enable to set the Server URL
     server_address: http://localhost:8080/fhir/
 #    defer_indexing_for_codesystems_of_size: 101
+#    install_transitive_ig_dependencies: true
 #    implementationguides:
 ###    example from registry (packages.fhir.org)
 #      swiss:
@@ -82,6 +83,7 @@ hapi:
 #    filter_search_enabled: true
 #    graphql_enabled: true
 #    narrative_enabled: true
+#    mdm_enabled: true
 #    partitioning:
 #      allow_references_across_partitions: false
 #      partitioning_include_in_search_hashes: false
