@@ -1,6 +1,7 @@
 package ca.uhn.fhir.jpa.starter;
 
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration;
+import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.InjectResourceOriginInterceptor;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.JwtSecurityInterceptor;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.Oauth2UrisStatementInterceptorForR4;
 import ca.uhn.fhir.rest.server.interceptor.CaptureResourceSourceFromHeaderInterceptor;
@@ -31,6 +32,7 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 	  // Add your own customization here
 	  if(fhirServerSecurityConfiguration.isEnabled()) {
 		  registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
+		  registerInterceptor(new InjectResourceOriginInterceptor()); // can only determine this from the Bearer token
 	  }
 
 	  registerInterceptor(new Oauth2UrisStatementInterceptorForR4(fhirServerSecurityConfiguration));
