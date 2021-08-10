@@ -167,5 +167,11 @@ fhir:
       authorizationEndpoint: "http://127.0.0.1:5001/oauth2/authorize"
       tokenEndpoint: "http://127.0.0.1:5001/oauth2/token"
 
+smart:
+  backend:
+    service:
+      baseUrl: "http://127.0.0.1:8086"
+      authorizationToken: "c1317ea3-de40-4a1e-be3f-3994fb79f759"
+
 server:
   forward-headers-strategy: framework
