@@ -10,20 +10,32 @@ import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
+import ca.uhn.fhir.jpa.api.model.DaoMethodOutcome;
+import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
+import ca.uhn.fhir.rest.api.server.IBundleProvider;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
+import ca.uhn.fhir.rest.param.UriParam;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
+import org.hl7.fhir.r4.model.CodeType;
 import org.hl7.fhir.r4.model.Device;
 import org.hl7.fhir.r4.model.DomainResource;
+import org.hl7.fhir.r4.model.Enumerations.PublicationStatus;
+import org.hl7.fhir.r4.model.Enumerations.SearchParamType;
 import org.hl7.fhir.r4.model.Extension;
 import org.hl7.fhir.r4.model.Reference;
 import org.hl7.fhir.r4.model.ResourceType;
+import org.hl7.fhir.r4.model.SearchParameter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +59,8 @@ public class InjectResourceOriginInterceptor {
 		this.daoRegistry = daoRegistry;
 		this.deviceDao = daoRegistry.getResourceDao(Device.class);
 		this.smartBackendServiceConfiguration = smartBackendServiceConfiguration;
+
+		ensureSearchParameter();
 	}
 
 	@Hook(Pointcut.SERVER_INCOMING_REQUEST_PRE_HANDLED)
@@ -143,6 +157,63 @@ public class InjectResourceOriginInterceptor {
 		}
 
 		return referenceElement;
+	}
+
+	private void ensureSearchParameter() {
+		final IFhirResourceDao<SearchParameter> searchParameterDao = daoRegistry.getResourceDao(SearchParameter.class);
+
+		final String searchParamUrl = "http://hl7.org/fhir/SearchParameter/resource-origin-extension";
+
+		final SearchParameterMap paramMap = new SearchParameterMap();
+		paramMap.add("url", new UriParam(searchParamUrl));
+		final IBundleProvider searchResult = searchParameterDao.search(paramMap);
+
+		if(searchResult.isEmpty()) {
+			final SearchParameter searchParameter = new SearchParameter();
+			searchParameter.setUrl(searchParamUrl);
+			searchParameter.setName("Search Parameter for extension resource-origin");
+			searchParameter.setStatus(PublicationStatus.ACTIVE);
+			searchParameter.setExpression("false");
+			searchParameter.setDescription("Search DomainResources by resource-origin");
+			searchParameter.setCode("resource-origin");
+			searchParameter.setTarget(Collections.singletonList(new CodeType(ResourceType.Device.name())));
+			searchParameter.setType(SearchParamType.REFERENCE);
+			searchParameter.setXpath("normal");
+
+
+			//TODO: Simply creating a Resource with `DomainResource` as the base doesn't work for all resource types for some reason. The code below should be a lot easier..
+
+			// DomainResource extends the base Resource. All of the listed Resources except Bundle, Parameters and Binary extend this resource.
+			final List<ResourceType> resourceTypes = Arrays.stream(ResourceType.values())
+				.filter(resourceType -> resourceType != ResourceType.Bundle && resourceType != ResourceType.Parameters && resourceType != ResourceType.Binary)
+				.collect(Collectors.toList());
+
+			final List<CodeType> allDomainResourceCodeTypes = resourceTypes.stream()
+				.map((resourceType -> new CodeType(resourceType.name())))
+				.collect(Collectors.toList());
+
+			StringBuilder expressionBuilder = new StringBuilder();
+
+			final Iterator<ResourceType> resourceTypeIterator = resourceTypes.iterator();
+			while(resourceTypeIterator.hasNext()) {
+				expressionBuilder.append(resourceTypeIterator.next());
+				expressionBuilder.append(".extension('https://koppeltaal.nl/resource-origin')");
+
+				if(resourceTypeIterator.hasNext()) {
+					expressionBuilder.append(" | ");
+				}
+			}
+
+			searchParameter.setBase(allDomainResourceCodeTypes);
+			searchParameter.setExpression(expressionBuilder.toString());
+
+			final DaoMethodOutcome daoMethodOutcome = searchParameterDao.create(searchParameter);
+			if(!daoMethodOutcome.getCreated()) {
+				throw new IllegalStateException("Unable to register the resource-origin SearchParameter: " + daoMethodOutcome.getOperationOutcome().getFormatCommentsPost());
+			}
+
+			LOG.info("Ensured SearchParam " + searchParamUrl);
+		}
 	}
 
 }
