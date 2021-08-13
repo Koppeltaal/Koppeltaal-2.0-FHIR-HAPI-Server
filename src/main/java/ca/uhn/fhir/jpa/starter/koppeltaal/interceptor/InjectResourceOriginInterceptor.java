@@ -6,6 +6,7 @@ import static ca.uhn.fhir.rest.api.RestOperationTypeEnum.CREATE;
 import ca.uhn.fhir.interceptor.api.Hook;
 import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
+import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
@@ -32,9 +33,9 @@ public class InjectResourceOriginInterceptor {
 	private final IFhirResourceDao<Device> deviceDao;
 	private final SmartBackendServiceConfiguration smartBackendServiceConfiguration;
 
-	public InjectResourceOriginInterceptor(IFhirResourceDao<Device> deviceDao,
+	public InjectResourceOriginInterceptor(DaoRegistry daoRegistry,
 		SmartBackendServiceConfiguration smartBackendServiceConfiguration) {
-		this.deviceDao = deviceDao;
+		this.deviceDao = daoRegistry.getResourceDao(Device.class);
 		this.smartBackendServiceConfiguration = smartBackendServiceConfiguration;
 	}
 

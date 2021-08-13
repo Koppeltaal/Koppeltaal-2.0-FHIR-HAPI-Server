@@ -5,6 +5,8 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuthorizationDto;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.CrudOperation;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.FhirResourceType;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.PermissionDto;
+import ca.uhn.fhir.rest.api.RequestTypeEnum;
+import ca.uhn.fhir.rest.api.server.RequestDetails;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -49,10 +51,13 @@ public class SmartBackendServiceAuthorizationService {
 		return deviceIdToAuthorizationMap.containsKey(deviceId) ? deviceIdToAuthorizationMap.get(deviceId).getPermissions() : new ArrayList<>();
 	}
 
-	public Optional<PermissionDto> getPermission(String deviceId, CrudOperation operation, FhirResourceType fhirResourceType) {
+	public Optional<PermissionDto> getPermission(String deviceId, RequestDetails requestDetails) {
+
+		final CrudOperation operation = getCrudOperation(requestDetails.getRequestType());
+		final FhirResourceType resourceType = FhirResourceType.fromResourceName(requestDetails.getResourceName());
 
 		return getPermissions(deviceId).stream()
-			.filter((permission -> permission.getOperation() == operation && permission.getResourceType() == fhirResourceType))
+			.filter((permission -> permission.getOperation() == operation && permission.getResourceType() == resourceType))
 			.findAny();
 	}
 
@@ -83,5 +88,17 @@ public class SmartBackendServiceAuthorizationService {
 		deviceIdToAuthorizationMap = authorizationDtos.stream()
 			.filter(authorizationDto -> StringUtils.isNotBlank(authorizationDto.getDeviceId()))
 			.collect(Collectors.toMap(AuthorizationDto::getDeviceId, Function.identity()));
+	}
+
+	private CrudOperation getCrudOperation(RequestTypeEnum requestType) {
+		switch(requestType) {
+			case GET: return CrudOperation.READ;
+			case POST: return CrudOperation.CREATE;
+			case PUT: return CrudOperation.UPDATE;
+			case DELETE: return CrudOperation.DELETE;
+			default:
+				throw new UnsupportedOperationException(String.format(
+					"Request type [%s] is not supported by the ResourceOriginAuthorizationInterceptor", requestType));
+		}
 	}
 }

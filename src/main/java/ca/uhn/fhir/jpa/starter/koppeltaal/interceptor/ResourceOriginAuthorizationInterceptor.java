@@ -3,10 +3,10 @@ package ca.uhn.fhir.jpa.starter.koppeltaal.interceptor;
 import ca.uhn.fhir.interceptor.api.Hook;
 import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
+import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.CrudOperation;
-import ca.uhn.fhir.jpa.starter.koppeltaal.dto.FhirResourceType;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.PermissionDto;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizationService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
@@ -24,18 +24,15 @@ import org.slf4j.LoggerFactory;
  * Not using the {@link AuthorizationInterceptor} as custom {@link org.hl7.fhir.CompartmentDefinition} objects are not allowed.
  */
 @Interceptor
-public class ResourceOriginAuthorizationInterceptor {
+public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInterceptor {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ResourceOriginAuthorizationInterceptor.class);
-	private final IFhirResourceDao<Device> deviceDao;
-	private final SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService;
 	private final SmartBackendServiceConfiguration smartBackendServiceConfiguration;
 
-	public ResourceOriginAuthorizationInterceptor(IFhirResourceDao<Device> deviceDao,
+	public ResourceOriginAuthorizationInterceptor(DaoRegistry daoRegistry,
 		SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService,
 		SmartBackendServiceConfiguration smartBackendServiceConfiguration) {
-		this.deviceDao = deviceDao;
-		this.smartBackendServiceAuthorizationService = smartBackendServiceAuthorizationService;
+		super(daoRegistry, smartBackendServiceAuthorizationService);
 		this.smartBackendServiceConfiguration = smartBackendServiceConfiguration;
 	}
 
@@ -59,39 +56,39 @@ public class ResourceOriginAuthorizationInterceptor {
 		Device requestingDevice = ResourceOriginUtil.getDevice(requestDetails, deviceDao)
 			.orElseThrow(() -> new IllegalStateException("Device not present"));
 
-		switch(requestDetails.getRequestType()) {
-			case GET: validate(requestDetails, CrudOperation.READ, requestingDevice); break;
-			case POST: validate(requestDetails, CrudOperation.CREATE, requestingDevice); break;
-			case PUT: validate(requestDetails, CrudOperation.UPDATE, requestingDevice); break;
-			case DELETE: validate(requestDetails, CrudOperation.DELETE, requestingDevice); break;
-			default:
-				throw new UnsupportedOperationException(String.format(
-					"Request type [%s] is not supported by the ResourceOriginAuthorizationInterceptor", requestDetails.getRequestType()));
-		}
+		validate(requestDetails, requestingDevice);
 	}
 
-	private void validate(RequestDetails requestDetails, CrudOperation operation, Device requestingDevice) {
+	private void validate(RequestDetails requestDetails, Device requestingDevice) {
 		final String requestingDeviceId = requestingDevice.getIdElement().getIdPart();
 		final String resourceName = requestDetails.getResourceName();
 
-		final Optional<PermissionDto> permissionOptional = smartBackendServiceAuthorizationService.getPermission(requestingDeviceId, operation, FhirResourceType.fromResourceName(resourceName));
+		final Optional<PermissionDto> permissionOptional = smartBackendServiceAuthorizationService.getPermission(requestingDeviceId, requestDetails);
 
 		if(!permissionOptional.isPresent()) {
-			LOG.info("Device [{}] executed [{}] on [{}] but no permission was found", requestingDeviceId, operation, resourceName);
+			LOG.info("Device [{}] executed [{}] on [{}] but no permission was found", requestingDeviceId,
+				requestDetails.getRequestType(), resourceName);
 			throw new SecurityException("Unauthorized");
 		}
 
 		final PermissionDto permission = permissionOptional.get();
-		final IBaseResource requestDetailsResource = requestDetails.getResource();
+		final CrudOperation operation = permission.getOperation();
+		IBaseResource existingResource = null;
+
+		final IIdType resourceId = requestDetails.getId();
+		if(resourceId != null) {
+			final IFhirResourceDao<?> resourceDao = daoRegistry.getResourceDao(resourceName);
+			existingResource = resourceDao.read(resourceId);
+		}
 
 		switch (permission.getScope()) {
 			case ALL: return; //valid
 			case OWN:
 
-				// Create will inject the resource-origin and READ will be handled by the ResourceOriginSearchNarrowingInterceptor
-				if(operation == CrudOperation.CREATE || operation == CrudOperation.READ) return;  //valid
+				// Create will inject the resource-origin and READ all will be handled by the ResourceOriginSearchNarrowingInterceptor
+				if(operation == CrudOperation.CREATE || (operation == CrudOperation.READ && resourceId == null)) return;  //valid
 
-				Device resourceOriginDevice = getResourceOriginDevice(requestDetailsResource);
+				Device resourceOriginDevice = getResourceOriginDevice(existingResource);
 				final String resourceOriginDeviceId = resourceOriginDevice.getIdElement().getIdPart();
 
 				if(resourceOriginDeviceId.equals(requestingDeviceId)) return; //valid
@@ -102,8 +99,8 @@ public class ResourceOriginAuthorizationInterceptor {
 				break;
 			case GRANTED:
 
-				// READ will be handled by the ResourceOriginSearchNarrowingInterceptor
-				if(operation == CrudOperation.READ) return;  //valid
+				// READ all will be handled by the ResourceOriginSearchNarrowingInterceptor
+				if(operation == CrudOperation.READ && resourceId == null) return;  //valid
 
 				if(permission.getGrantedDeviceIds().contains(requestingDeviceId)) return; //valid
 
@@ -116,17 +113,5 @@ public class ResourceOriginAuthorizationInterceptor {
 		}
 
 		throw new SecurityException("Unauthorized");
-	}
-
-	private Device getResourceOriginDevice(IBaseResource requestDetailsResource) {
-		Optional<IIdType> resourceOriginOptional = ResourceOriginUtil.getResourceOriginDeviceId(requestDetailsResource);
-
-		if(!resourceOriginOptional.isPresent()) {
-			LOG.warn("Found resource ({}) without resource-origin", requestDetailsResource.getIdElement());
-			throw new SecurityException("Unauthorized");
-		}
-
-		IIdType resourceOriginDeviceId = resourceOriginOptional.get();
-		return deviceDao.read(resourceOriginDeviceId);
 	}
 }

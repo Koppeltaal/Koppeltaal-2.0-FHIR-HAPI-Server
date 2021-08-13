@@ -1,16 +1,15 @@
 package ca.uhn.fhir.jpa.starter;
 
-import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.InjectResourceOriginInterceptor;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.JwtSecurityInterceptor;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.Oauth2UrisStatementInterceptorForR4;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.ResourceOriginAuthorizationInterceptor;
+import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.ResourceOriginSearchNarrowingInterceptor;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizationService;
 import ca.uhn.fhir.rest.server.interceptor.CaptureResourceSourceFromHeaderInterceptor;
 import javax.servlet.ServletException;
-import org.hl7.fhir.r4.model.Device;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
@@ -41,12 +40,11 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 
 		// Add your own customization here
 		if (fhirServerSecurityConfiguration.isEnabled()) {
-
-			final IFhirResourceDao<Device> deviceDao = daoRegistry.getResourceDao(Device.class);
 			registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
-			registerInterceptor(new InjectResourceOriginInterceptor(deviceDao, smartBackendServiceConfiguration)); // can only determine this from the Bearer token
-			registerInterceptor(new ResourceOriginAuthorizationInterceptor(deviceDao, smartBackendServiceAuthorizationService, smartBackendServiceConfiguration));
-//		   registerInterceptor(new ResourceOriginSearchNarrowingInterceptor(deviceDao));
+
+			registerInterceptor(new InjectResourceOriginInterceptor(daoRegistry, smartBackendServiceConfiguration)); // can only determine this from the Bearer token
+			registerInterceptor(new ResourceOriginAuthorizationInterceptor(daoRegistry, smartBackendServiceAuthorizationService, smartBackendServiceConfiguration));
+		   registerInterceptor(new ResourceOriginSearchNarrowingInterceptor(daoRegistry, smartBackendServiceAuthorizationService));
 		}
 
 
