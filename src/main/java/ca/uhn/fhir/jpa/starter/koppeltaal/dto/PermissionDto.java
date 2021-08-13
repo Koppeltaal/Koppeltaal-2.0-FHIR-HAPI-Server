@@ -17,7 +17,7 @@ import java.util.UUID;
  */
 public class PermissionDto {
 	private UUID id;
-	private Set<UUID> grantedServices = new HashSet<>();
+	private Set<String> grantedDeviceIds = new HashSet<>();
 	private FhirResourceType resourceType;
 	private CrudOperation operation;
 	private PermissionScope scope;
@@ -30,12 +30,12 @@ public class PermissionDto {
 		this.id = id;
 	}
 
-	public Set<UUID> getGrantedServices() {
-		return grantedServices;
+	public Set<String> getGrantedDeviceIds() {
+		return grantedDeviceIds;
 	}
 
-	public void setGrantedServices(Set<UUID> grantedServices) {
-		this.grantedServices = grantedServices;
+	public void setGrantedDeviceIds(Set<String> grantedDeviceIds) {
+		this.grantedDeviceIds = grantedDeviceIds;
 	}
 
 	public FhirResourceType getResourceType() {
@@ -65,10 +65,12 @@ public class PermissionDto {
 	@Override
 	public String toString() {
 		return "PermissionDto{" +
-				", grantedServices=" + grantedServices +
-				", resourceType=" + resourceType +
-				", operation=" + operation +
-				", scope=" + scope +
-				'}';
+			"id=" + id +
+			", grantedDeviceIds=" + grantedDeviceIds +
+			", resourceType=" + resourceType +
+			", operation=" + operation +
+			", scope=" + scope +
+			'}';
 	}
+
 }

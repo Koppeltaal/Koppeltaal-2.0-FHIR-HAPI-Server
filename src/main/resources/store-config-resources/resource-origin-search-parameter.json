@@ -1,0 +1,24 @@
+{
+  "resourceType": "SearchParameter",
+  "url": "http://hl7.org/fhir/SearchParameter/resource-origin-extension",
+  "name": "Search Parameter for extension resource-origin",
+  "status": "active",
+  "experimental": false,
+  "description": "Search DomainResources by resource-origin",
+  "code": "resource-origin",
+  "base": [
+    "ActivityDefinition",
+    "CareTeam",
+    "Task",
+    "Patient",
+    "Practitioner",
+    "RelatedPerson",
+    "Endpoint",
+    "Device",
+    "Subscription"
+  ],
+  "target": ["Device"],
+  "type": "reference",
+  "expression": "ActivityDefinition.extension('https://koppeltaal.nl/resource-origin') | CareTeam.extension('https://koppeltaal.nl/resource-origin') | Task.extension('https://koppeltaal.nl/resource-origin') | Patient.extension('https://koppeltaal.nl/resource-origin') | Practitioner.extension('https://koppeltaal.nl/resource-origin') | RelatedPerson.extension('https://koppeltaal.nl/resource-origin') | Endpoint.extension('https://koppeltaal.nl/resource-origin') | Device.extension('https://koppeltaal.nl/resource-origin') | Subscription.extension('https://koppeltaal.nl/resource-origin')",
+  "xpathUsage": "normal"
+}

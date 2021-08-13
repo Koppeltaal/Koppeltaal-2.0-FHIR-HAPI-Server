@@ -172,6 +172,7 @@ smart:
     service:
       baseUrl: "http://127.0.0.1:8086"
       authorizationToken: "c1317ea3-de40-4a1e-be3f-3994fb79f759"
+      domainAdminClientId: "5ad7cf6a-9556-4d23-91ca-250dafa1df09"
 
 server:
   forward-headers-strategy: framework

@@ -9,6 +9,7 @@ public class SmartBackendServiceConfiguration {
 
 	private String baseUrl;
 	private String authorizationToken;
+	private String domainAdminClientId;
 
 	public String getBaseUrl() {
 		return baseUrl;
@@ -24,5 +25,13 @@ public class SmartBackendServiceConfiguration {
 
 	public void setAuthorizationToken(String authorizationToken) {
 		this.authorizationToken = authorizationToken;
+	}
+
+	public String getDomainAdminClientId() {
+		return domainAdminClientId;
+	}
+
+	public void setDomainAdminClientId(String domainAdminClientId) {
+		this.domainAdminClientId = domainAdminClientId;
 	}
 }
