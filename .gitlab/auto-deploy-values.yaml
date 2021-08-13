@@ -4,8 +4,8 @@ service:
 
 livenessProbe:
   path: "/fhir/metadata"
-  initialDelaySeconds: 80
+  initialDelaySeconds: 120
 
 readinessProbe:
   path: "/fhir/metadata"
-  initialDelaySeconds: 80
+  initialDelaySeconds: 120
