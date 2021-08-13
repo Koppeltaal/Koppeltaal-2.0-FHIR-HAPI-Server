@@ -11,6 +11,7 @@ package ca.uhn.fhir.jpa.starter.koppeltaal.dto;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import org.hl7.fhir.r4.model.ResourceType;
 
 /**
  *
@@ -18,7 +19,7 @@ import java.util.UUID;
 public class PermissionDto {
 	private UUID id;
 	private Set<String> grantedDeviceIds = new HashSet<>();
-	private FhirResourceType resourceType;
+	private ResourceType resourceType;
 	private CrudOperation operation;
 	private PermissionScope scope;
 
@@ -38,11 +39,11 @@ public class PermissionDto {
 		this.grantedDeviceIds = grantedDeviceIds;
 	}
 
-	public FhirResourceType getResourceType() {
+	public ResourceType getResourceType() {
 		return resourceType;
 	}
 
-	public void setResourceType(FhirResourceType resourceType) {
+	public void setResourceType(ResourceType resourceType) {
 		this.resourceType = resourceType;
 	}
 

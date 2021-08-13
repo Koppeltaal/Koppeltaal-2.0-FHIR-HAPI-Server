@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.hl7.fhir.r4.model.ResourceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
@@ -54,11 +55,9 @@ public class SmartBackendServiceAuthorizationService {
 	public Optional<PermissionDto> getPermission(String deviceId, RequestDetails requestDetails) {
 
 		final CrudOperation operation = getCrudOperation(requestDetails.getRequestType());
-		//TODO: Use R4 enum for mapping to easily add  more resource types
-		final FhirResourceType resourceType = FhirResourceType.fromResourceName(requestDetails.getResourceName());
 
 		return getPermissions(deviceId).stream()
-			.filter((permission -> permission.getOperation() == operation && permission.getResourceType() == resourceType))
+			.filter((permission -> permission.getOperation() == operation && permission.getResourceType() == ResourceType.valueOf(requestDetails.getResourceName())))
 			.findAny();
 	}
 
