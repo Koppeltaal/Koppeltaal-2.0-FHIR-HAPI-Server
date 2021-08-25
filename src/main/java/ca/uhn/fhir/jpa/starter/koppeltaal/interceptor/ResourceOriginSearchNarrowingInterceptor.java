@@ -9,6 +9,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizati
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
+import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import ca.uhn.fhir.rest.server.interceptor.auth.SearchNarrowingInterceptor;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,7 +38,7 @@ public class ResourceOriginSearchNarrowingInterceptor extends BaseAuthorizationI
 				.orElseThrow(() -> new IllegalStateException("Device not found, now allowed to query"));
 
 		PermissionDto permission = smartBackendServiceAuthorizationService.getPermission(device.getIdElement().getIdPart(), requestDetails)
-			.orElseThrow(() -> new SecurityException("Unauthorized"));
+			.orElseThrow(() -> new AuthenticationException("Unauthorized"));
 
 		final Map<String, String[]> originalParameters = requestDetails.getParameters();
 		final HashMap<String, String[]> narrowedSearchParameters = new HashMap<>(originalParameters);

@@ -4,6 +4,7 @@ import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizationService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
+import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import java.util.Optional;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
@@ -30,7 +31,7 @@ public abstract class BaseAuthorizationInterceptor {
 
 		if(!resourceOriginOptional.isPresent()) {
 			LOG.warn("Found resource ({}) without resource-origin", requestDetailsResource.getIdElement());
-			throw new SecurityException("Unauthorized");
+			throw new AuthenticationException("Unauthorized");
 		}
 
 		IIdType resourceOriginDeviceId = resourceOriginOptional.get();

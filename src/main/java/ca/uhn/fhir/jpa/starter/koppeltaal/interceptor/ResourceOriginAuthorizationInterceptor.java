@@ -11,6 +11,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.dto.PermissionDto;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizationService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
+import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import ca.uhn.fhir.rest.server.interceptor.auth.AuthorizationInterceptor;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
@@ -68,7 +69,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 		if(!permissionOptional.isPresent()) {
 			LOG.info("Device [{}] executed [{}] on [{}] but no permission was found", requestingDeviceId,
 				requestDetails.getRequestType(), resourceName);
-			throw new SecurityException("Unauthorized");
+			throw new AuthenticationException("Unauthorized");
 		}
 
 		final PermissionDto permission = permissionOptional.get();
@@ -112,6 +113,6 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 				LOG.warn("Unsupported scope: [{}]", permission.getScope());
 		}
 
-		throw new SecurityException("Unauthorized");
+		throw new AuthenticationException("Unauthorized");
 	}
 }

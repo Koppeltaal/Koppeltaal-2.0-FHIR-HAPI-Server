@@ -18,6 +18,7 @@ import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.IBundleProvider;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.param.UriParam;
+import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
@@ -124,7 +125,7 @@ public class InjectResourceOriginInterceptor {
 				device.isPresent() ? device.get().getIdElement().getIdPart() : "unknown", requestDetails.getResourceName(),
 				existingResourceOriginDeviceIdPart, bodyResourceOriginDeviceIdPart);
 
-			throw new SecurityException("Unauthorized");
+			throw new AuthenticationException("Unauthorized");
 		}
 	}
 
