@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Not using the {@link AuthorizationInterceptor} as custom {@link org.hl7.fhir.CompartmentDefinition} objects are not allowed.
  */
-@Interceptor
+@Interceptor(order = Integer.MIN_VALUE)
 public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInterceptor {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ResourceOriginAuthorizationInterceptor.class);
