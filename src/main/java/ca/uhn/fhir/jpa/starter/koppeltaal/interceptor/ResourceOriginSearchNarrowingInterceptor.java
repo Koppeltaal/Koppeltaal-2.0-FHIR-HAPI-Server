@@ -49,9 +49,12 @@ public class ResourceOriginSearchNarrowingInterceptor extends BaseAuthorizationI
 				narrowedSearchParameters.put("resource-origin", new String[]{"Device/" + device.getIdElement().getIdPart()});
 				break;
 			case GRANTED:
-				permission.getGrantedDeviceIds().forEach((grantedDeviceId) -> {
-					narrowedSearchParameters.put("resource-origin", new String[]{"Device/" + grantedDeviceId});
-				});
+
+				final String[] resourceOrigins = permission.getGrantedDeviceIds().stream()
+					.map(grantedDeviceId -> "Device/" + grantedDeviceId)
+					.toArray(String[]::new);
+
+				narrowedSearchParameters.put("resource-origin", resourceOrigins);
 				break;
 			default:
 				throw new UnsupportedOperationException("Unable to  handle permission scope " + permission.getScope());
