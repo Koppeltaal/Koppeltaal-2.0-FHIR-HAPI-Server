@@ -56,7 +56,7 @@ public class ResourceOriginUtil {
 		return getDevice(clientIdOptional.get(), deviceDao);
 	}
 
-	public static Optional<Device> getDevice(String clientId, IFhirResourceDao<Device> deviceDao) {
+	private static Optional<Device> getDevice(String clientId, IFhirResourceDao<Device> deviceDao) {
 		final SearchParameterMap searchParameterMap = new SearchParameterMap();
 		searchParameterMap.add(StructureDefinition.SP_IDENTIFIER, new TokenParam(clientId));
 
