@@ -18,7 +18,8 @@ import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.IBundleProvider;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.param.UriParam;
-import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
+import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
+import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
@@ -56,9 +57,9 @@ public class InjectResourceOriginInterceptor {
 	private final IFhirResourceDao<Device> deviceDao;
 	private final SmartBackendServiceConfiguration smartBackendServiceConfiguration;
 
-	public InjectResourceOriginInterceptor(DaoRegistry daoRegistry, SmartBackendServiceConfiguration smartBackendServiceConfiguration) {
+	public InjectResourceOriginInterceptor(DaoRegistry daoRegistry, IFhirResourceDao<Device> deviceDao, SmartBackendServiceConfiguration smartBackendServiceConfiguration) {
 		this.daoRegistry = daoRegistry;
-		this.deviceDao = daoRegistry.getResourceDao(Device.class);
+		this.deviceDao = deviceDao;
 		this.smartBackendServiceConfiguration = smartBackendServiceConfiguration;
 
 		ensureSearchParameter();
@@ -93,7 +94,7 @@ public class InjectResourceOriginInterceptor {
 		DomainResource domainResource = (DomainResource) resource;
 
 		Device device = ResourceOriginUtil.getDevice(requestDetails, deviceDao)
-			.orElseThrow(() -> new IllegalArgumentException("Device not present"));
+			.orElseThrow(() -> new InvalidRequestException("Device not present"));
 
 		final Extension resourceOriginExtension = new Extension();
 		resourceOriginExtension.setUrl(RESOURCE_ORIGIN_SYSTEM);
@@ -125,7 +126,7 @@ public class InjectResourceOriginInterceptor {
 				device.isPresent() ? device.get().getIdElement().getIdPart() : "unknown", requestDetails.getResourceName(),
 				existingResourceOriginDeviceIdPart, bodyResourceOriginDeviceIdPart);
 
-			throw new AuthenticationException("Unauthorized");
+			throw new ForbiddenOperationException("Unauthorized");
 		}
 	}
 
@@ -136,14 +137,14 @@ public class InjectResourceOriginInterceptor {
 		final List<Extension> resourceOrigin = requestBodyResource.getExtensionsByUrl(RESOURCE_ORIGIN_SYSTEM);
 
 		if(!resourceOrigin.isEmpty()) {
-			throw new IllegalArgumentException("Not allowed to set extension with system " + RESOURCE_ORIGIN_SYSTEM);
+			throw new InvalidRequestException("Not allowed to set extension with system " + RESOURCE_ORIGIN_SYSTEM);
 		}
 	}
 
 	private IIdType getResourceOriginDeviceId(DomainResource domainResource, RequestDetails requestDetails) {
 		final List<Extension> resourceOrigin = domainResource.getExtensionsByUrl(RESOURCE_ORIGIN_SYSTEM);
 		if(resourceOrigin.size() != 1) {
-			throw new IllegalArgumentException("Expecting a single extension with system " + RESOURCE_ORIGIN_SYSTEM);
+			throw new InvalidRequestException("Expecting a single extension with system " + RESOURCE_ORIGIN_SYSTEM);
 		}
 
 		final IIdType referenceElement = ((Reference) resourceOrigin.get(0).getValue()).getReferenceElement();
@@ -154,7 +155,7 @@ public class InjectResourceOriginInterceptor {
 			LOG.warn("Requesting Device [{}] attempted to provide an invalid resource for the resource-origin extension [{}]",
 				device.isPresent() ? device.get().getIdElement().getIdPart() : "unknown", referenceElement.getValue());
 
-			throw new IllegalArgumentException("Expecting a Device reference value for extension with system " + RESOURCE_ORIGIN_SYSTEM);
+			throw new InvalidRequestException("Expecting a Device reference value for extension with system " + RESOURCE_ORIGIN_SYSTEM);
 		}
 
 		return referenceElement;

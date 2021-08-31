@@ -19,8 +19,8 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizati
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
-import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
+import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 import java.util.Optional;
 import java.util.Set;
@@ -96,7 +96,7 @@ class ResourceOriginAuthorizationInterceptorTest {
 		resourceOriginUtil.when(() -> ResourceOriginUtil.getDevice(any(RequestDetails.class), any()))
 			.thenReturn(Optional.empty());
 
-		assertThrows(AuthenticationException.class, () ->
+		assertThrows(InvalidRequestException.class, () ->
 			interceptor.authorizeRequest(requestDetails)
 		);
 	}

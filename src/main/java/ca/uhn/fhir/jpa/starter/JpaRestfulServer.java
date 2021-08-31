@@ -45,7 +45,7 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 			registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
 
 			IFhirResourceDao<Device> deviceDao = daoRegistry.getResourceDao(Device.class);
-			registerInterceptor(new InjectResourceOriginInterceptor(daoRegistry, smartBackendServiceConfiguration)); // can only determine this from the Bearer token
+			registerInterceptor(new InjectResourceOriginInterceptor(daoRegistry, deviceDao, smartBackendServiceConfiguration)); // can only determine this from the Bearer token
 			registerInterceptor(new ResourceOriginAuthorizationInterceptor(daoRegistry, deviceDao, smartBackendServiceAuthorizationService, smartBackendServiceConfiguration));
 		   registerInterceptor(new ResourceOriginSearchNarrowingInterceptor(daoRegistry, deviceDao, smartBackendServiceAuthorizationService));
 		}
