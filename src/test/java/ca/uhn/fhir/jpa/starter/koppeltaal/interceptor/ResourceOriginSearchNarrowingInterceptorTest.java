@@ -90,9 +90,8 @@ class ResourceOriginSearchNarrowingInterceptorTest {
 
 		final Map<String, String[]> parameters = requestDetails.getParameters();
 		final String[] resourceOrigins = parameters.get("resource-origin");
-		assertEquals(2, resourceOrigins.length,  "Should contain two granted Devices");
-		assertEquals("Device/1", resourceOrigins[0], "Expected to narrow Device/1");
-		assertEquals("Device/2", resourceOrigins[1], "Expected to narrow Device/2");
+		assertEquals(1, resourceOrigins.length,  "Should contain two granted Devices");
+		assertEquals("Device/1,Device/2", resourceOrigins[0], "Expected to narrow Device/1,Device/2");
 	}
 
 	@Test

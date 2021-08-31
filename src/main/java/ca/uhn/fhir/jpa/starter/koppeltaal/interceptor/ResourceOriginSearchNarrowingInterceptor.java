@@ -12,6 +12,7 @@ import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import ca.uhn.fhir.rest.server.interceptor.auth.SearchNarrowingInterceptor;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.r4.model.Device;
@@ -50,11 +51,16 @@ public class ResourceOriginSearchNarrowingInterceptor extends BaseAuthorizationI
 				break;
 			case GRANTED:
 
-				final String[] resourceOrigins = permission.getGrantedDeviceIds().stream()
-					.map(grantedDeviceId -> "Device/" + grantedDeviceId)
-					.toArray(String[]::new);
+				StringBuilder grantedDeviceIdsBuilder = new StringBuilder();
+				final Iterator<String> deviceIdIterator = permission.getGrantedDeviceIds().iterator();
 
-				narrowedSearchParameters.put("resource-origin", resourceOrigins);
+				while(deviceIdIterator.hasNext()) {
+					grantedDeviceIdsBuilder.append("Device/");
+					grantedDeviceIdsBuilder.append(deviceIdIterator.next());
+					if(deviceIdIterator.hasNext()) grantedDeviceIdsBuilder.append(",");
+				}
+
+				narrowedSearchParameters.put("resource-origin", new String[]{grantedDeviceIdsBuilder.toString()});
 				break;
 			default:
 				throw new UnsupportedOperationException("Unable to  handle permission scope " + permission.getScope());
