@@ -9,6 +9,7 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
+import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.CrudOperation;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.PermissionDto;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.PermissionScope;
@@ -52,12 +53,13 @@ class ResourceOriginSearchNarrowingInterceptorTest {
 	}
 
 	@BeforeEach
-	void init(@Mock DaoRegistry daoRegistry, @Mock SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService) {
+	void init(@Mock DaoRegistry daoRegistry, @Mock IFhirResourceDao<Device> deviceDao, @Mock SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService) {
 
 		this.smartBackendServiceAuthorizationService = smartBackendServiceAuthorizationService;
 
 		interceptor = new ResourceOriginSearchNarrowingInterceptor(
 			daoRegistry,
+			deviceDao,
 			smartBackendServiceAuthorizationService
 		);
 

@@ -4,6 +4,7 @@ import ca.uhn.fhir.interceptor.api.Hook;
 import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
+import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.PermissionDto;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizationService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
@@ -24,8 +25,11 @@ import org.hl7.fhir.r4.model.Device;
 @Interceptor
 public class ResourceOriginSearchNarrowingInterceptor extends BaseAuthorizationInterceptor {
 
-	public ResourceOriginSearchNarrowingInterceptor(DaoRegistry daoRegistry, SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService) {
-		super(daoRegistry, smartBackendServiceAuthorizationService);
+	public ResourceOriginSearchNarrowingInterceptor(DaoRegistry daoRegistry,
+		IFhirResourceDao<Device> deviceDao,
+		SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService) {
+
+		super(daoRegistry, deviceDao, smartBackendServiceAuthorizationService);
 	}
 
 	@Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)

@@ -14,27 +14,16 @@ import org.slf4j.LoggerFactory;
 
 public abstract class BaseAuthorizationInterceptor {
 
-	private static final Logger LOG = LoggerFactory.getLogger(BaseAuthorizationInterceptor.class);
-
 	protected final DaoRegistry daoRegistry;
 	protected final IFhirResourceDao<Device> deviceDao;
 	protected final SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService;
 
-	protected BaseAuthorizationInterceptor(DaoRegistry daoRegistry, SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService) {
+	protected BaseAuthorizationInterceptor(DaoRegistry daoRegistry,
+		IFhirResourceDao<Device> deviceDao,
+		SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService) {
+
 		this.daoRegistry = daoRegistry;
-		this.deviceDao = daoRegistry.getResourceDao(Device.class);
+		this.deviceDao = deviceDao;
 		this.smartBackendServiceAuthorizationService = smartBackendServiceAuthorizationService;
-	}
-
-	protected Device getResourceOriginDevice(IBaseResource requestDetailsResource) {
-		Optional<IIdType> resourceOriginOptional = ResourceOriginUtil.getResourceOriginDeviceId(requestDetailsResource);
-
-		if(!resourceOriginOptional.isPresent()) {
-			LOG.warn("Found resource ({}) without resource-origin", requestDetailsResource.getIdElement());
-			throw new AuthenticationException("Unauthorized");
-		}
-
-		IIdType resourceOriginDeviceId = resourceOriginOptional.get();
-		return deviceDao.read(resourceOriginDeviceId);
 	}
 }

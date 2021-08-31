@@ -1,5 +1,6 @@
 package ca.uhn.fhir.jpa.starter;
 
+import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.InjectResourceOriginInterceptor;
@@ -10,6 +11,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.ResourceOriginSearchNarrow
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizationService;
 import ca.uhn.fhir.rest.server.interceptor.CaptureResourceSourceFromHeaderInterceptor;
 import javax.servlet.ServletException;
+import org.hl7.fhir.r4.model.Device;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 
@@ -42,11 +44,11 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 		if (fhirServerSecurityConfiguration.isEnabled()) {
 			registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
 
+			IFhirResourceDao<Device> deviceDao = daoRegistry.getResourceDao(Device.class);
 			registerInterceptor(new InjectResourceOriginInterceptor(daoRegistry, smartBackendServiceConfiguration)); // can only determine this from the Bearer token
-			registerInterceptor(new ResourceOriginAuthorizationInterceptor(daoRegistry, smartBackendServiceAuthorizationService, smartBackendServiceConfiguration));
-		   registerInterceptor(new ResourceOriginSearchNarrowingInterceptor(daoRegistry, smartBackendServiceAuthorizationService));
+			registerInterceptor(new ResourceOriginAuthorizationInterceptor(daoRegistry, deviceDao, smartBackendServiceAuthorizationService, smartBackendServiceConfiguration));
+		   registerInterceptor(new ResourceOriginSearchNarrowingInterceptor(daoRegistry, deviceDao, smartBackendServiceAuthorizationService));
 		}
-
 
 		registerInterceptor(new Oauth2UrisStatementInterceptorForR4(fhirServerSecurityConfiguration));
 

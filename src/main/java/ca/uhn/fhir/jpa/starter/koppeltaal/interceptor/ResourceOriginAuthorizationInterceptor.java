@@ -12,6 +12,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizati
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
+import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
 import ca.uhn.fhir.rest.server.interceptor.auth.AuthorizationInterceptor;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
@@ -31,9 +32,11 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 	private final SmartBackendServiceConfiguration smartBackendServiceConfiguration;
 
 	public ResourceOriginAuthorizationInterceptor(DaoRegistry daoRegistry,
+		IFhirResourceDao<Device> deviceDao,
 		SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService,
 		SmartBackendServiceConfiguration smartBackendServiceConfiguration) {
-		super(daoRegistry, smartBackendServiceAuthorizationService);
+
+		super(daoRegistry, deviceDao, smartBackendServiceAuthorizationService);
 		this.smartBackendServiceConfiguration = smartBackendServiceConfiguration;
 	}
 
@@ -49,13 +52,13 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 			// devices are used for authorizations, but this makes it impossible
 			// to create the initial device needed for the domain admin without whitelisting
 			final String requesterClientId = ResourceOriginUtil.getRequesterClientId(requestDetails)
-				.orElseThrow(() -> new IllegalStateException("client_id not present"));
+				.orElseThrow(() -> new AuthenticationException("client_id not present"));
 
 			if(StringUtils.equals(smartBackendServiceConfiguration.getDomainAdminClientId(), requesterClientId)) return;
 		}
 
 		Device requestingDevice = ResourceOriginUtil.getDevice(requestDetails, deviceDao)
-			.orElseThrow(() -> new IllegalStateException("Device not present"));
+			.orElseThrow(() -> new AuthenticationException("Device not present"));
 
 		validate(requestDetails, requestingDevice);
 	}
@@ -69,7 +72,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 		if(!permissionOptional.isPresent()) {
 			LOG.info("Device [{}] executed [{}] on [{}] but no permission was found", requestingDeviceId,
 				requestDetails.getRequestType(), resourceName);
-			throw new AuthenticationException("Unauthorized");
+			throw new ForbiddenOperationException("Unauthorized");
 		}
 
 		final PermissionDto permission = permissionOptional.get();
@@ -113,6 +116,18 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 				LOG.warn("Unsupported scope: [{}]", permission.getScope());
 		}
 
-		throw new AuthenticationException("Unauthorized");
+		throw new ForbiddenOperationException("Unauthorized");
+	}
+
+	Device getResourceOriginDevice(IBaseResource requestDetailsResource) {
+		Optional<IIdType> resourceOriginOptional = ResourceOriginUtil.getResourceOriginDeviceId(requestDetailsResource);
+
+		if(!resourceOriginOptional.isPresent()) {
+			LOG.warn("Found resource ({}) without resource-origin", requestDetailsResource.getIdElement());
+			throw new ForbiddenOperationException("Unauthorized");
+		}
+
+		IIdType resourceOriginDeviceId = resourceOriginOptional.get();
+		return deviceDao.read(resourceOriginDeviceId);
 	}
 }
