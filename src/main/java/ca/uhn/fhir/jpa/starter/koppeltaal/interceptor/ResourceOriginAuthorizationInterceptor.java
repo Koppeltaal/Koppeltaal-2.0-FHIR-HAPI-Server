@@ -41,7 +41,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 		this.smartBackendServiceConfiguration = smartBackendServiceConfiguration;
 	}
 
-	@Hook(Pointcut.SERVER_INCOMING_REQUEST_PRE_HANDLED)
+	@Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)
 	public void authorizeRequest(RequestDetails requestDetails) {
 
 		final String resourceName = requestDetails.getResourceName();
