@@ -207,11 +207,15 @@ class ResourceOriginAuthorizationInterceptorTest {
 	public void shouldBeAbleToModifyOtherResourceWithGrantedScope() {
 		final IdType resourceId = new IdType(ResourceType.Task.name(), 12L);
 
-		final Device device = new Device();
-		device.setIdElement(new IdType("Device", 1L));
+		final IdType resourceOriginDeviceId = new IdType("Device", 1L);
+		resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(any(IBaseResource.class)))
+			.thenReturn(Optional.of(resourceOriginDeviceId));
 
-		resourceOriginUtil.when(() -> ResourceOriginUtil.getDevice(any(RequestDetails.class), any()))
-			.thenReturn(Optional.of(device));
+		final Device resourceOriginDevice = new Device();
+		resourceOriginDevice.setId(resourceOriginDeviceId);
+
+		when(deviceDao.read(resourceOriginDeviceId))
+			.thenReturn(resourceOriginDevice);
 
 		// below grants Device/1 and Device/2
 		RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.POST,

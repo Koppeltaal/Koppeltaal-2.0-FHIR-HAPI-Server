@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Not using the {@link AuthorizationInterceptor} as custom {@link org.hl7.fhir.CompartmentDefinition} objects are not allowed.
  */
-@Interceptor(order = Integer.MIN_VALUE)
+@Interceptor(order = Integer.MIN_VALUE + 1)
 public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInterceptor {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ResourceOriginAuthorizationInterceptor.class);
@@ -94,7 +94,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 				if(operation == CrudOperation.CREATE || (operation == CrudOperation.READ && resourceId == null)) return;  //valid
 
 				Device resourceOriginDevice = getResourceOriginDevice(existingResource);
-				final String resourceOriginDeviceId = resourceOriginDevice.getIdElement().getIdPart();
+				String resourceOriginDeviceId = resourceOriginDevice.getIdElement().getIdPart();
 
 				if(resourceOriginDeviceId.equals(requestingDeviceId)) return; //valid
 
@@ -107,7 +107,13 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 				// READ all will be handled by the ResourceOriginSearchNarrowingInterceptor
 				if(operation == CrudOperation.READ && resourceId == null) return;  //valid
 
-				if(permission.getGrantedDeviceIds().contains(requestingDeviceId)) return; //valid
+				resourceOriginDevice = getResourceOriginDevice(
+					operation == CrudOperation.CREATE ?  requestDetails.getResource() : existingResource
+				);
+
+				resourceOriginDeviceId = resourceOriginDevice.getIdElement().getIdPart();
+
+				if(permission.getGrantedDeviceIds().contains(resourceOriginDeviceId)) return; //valid
 
 				LOG.warn("Device [{}] executed [{}] on [{}] with GRANTED permission on resource [{}], "
 						+ "but granted devices are [{}]", requestingDeviceId, operation, resourceName,

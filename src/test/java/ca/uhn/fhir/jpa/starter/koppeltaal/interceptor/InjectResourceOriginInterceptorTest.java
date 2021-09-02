@@ -82,10 +82,11 @@ class InjectResourceOriginInterceptorTest {
 	public void shouldSetResourceOriginOnCreate() {
 
 		final ServletRequestDetails requestDetails = new ServletRequestDetails();
+		requestDetails.setRestOperationType(RestOperationTypeEnum.CREATE);
 		final Patient resource = new Patient();
 		requestDetails.setResource(resource);
 
-		interceptor.incomingRequestPreHandled(requestDetails, RestOperationTypeEnum.CREATE);
+		interceptor.incomingRequestPreHandled(requestDetails);
 
 		final List<Extension> resourceOriginExtension = resource.getExtensionsByUrl(RESOURCE_ORIGIN_SYSTEM);
 		final String referenceValue = ((Reference) resourceOriginExtension.get(0).getValue()).getResource().getIdElement().getValue();
@@ -97,22 +98,24 @@ class InjectResourceOriginInterceptorTest {
 	@Test
 	public void shouldForceResourceOriginSetOnUpdate() {
 		final ServletRequestDetails requestDetails = new ServletRequestDetails();
+		requestDetails.setRestOperationType(RestOperationTypeEnum.UPDATE);
 		final Patient resource = new Patient();
 		requestDetails.setResource(resource);
 
 		assertThrows(InvalidRequestException.class, ()  ->
-			interceptor.incomingRequestPreHandled(requestDetails, RestOperationTypeEnum.UPDATE)
+			interceptor.incomingRequestPreHandled(requestDetails)
 		);
 	}
 
 	@Test
 	public void shouldForceResourceOriginSetOnDelete() {
 		final ServletRequestDetails requestDetails = new ServletRequestDetails();
+		requestDetails.setRestOperationType(RestOperationTypeEnum.DELETE);
 		final Patient resource = new Patient();
 		requestDetails.setResource(resource);
 
 		assertThrows(InvalidRequestException.class, ()  ->
-			interceptor.incomingRequestPreHandled(requestDetails, RestOperationTypeEnum.DELETE)
+			interceptor.incomingRequestPreHandled(requestDetails)
 		);
 	}
 
@@ -120,6 +123,7 @@ class InjectResourceOriginInterceptorTest {
 	public void shouldNotBeAbleToChangeResourceOrigin() {
 
 		final ServletRequestDetails requestDetails = new ServletRequestDetails();
+		requestDetails.setRestOperationType(RestOperationTypeEnum.UPDATE);
 		requestDetails.setResourceName("Patient");
 		requestDetails.setId(new IdType("Patient/5"));
 		setPatientWithResourceOriginAsResource(requestDetails, "Device/567");
@@ -134,17 +138,18 @@ class InjectResourceOriginInterceptorTest {
 			.thenReturn(resourceFromDatabase);
 
 		assertThrows(ForbiddenOperationException.class, () ->
-			interceptor.incomingRequestPreHandled(requestDetails, RestOperationTypeEnum.UPDATE)
+			interceptor.incomingRequestPreHandled(requestDetails)
 		);
 	}
 
 	@Test
 	public void shouldRejectProvidedResourceOriginOnCreates() {
 		final ServletRequestDetails requestDetails = new ServletRequestDetails();
+		requestDetails.setRestOperationType(RestOperationTypeEnum.CREATE);
 		setPatientWithResourceOriginAsResource(requestDetails, "Device/123");
 
 		assertThrows(InvalidRequestException.class, ()  ->
-			interceptor.incomingRequestPreHandled(requestDetails, RestOperationTypeEnum.CREATE)
+			interceptor.incomingRequestPreHandled(requestDetails)
 		);
 
 	}
@@ -152,16 +157,18 @@ class InjectResourceOriginInterceptorTest {
 	@Test
 	public void shouldRejectNonDeviceExtensionValue() {
 		final ServletRequestDetails requestDetails = new ServletRequestDetails();
+		requestDetails.setRestOperationType(RestOperationTypeEnum.UPDATE);
 		setPatientWithResourceOriginAsResource(requestDetails, "Patient/123");
 
 		assertThrows(InvalidRequestException.class, () ->
-			interceptor.incomingRequestPreHandled(requestDetails, RestOperationTypeEnum.UPDATE)
+			interceptor.incomingRequestPreHandled(requestDetails)
 		);
 	}
 
 	@Test
 	public void shouldRejectIfDeviceNotFound() {
 		final ServletRequestDetails requestDetails = new ServletRequestDetails();
+		requestDetails.setRestOperationType(RestOperationTypeEnum.CREATE);
 		final Patient resource = new Patient();
 		requestDetails.setResource(resource);
 
@@ -169,7 +176,7 @@ class InjectResourceOriginInterceptorTest {
 			.thenReturn(Optional.empty());
 
 		assertThrows(InvalidRequestException.class, () ->
-			interceptor.incomingRequestPreHandled(requestDetails, RestOperationTypeEnum.CREATE)
+			interceptor.incomingRequestPreHandled(requestDetails)
 		);
 	}
 
