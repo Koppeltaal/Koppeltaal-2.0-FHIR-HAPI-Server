@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Not using the {@link AuthorizationInterceptor} as custom {@link org.hl7.fhir.CompartmentDefinition} objects are not allowed.
  */
-@Interceptor(order = Integer.MIN_VALUE + 1)
+@Interceptor
 public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInterceptor {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ResourceOriginAuthorizationInterceptor.class);
@@ -41,7 +41,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 		this.smartBackendServiceConfiguration = smartBackendServiceConfiguration;
 	}
 
-	@Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)
+	@Hook( value = Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED, order = -10)
 	public void authorizeRequest(RequestDetails requestDetails) {
 
 		final String resourceName = requestDetails.getResourceName();
@@ -107,11 +107,12 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 				// READ all will be handled by the ResourceOriginSearchNarrowingInterceptor
 				if(operation == CrudOperation.READ && resourceId == null) return;  //valid
 
-				resourceOriginDevice = getResourceOriginDevice(
-					operation == CrudOperation.CREATE ?  requestDetails.getResource() : existingResource
-				);
-
-				resourceOriginDeviceId = resourceOriginDevice.getIdElement().getIdPart();
+				if(operation == CrudOperation.CREATE) { //will be ensured by the InjectResourceOriginInterceptor
+					resourceOriginDeviceId = requestingDeviceId;
+				} else {
+					resourceOriginDevice = getResourceOriginDevice(existingResource);
+					resourceOriginDeviceId = resourceOriginDevice.getIdElement().getIdPart();
+				}
 
 				if(permission.getGrantedDeviceIds().contains(resourceOriginDeviceId)) return; //valid
 

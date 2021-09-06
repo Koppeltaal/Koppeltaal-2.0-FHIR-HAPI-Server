@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * <p>This can be used to determine if applications have a granted permission on entities
  * they originally created.</p>
  */
-@Interceptor(order = Integer.MIN_VALUE)
+@Interceptor(order = Integer.MAX_VALUE)
 public class InjectResourceOriginInterceptor {
 
 	private static final Logger LOG = LoggerFactory.getLogger(InjectResourceOriginInterceptor.class);
@@ -65,7 +65,7 @@ public class InjectResourceOriginInterceptor {
 		ensureSearchParameter();
 	}
 
-	@Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)
+	@Hook(Pointcut.SERVER_INCOMING_REQUEST_PRE_HANDLED)
 	public void incomingRequestPreHandled(RequestDetails requestDetails) {
 
 		final IBaseResource resource = requestDetails.getResource();
