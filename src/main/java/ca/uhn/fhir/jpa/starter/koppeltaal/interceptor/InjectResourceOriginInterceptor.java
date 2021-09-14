@@ -75,6 +75,7 @@ public class InjectResourceOriginInterceptor {
 
 		if(!isDomainResource) return;
 
+		//TODO: Verify PATCH request doesn't change the resource-origin
 		if(operation == UPDATE || operation == DELETE) {
 			ensureResourceOriginIsUnmodified(requestDetails);
 		}
@@ -108,6 +109,8 @@ public class InjectResourceOriginInterceptor {
 	}
 
 	private void ensureResourceOriginIsUnmodified(RequestDetails requestDetails) {
+
+		//PATCH?
 		final IBaseResource requestBodyResource = requestDetails.getResource();
 
 		final IIdType requestBodyResourceOriginDevice = getResourceOriginDeviceId((DomainResource) requestBodyResource, requestDetails);

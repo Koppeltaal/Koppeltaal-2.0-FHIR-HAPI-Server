@@ -3,7 +3,6 @@ package ca.uhn.fhir.jpa.starter.koppeltaal.service;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuthorizationDto;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.CrudOperation;
-import ca.uhn.fhir.jpa.starter.koppeltaal.dto.FhirResourceType;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.PermissionDto;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
@@ -94,6 +93,7 @@ public class SmartBackendServiceAuthorizationService {
 		switch(requestType) {
 			case GET: return CrudOperation.READ;
 			case POST: return CrudOperation.CREATE;
+			case PATCH: //fallthrough
 			case PUT: return CrudOperation.UPDATE;
 			case DELETE: return CrudOperation.DELETE;
 			default:
