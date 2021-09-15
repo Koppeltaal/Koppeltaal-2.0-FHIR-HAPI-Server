@@ -124,7 +124,7 @@ hapi:
           fhir_version: R4
     validation:
       requests_enabled: true
-      responses_enabled: true
+      responses_enabled: false
 #    binary_storage_enabled: true
     bulk_export_enabled: true
     subscription:
