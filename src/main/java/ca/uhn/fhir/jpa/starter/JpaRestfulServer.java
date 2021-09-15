@@ -42,9 +42,9 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 	protected void initialize() throws ServletException {
 		super.initialize();
 
-		final FhirContext fhirContext = getFhirContext();
-		fhirContext.setParserErrorHandler(new StrictErrorHandler());
-		setFhirContext(fhirContext);
+//		final FhirContext fhirContext = getFhirContext();
+//		fhirContext.setParserErrorHandler(new StrictErrorHandler());
+//		setFhirContext(fhirContext);
 
 		// Add your own customization here
 		if (fhirServerSecurityConfiguration.isEnabled()) {
