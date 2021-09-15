@@ -1,5 +1,6 @@
 package ca.uhn.fhir.jpa.starter;
 
+import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
@@ -9,6 +10,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.Oauth2UrisStatementInterce
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.ResourceOriginAuthorizationInterceptor;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.ResourceOriginSearchNarrowingInterceptor;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizationService;
+import ca.uhn.fhir.parser.StrictErrorHandler;
 import ca.uhn.fhir.rest.server.interceptor.CaptureResourceSourceFromHeaderInterceptor;
 import javax.servlet.ServletException;
 import org.hl7.fhir.r4.model.Device;
@@ -39,6 +41,10 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 	@Override
 	protected void initialize() throws ServletException {
 		super.initialize();
+
+		final FhirContext fhirContext = getFhirContext();
+		fhirContext.setParserErrorHandler(new StrictErrorHandler());
+		setFhirContext(fhirContext);
 
 		// Add your own customization here
 		if (fhirServerSecurityConfiguration.isEnabled()) {
