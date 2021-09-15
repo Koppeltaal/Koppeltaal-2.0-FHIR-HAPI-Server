@@ -122,9 +122,9 @@ hapi:
           server_address: "http://hapi.fhir.org/baseR4"
           refuse_to_fetch_third_party_urls: false
           fhir_version: R4
-#    validation:
-#      requests_enabled: true
-#      responses_enabled: true
+    validation:
+      requests_enabled: true
+      responses_enabled: true
 #    binary_storage_enabled: true
     bulk_export_enabled: true
     subscription:
@@ -161,11 +161,11 @@ hapi:
 fhir:
   server:
     security:
-      enabled: true
+      enabled: false
       issuer: "koppeltaal"
       audience: "fhir-server"
-      authorizationEndpoint: "http://127.0.0.1:5001/oauth2/authorize"
-      tokenEndpoint: "http://127.0.0.1:5001/oauth2/token"
+      authorizationEndpoint: "http://127.0.0.1:8083/oauth2/authorize"
+      tokenEndpoint: "http://127.0.0.1:8083/oauth2/token"
 
 smart:
   backend:
@@ -176,3 +176,8 @@ smart:
 
 server:
   forward-headers-strategy: framework
+
+logging:
+  level:
+    ca.uhn.fhir.jpa.search.builder.sql: TRACE
+    ca.uhn.fhir.rest.server.interceptor: TRACE
