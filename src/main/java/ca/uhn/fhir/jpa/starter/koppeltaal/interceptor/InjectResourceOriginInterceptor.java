@@ -2,7 +2,6 @@ package ca.uhn.fhir.jpa.starter.koppeltaal.interceptor;
 
 import static ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM;
 import static ca.uhn.fhir.rest.api.RestOperationTypeEnum.CREATE;
-import static ca.uhn.fhir.rest.api.RestOperationTypeEnum.DELETE;
 import static ca.uhn.fhir.rest.api.RestOperationTypeEnum.UPDATE;
 
 import ca.uhn.fhir.interceptor.api.Hook;
@@ -19,6 +18,7 @@ import ca.uhn.fhir.rest.api.server.IBundleProvider;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.param.UriParam;
 import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
+import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -76,8 +76,9 @@ public class InjectResourceOriginInterceptor {
 		if(!isDomainResource) return;
 
 		//TODO: Verify PATCH request doesn't change the resource-origin
-		if(operation == UPDATE || operation == DELETE) {
-			ensureResourceOriginIsUnmodified(requestDetails);
+
+		if(operation == UPDATE) {
+			ensureResourceOriginIsUnmodifiedOrEnsureResourceOrigin(requestDetails, (DomainResource) resource);
 		}
 
 		if(operation != CREATE) return;
@@ -108,11 +109,39 @@ public class InjectResourceOriginInterceptor {
 		domainResource.addExtension(resourceOriginExtension);
 	}
 
+	private void ensureResourceOriginIsUnmodifiedOrEnsureResourceOrigin(RequestDetails requestDetails, DomainResource frontendResource) {
+
+		final List<Extension> frontendResourceOriginExtension = frontendResource.getExtensionsByUrl(RESOURCE_ORIGIN_SYSTEM);
+
+		if(frontendResourceOriginExtension.isEmpty()) {
+			ensureResourceOrigin(requestDetails, frontendResource);
+		} else if(frontendResourceOriginExtension.size() == 1) {
+			ensureResourceOriginIsUnmodified(requestDetails);
+		} else {
+			throw new InvalidRequestException("Cannot provide more than one resource-origin extension");
+		}
+	}
+
+	private void ensureResourceOrigin(RequestDetails requestDetails, DomainResource resource) {
+		final IFhirResourceDao<?> resourceDao = daoRegistry.getResourceDao(requestDetails.getResourceName());
+		final IBaseResource existingResource = resourceDao.read(requestDetails.getId());
+
+		final List<Extension> extensionsByUrl = ((DomainResource) existingResource).getExtensionsByUrl(RESOURCE_ORIGIN_SYSTEM);
+
+		if(extensionsByUrl.size() != 1) {
+
+			throw new InternalErrorException(String.format(
+				"Cannot set the resource-origin extension in the Update as the resource-extension isn't "
+					+ "found on the persisted version [%s]", resource.getIdElement()));
+		} else {
+			resource.addExtension(extensionsByUrl.get(0));
+		}
+	}
+
 	private void ensureResourceOriginIsUnmodified(RequestDetails requestDetails) {
 
 		//PATCH?
 		final IBaseResource requestBodyResource = requestDetails.getResource();
-
 		final IIdType requestBodyResourceOriginDevice = getResourceOriginDeviceId((DomainResource) requestBodyResource, requestDetails);
 
 		final IFhirResourceDao<?> resourceDao = daoRegistry.getResourceDao(requestDetails.getResourceName());

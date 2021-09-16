@@ -96,31 +96,36 @@ class InjectResourceOriginInterceptorTest {
 	}
 
 	@Test
-	public void shouldForceResourceOriginSetOnUpdate() {
+	public void shouldEnsureResourceOriginSetOnUpdate() {
 		final ServletRequestDetails requestDetails = new ServletRequestDetails();
 		requestDetails.setRestOperationType(RestOperationTypeEnum.UPDATE);
+		requestDetails.setResourceName("Patient");
+		requestDetails.setId(new IdType("Patient", 234L));
 		final Patient resource = new Patient();
 		requestDetails.setResource(resource);
 
-		assertThrows(InvalidRequestException.class, ()  ->
-			interceptor.incomingRequestPreHandled(requestDetails)
-		);
+		IFhirResourceDao<Patient> resourceDao = mock(IFhirResourceDao.class);
+		when(daoRegistry.getResourceDao(anyString()))
+			.thenReturn(resourceDao);
+
+		final String resourceOriginDeviceIdFromDb = "Device/4342436";
+		final Patient resourceFromDatabase = createPatientWithResourceOrigin(resourceOriginDeviceIdFromDb);
+
+		when(resourceDao.read(any(IIdType.class)))
+			.thenReturn(resourceFromDatabase);
+
+		List<Extension> extensionsByUrl = resource.getExtensionsByUrl(RESOURCE_ORIGIN_SYSTEM);
+		assertEquals(0, extensionsByUrl.size(), "Should have no resource-origin extension before execution");
+
+		interceptor.incomingRequestPreHandled(requestDetails);
+
+		extensionsByUrl = resource.getExtensionsByUrl(RESOURCE_ORIGIN_SYSTEM);
+		assertEquals(1, extensionsByUrl.size(), "Should have copied the resource-origin extension");
+		assertEquals(resourceOriginDeviceIdFromDb, ((Reference) extensionsByUrl.get(0).getValue()).getReference());
 	}
 
 	@Test
-	public void shouldForceResourceOriginSetOnDelete() {
-		final ServletRequestDetails requestDetails = new ServletRequestDetails();
-		requestDetails.setRestOperationType(RestOperationTypeEnum.DELETE);
-		final Patient resource = new Patient();
-		requestDetails.setResource(resource);
-
-		assertThrows(InvalidRequestException.class, ()  ->
-			interceptor.incomingRequestPreHandled(requestDetails)
-		);
-	}
-
-	@Test
-	public void shouldNotBeAbleToChangeResourceOrigin() {
+	public void shouldNotBeAbleToChangeResourceOriginIfProvided() {
 
 		final ServletRequestDetails requestDetails = new ServletRequestDetails();
 		requestDetails.setRestOperationType(RestOperationTypeEnum.UPDATE);
@@ -138,6 +143,27 @@ class InjectResourceOriginInterceptorTest {
 			.thenReturn(resourceFromDatabase);
 
 		assertThrows(ForbiddenOperationException.class, () ->
+			interceptor.incomingRequestPreHandled(requestDetails)
+		);
+	}
+
+	@Test
+	public void shouldNotBeAbleToProvideMultipleResourceOriginExtensions() {
+
+		final ServletRequestDetails requestDetails = new ServletRequestDetails();
+		requestDetails.setRestOperationType(RestOperationTypeEnum.UPDATE);
+
+		final Patient patient = createPatientWithResourceOrigin("Device/1234");
+		final Extension resourceOriginExtension = new Extension();
+		resourceOriginExtension.setUrl(RESOURCE_ORIGIN_SYSTEM);
+		final Reference deviceReference = new Reference("Device/5678");
+		deviceReference.setType(ResourceType.Device.name());
+		resourceOriginExtension.setValue(deviceReference);
+
+		patient.addExtension(resourceOriginExtension);
+		requestDetails.setResource(patient);
+
+		assertThrows(InvalidRequestException.class, () ->
 			interceptor.incomingRequestPreHandled(requestDetails)
 		);
 	}
