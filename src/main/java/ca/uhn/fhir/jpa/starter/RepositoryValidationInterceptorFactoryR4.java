@@ -10,14 +10,13 @@ import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
 import ca.uhn.fhir.jpa.starter.annotations.OnR4Condition;
 import ca.uhn.fhir.rest.api.server.IBundleProvider;
 import ca.uhn.fhir.rest.param.TokenParam;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.hl7.fhir.r4.model.StructureDefinition;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
-
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * This class can be customized to enable the {@link ca.uhn.fhir.jpa.interceptor.validation.RepositoryValidatingInterceptor}
@@ -67,8 +66,8 @@ public class RepositoryValidationInterceptorFactoryR4 implements IRepositoryVali
 		// Customize the ruleBuilder here to have the rules you want! We will give a simple example
 		// of enabling validation for all Patient resources
 		repositoryValidatingRuleBuilder
-			.forResourcesOfType("Patient")
-				.requireAtLeastProfile("http://example.org/fhir/StructureDefinition/KT2Patient")
+			.forResourcesOfType("Task")
+				.requireAtLeastProfile("http://example.org/fhir/StructureDefinition/KT2Task")
 			.and()
 				.requireValidationToDeclaredProfiles();
 
