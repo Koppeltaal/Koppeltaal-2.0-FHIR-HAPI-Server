@@ -22,7 +22,7 @@ public class FhirServerSecurityConfiguration {
 	String tokenEndpoint;
 	String audience;
 	boolean enabled = true;
-	long tokenValidationLeeway;
+	long tokenValidationLeeway = 60;
 
 	public String getAudience() {
 		return audience;
