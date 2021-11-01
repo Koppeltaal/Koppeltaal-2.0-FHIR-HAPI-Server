@@ -67,7 +67,7 @@ public class RepositoryValidationInterceptorFactoryR4 implements IRepositoryVali
 		// of enabling validation for all Patient resources
 		repositoryValidatingRuleBuilder
 			.forResourcesOfType("Task")
-				.requireAtLeastProfile("http://example.org/fhir/StructureDefinition/KT2Task")
+				.requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2Task")
 			.and()
 				.requireValidationToDeclaredProfiles();
 
