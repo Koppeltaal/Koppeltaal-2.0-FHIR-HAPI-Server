@@ -23,7 +23,6 @@ import ca.uhn.fhir.jpa.provider.SubscriptionTriggeringProvider;
 import ca.uhn.fhir.jpa.provider.TerminologyUploaderProvider;
 import ca.uhn.fhir.jpa.provider.dstu3.JpaConformanceProviderDstu3;
 import ca.uhn.fhir.jpa.search.DatabaseBackedPagingProvider;
-import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.JwtSecurityInterceptor;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.Oauth2AccessTokenService;
 import ca.uhn.fhir.jpa.subscription.util.SubscriptionDebugLogInterceptor;
 import ca.uhn.fhir.mdm.provider.MdmProviderLoader;
@@ -58,6 +57,7 @@ import java.util.stream.Collectors;
 import javax.servlet.ServletException;
 import org.hl7.fhir.r4.model.Bundle.BundleType;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.cors.CorsConfiguration;
@@ -112,6 +112,9 @@ public class BaseJpaRestfulServer extends RestfulServer {
 
   @Autowired
   private IValidationSupport myValidationSupport;
+
+  @Value("${hapi.fhir.validation.buildUsingStoredStructureDefinitions:true}")
+  private boolean buildUsingStoredStructureDefinitions;
 
   public BaseJpaRestfulServer() {
   }
@@ -394,7 +397,7 @@ public class BaseJpaRestfulServer extends RestfulServer {
       }
     }
 
-    if(factory != null) {
+    if(factory != null && buildUsingStoredStructureDefinitions) {
 		 interceptorService.registerInterceptor(factory.buildUsingStoredStructureDefinitions());
 	 }
 

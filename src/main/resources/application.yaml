@@ -33,6 +33,7 @@ spring:
   batch:
     job:
       enabled: false
+
 hapi:
   fhir:
     ### This is the FHIR version. Choose between, DSTU2, DSTU3, R4 or R5
@@ -125,6 +126,8 @@ hapi:
     validation:
       requests_enabled: true
       responses_enabled: false
+      # custom addition to not load SDs and require them for the specified resource
+      buildUsingStoredStructureDefinitions: false
 #    binary_storage_enabled: true
     bulk_export_enabled: true
     subscription:
