@@ -62,6 +62,6 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 		registerInterceptor(new CaptureResourceSourceFromHeaderInterceptor(getFhirContext()));
 
 		// Register our custom structured definitions
-//		interceptorService.registerInterceptor(factory.build());
+		interceptorService.registerInterceptor(factory.build());
 	}
 }
