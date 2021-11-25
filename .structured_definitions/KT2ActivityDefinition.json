@@ -1,0 +1,105 @@
+{
+  "resourceType": "StructureDefinition",
+  "url": "http://koppeltaal.nl/fhir/StructureDefinition/KT2ActivityDefinition",
+  "version": "0.0.3",
+  "name": "KT2_ActivityDefinition",
+  "status": "draft",
+  "date": "2021-11-03T13:13:42.3375768+00:00",
+  "publisher": "VZVZ",
+  "contact": [
+    {
+      "name": "Bernard Stibbe"
+    }
+  ],
+  "description": "The (FHIR) ActivityDefinition (resource) describes an eHealth activity that is available for assignment to a patient. When assigning an eHealth activity to a patient, an eHealth Task is created, in which sub-activities are included as contained resources that refer to the main task via Task.partOf.",
+  "copyright": "VZVZ",
+  "fhirVersion": "4.0.1",
+  "mapping": [
+    {
+      "identity": "workflow",
+      "uri": "http://hl7.org/fhir/workflow",
+      "name": "Workflow Pattern"
+    },
+    {
+      "identity": "rim",
+      "uri": "http://hl7.org/v3",
+      "name": "RIM Mapping"
+    },
+    {
+      "identity": "w5",
+      "uri": "http://hl7.org/fhir/fivews",
+      "name": "FiveWs Pattern Mapping"
+    },
+    {
+      "identity": "objimpl",
+      "uri": "http://hl7.org/fhir/object-implementation",
+      "name": "Object Implementation Information"
+    }
+  ],
+  "kind": "resource",
+  "abstract": false,
+  "type": "ActivityDefinition",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/ActivityDefinition",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "ActivityDefinition",
+        "path": "ActivityDefinition",
+        "short": "Beschrijving van een eHealth activiteit"
+      },
+      {
+        "id": "ActivityDefinition.extension",
+        "path": "ActivityDefinition.extension",
+        "slicing": {
+          "discriminator": [
+            {
+              "type": "value",
+              "path": "url"
+            }
+          ],
+          "rules": "open"
+        },
+        "min": 0
+      },
+      {
+        "id": "ActivityDefinition.extension:publisherIdentifier",
+        "path": "ActivityDefinition.extension",
+        "sliceName": "publisherIdentifier",
+        "min": 0,
+        "type": [
+          {
+            "code": "Extension",
+            "profile": [
+              "http://koppeltaal.nl/fhir/StructureDefinition/KT2PublisherIdentifier"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "ActivityDefinition.extension:endpoint",
+        "path": "ActivityDefinition.extension",
+        "sliceName": "endpoint",
+        "min": 0,
+        "type": [
+          {
+            "code": "Extension",
+            "profile": [
+              "http://koppeltaal.nl/fhir/StructureDefinition/KT2EndpointExtension"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "ActivityDefinition.url",
+        "path": "ActivityDefinition.url",
+        "min": 1
+      },
+      {
+        "id": "ActivityDefinition.title",
+        "path": "ActivityDefinition.title",
+        "min": 1
+      }
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "resourceType": "StructureDefinition",
+  "url": "http://koppeltaal.nl/fhir/StructureDefinition/KT2Endpoint",
+  "version": "0.0.3",
+  "name": "KT2_Endpoint",
+  "status": "draft",
+  "date": "2021-11-03T13:23:02.7669683+00:00",
+  "publisher": "VZVZ",
+  "contact": [
+    {
+      "name": "Bernard Stibbe"
+    }
+  ],
+  "description": "The (FHIR) Endpoint (resource) is a representation of a technical contact point of an application that offers one or more eHealth services for a healthcare provider.",
+  "copyright": "VZVZ",
+  "fhirVersion": "4.0.1",
+  "mapping": [
+    {
+      "identity": "rim",
+      "uri": "http://hl7.org/v3",
+      "name": "RIM Mapping"
+    },
+    {
+      "identity": "w5",
+      "uri": "http://hl7.org/fhir/fivews",
+      "name": "FiveWs Pattern Mapping"
+    }
+  ],
+  "kind": "resource",
+  "abstract": false,
+  "type": "Endpoint",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Endpoint",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Endpoint.managingOrganization",
+        "path": "Endpoint.managingOrganization",
+        "type": [
+          {
+            "code": "Reference",
+            "targetProfile": [
+              "http://koppeltaal.nl/fhir/StructureDefinition/KT2Organization"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
