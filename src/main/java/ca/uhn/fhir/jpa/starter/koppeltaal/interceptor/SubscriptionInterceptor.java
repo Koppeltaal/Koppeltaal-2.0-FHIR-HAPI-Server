@@ -51,47 +51,51 @@ public class SubscriptionInterceptor {
 	@Hook(Pointcut.SUBSCRIPTION_BEFORE_DELIVERY)
 	public boolean subscriptionBeforeDelivery(ResourceDeliveryMessage message, CanonicalSubscription canonicalSubscription) {
 
-		final IBaseResource payload = message.getPayload(context);
+		try {
+			final IBaseResource payload = message.getPayload(context);
 
-		final IIdType canonicalSubscriptionIdElement = canonicalSubscription.getIdElement(context);
-		final Subscription subscription = subscriptionDao.read(canonicalSubscriptionIdElement);
+			final IIdType canonicalSubscriptionIdElement = canonicalSubscription.getIdElement(context);
+			final Subscription subscription = subscriptionDao.read(canonicalSubscriptionIdElement);
 
-		final Optional<IIdType> optionalSubscriptionDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(
-			subscription);
+			final Optional<IIdType> optionalSubscriptionDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(
+				subscription);
 
-		if(!optionalSubscriptionDeviceId.isPresent()) {
-			LOG.warn("No resource-origin found on canonicalSubscriptionIdElement [Subscription/{}]",
-				canonicalSubscriptionIdElement.getIdPart());
-			return true; //TODO: Decide whether we want this to break
-		}
-
-		final IIdType subscriptionDeviceId = optionalSubscriptionDeviceId.get();
-		final List<PermissionDto> permissions = smartBackendServiceAuthorizationService.getPermissions(
-			subscriptionDeviceId.getIdPart());
-
-		if(payload instanceof DomainResource) {
-			final Optional<IIdType> payloadOptionalDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(
-				payload);
-
-			if(!payloadOptionalDeviceId.isPresent()) {
+			if(!optionalSubscriptionDeviceId.isPresent()) {
+				LOG.warn("No resource-origin found on canonicalSubscriptionIdElement [Subscription/{}]",
+					canonicalSubscriptionIdElement.getIdPart());
 				return true; //TODO: Decide whether we want this to break
 			}
 
-			final IIdType payloadDeviceId = payloadOptionalDeviceId.get();
-			boolean isResourceOwner = StringUtils.equals(subscriptionDeviceId.getIdPart(), payloadDeviceId.getIdPart());
+			final IIdType subscriptionDeviceId = optionalSubscriptionDeviceId.get();
+			final List<PermissionDto> permissions = smartBackendServiceAuthorizationService.getPermissions(
+				subscriptionDeviceId.getIdPart());
 
-			final ResourceType resourceType = ((DomainResource) payload).getResourceType();
+			if(payload instanceof DomainResource) {
+				final Optional<IIdType> payloadOptionalDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(
+					payload);
 
-			return permissions.stream()
-				.anyMatch(permission ->
-					permission.getResourceType() == resourceType &&
-					permission.getOperation() == CrudOperation.READ &&
-					(
-							permission.getScope() == PermissionScope.ALL ||
-							permission.getScope() == PermissionScope.OWN && isResourceOwner ||
-							permission.getScope() == PermissionScope.GRANTED && permission.getGrantedDeviceIds().contains(payloadDeviceId.getIdPart())
-					)
-				);
+				if(!payloadOptionalDeviceId.isPresent()) {
+					return true; //TODO: Decide whether we want this to break
+				}
+
+				final IIdType payloadDeviceId = payloadOptionalDeviceId.get();
+				boolean isResourceOwner = StringUtils.equals(subscriptionDeviceId.getIdPart(), payloadDeviceId.getIdPart());
+
+				final ResourceType resourceType = ((DomainResource) payload).getResourceType();
+
+				return permissions.stream()
+					.anyMatch(permission ->
+						permission.getResourceType() == resourceType &&
+						permission.getOperation() == CrudOperation.READ &&
+						(
+								permission.getScope() == PermissionScope.ALL ||
+								permission.getScope() == PermissionScope.OWN && isResourceOwner ||
+								permission.getScope() == PermissionScope.GRANTED && permission.getGrantedDeviceIds().contains(payloadDeviceId.getIdPart())
+						)
+					);
+			}
+		} catch (Exception e) {
+			LOG.error("Failed to execute Notification Narrowing. Non-breaking, might have notified for inaccessible resources!\n\nMessage: {}", message);
 		}
 
 		return true; //TODO: Decide whether we want this to break
