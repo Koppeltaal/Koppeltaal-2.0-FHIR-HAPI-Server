@@ -60,7 +60,7 @@ public class SmartBackendServiceAuthorizationService {
 			.findAny();
 	}
 
-	@Scheduled(fixedDelay = 1000 * 30)
+	@Scheduled(fixedDelay = 1000 * 5)
 	public void refreshAuthorizations() {
 
 		try  {
