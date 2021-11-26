@@ -49,7 +49,7 @@ public class SubscriptionInterceptor {
 	}
 
 	@Hook(Pointcut.SUBSCRIPTION_BEFORE_DELIVERY)
-	public boolean incomingRequestPreHandled(ResourceDeliveryMessage message, CanonicalSubscription canonicalSubscription) {
+	public boolean subscriptionBeforeDelivery(ResourceDeliveryMessage message, CanonicalSubscription canonicalSubscription) {
 
 		final IBaseResource payload = message.getPayload(context);
 
@@ -89,7 +89,7 @@ public class SubscriptionInterceptor {
 					(
 							permission.getScope() == PermissionScope.ALL ||
 							permission.getScope() == PermissionScope.OWN && isResourceOwner ||
-							permission.getScope() == PermissionScope.GRANTED && permission.getGrantedDeviceIds().contains(subscriptionDeviceId.getIdPart())
+							permission.getScope() == PermissionScope.GRANTED && permission.getGrantedDeviceIds().contains(payloadDeviceId.getIdPart())
 					)
 				);
 		}
