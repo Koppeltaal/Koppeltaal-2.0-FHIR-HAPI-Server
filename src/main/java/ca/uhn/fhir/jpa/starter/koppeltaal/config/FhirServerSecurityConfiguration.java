@@ -18,6 +18,7 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "fhir.server.security")
 public class FhirServerSecurityConfiguration {
 
+	String introspectEndpoint;
 	String authorizationEndpoint;
 	String tokenEndpoint;
 	String audience;
@@ -38,6 +39,14 @@ public class FhirServerSecurityConfiguration {
 
 	public void setAuthorizationEndpoint(String authorizationEndpoint) {
 		this.authorizationEndpoint = authorizationEndpoint;
+	}
+
+	public String getIntrospectEndpoint() {
+		return introspectEndpoint;
+	}
+
+	public void setIntrospectEndpoint(String introspectEndpoint) {
+		this.introspectEndpoint = introspectEndpoint;
 	}
 
 	public String getTokenEndpoint() {

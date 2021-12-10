@@ -65,6 +65,7 @@ public class Oauth2UrisStatementInterceptorForR4 {
 
 				setSecurityUrlExtension(extension, "token", fhirServerSecurityConfiguration.getTokenEndpoint());
 				setSecurityUrlExtension(extension, "authorize", fhirServerSecurityConfiguration.getAuthorizationEndpoint());
+				setSecurityUrlExtension(extension, "introspect", fhirServerSecurityConfiguration.getIntrospectEndpoint());
 
 			}
 
