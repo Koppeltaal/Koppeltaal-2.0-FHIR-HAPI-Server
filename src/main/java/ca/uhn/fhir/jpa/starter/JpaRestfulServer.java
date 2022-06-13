@@ -3,12 +3,7 @@ package ca.uhn.fhir.jpa.starter;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
-import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.InjectResourceOriginInterceptor;
-import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.JwtSecurityInterceptor;
-import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.Oauth2UrisStatementInterceptorForR4;
-import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.ResourceOriginAuthorizationInterceptor;
-import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.ResourceOriginSearchNarrowingInterceptor;
-import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.SubscriptionInterceptor;
+import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.*;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizationService;
 import ca.uhn.fhir.rest.server.interceptor.CaptureResourceSourceFromHeaderInterceptor;
 import javax.servlet.ServletException;
@@ -58,6 +53,7 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 			interceptorService.registerInterceptor(new SubscriptionInterceptor(daoRegistry, deviceDao, smartBackendServiceAuthorizationService));
 		}
 
+		registerInterceptor(new EnforceIfMatchHeaderInterceptor());
 		registerInterceptor(new Oauth2UrisStatementInterceptorForR4(fhirServerSecurityConfiguration));
 
 		//  Allow users to set the meta.source with the "X-Request-Source" header
