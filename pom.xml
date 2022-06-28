@@ -341,6 +341,11 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+        	<groupId>ca.uhn.hapi.fhir</groupId>
+        	<artifactId>hapi-fhir-server-openapi</artifactId>
+        	<version>5.4.1</version>
+        </dependency>
 
     </dependencies>
   <dependencyManagement>
