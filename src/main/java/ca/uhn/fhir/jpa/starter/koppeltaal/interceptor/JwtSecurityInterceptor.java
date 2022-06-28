@@ -58,6 +58,9 @@ public class JwtSecurityInterceptor {
 	}
 
 	private boolean isFhirApiRequest(String servletPath) {
-		return StringUtils.startsWith(servletPath, "/fhir") && !StringUtils.startsWith(servletPath, "/fhir/metadata");
+		return StringUtils.startsWith(servletPath, "/fhir")
+			&& !StringUtils.startsWith(servletPath, "/fhir/metadata")
+			&& !StringUtils.startsWith(servletPath, "/fhir/swagger-ui")
+			&& !StringUtils.startsWith(servletPath, "/fhir/api-docs");
 	}
 }
