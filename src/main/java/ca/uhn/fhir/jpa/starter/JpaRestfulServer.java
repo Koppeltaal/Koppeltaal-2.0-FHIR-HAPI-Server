@@ -64,6 +64,8 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 		registerInterceptor(factory.build());
 
 		// Register the OpenApi Interceptor
-		registerInterceptor(new OpenApiInterceptor());
+		if (openApiConfiguration.isEnabled()) {
+			registerInterceptor(new OpenApiInterceptor());
+		}
 	}
 }

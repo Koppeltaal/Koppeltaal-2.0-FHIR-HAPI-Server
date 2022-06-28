@@ -163,6 +163,8 @@ hapi:
 
 fhir:
   server:
+    openapi:
+      enabled: false
     security:
       enabled: false
       issuer: "koppeltaal"
