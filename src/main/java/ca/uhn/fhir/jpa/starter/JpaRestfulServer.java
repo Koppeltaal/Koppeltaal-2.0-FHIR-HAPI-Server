@@ -5,6 +5,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.*;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizationService;
+import ca.uhn.fhir.rest.openapi.OpenApiInterceptor;
 import ca.uhn.fhir.rest.server.interceptor.CaptureResourceSourceFromHeaderInterceptor;
 import javax.servlet.ServletException;
 import org.hl7.fhir.r4.model.Device;
@@ -60,6 +61,9 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 		registerInterceptor(new CaptureResourceSourceFromHeaderInterceptor(getFhirContext()));
 
 		// Register our custom structured definitions
-		interceptorService.registerInterceptor(factory.build());
+		registerInterceptor(factory.build());
+
+		// Register the OpenApi Interceptor
+		registerInterceptor(new OpenApiInterceptor());
 	}
 }
