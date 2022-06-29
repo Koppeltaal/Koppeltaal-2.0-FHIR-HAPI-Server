@@ -172,6 +172,13 @@ fhir:
       introspectEndpoint: "http://127.0.0.1:8083/oauth2/introspect"
       authorizationEndpoint: "http://127.0.0.1:8083/oauth2/authorize"
       tokenEndpoint: "http://127.0.0.1:8083/oauth2/token"
+    auditlog:
+      enabled: true
+      site: "Koppeltaal domein VZVZ"
+      observer:
+        identifier:
+          system: "koppeltaal-fhir"
+          value: "koppeltaal-server-001"
 
 smart:
   backend:
