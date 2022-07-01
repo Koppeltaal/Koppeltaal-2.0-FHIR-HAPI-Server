@@ -20,7 +20,8 @@
     <artifactId>hapi-fhir-jpaserver-starter</artifactId>
 
     <properties>
-        <spring_boot_version>2.5.12</spring_boot_version>
+        <spring_boot_version>2.5.14</spring_boot_version>
+        <spring_version>5.3.20</spring_version>
         <java.version>8</java.version>
     </properties>
 
@@ -339,7 +340,7 @@
         <dependency>
         	<groupId>ca.uhn.hapi.fhir</groupId>
         	<artifactId>hapi-fhir-server-openapi</artifactId>
-        	<version>5.4.1</version>
+        	<version>${project.version}</version>
         </dependency>
 
     </dependencies>
