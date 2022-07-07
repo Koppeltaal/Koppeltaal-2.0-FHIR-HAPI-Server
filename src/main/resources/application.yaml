@@ -172,6 +172,7 @@ fhir:
       introspectEndpoint: "http://127.0.0.1:8083/oauth2/introspect"
       authorizationEndpoint: "http://127.0.0.1:8083/oauth2/authorize"
       tokenEndpoint: "http://127.0.0.1:8083/oauth2/token"
+      jwksEndpoint: "http://127.0.0.1:8083/.well-known/jwks.json"
     auditlog:
       enabled: true
       site: "Koppeltaal domein VZVZ"

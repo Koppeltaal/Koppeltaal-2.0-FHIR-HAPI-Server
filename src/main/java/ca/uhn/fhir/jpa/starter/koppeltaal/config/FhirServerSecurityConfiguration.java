@@ -21,6 +21,7 @@ public class FhirServerSecurityConfiguration {
 	String introspectEndpoint;
 	String authorizationEndpoint;
 	String tokenEndpoint;
+  String jwksEndpoint;
 	String audience;
 	boolean enabled = true;
 	long tokenValidationLeeway = 60;
@@ -48,6 +49,14 @@ public class FhirServerSecurityConfiguration {
 	public void setIntrospectEndpoint(String introspectEndpoint) {
 		this.introspectEndpoint = introspectEndpoint;
 	}
+
+  public String getJwksEndpoint() {
+    return jwksEndpoint;
+  }
+
+  public void setJwksEndpoint(String jwksEndpoint) {
+    this.jwksEndpoint = jwksEndpoint;
+  }
 
 	public String getTokenEndpoint() {
 		return tokenEndpoint;
