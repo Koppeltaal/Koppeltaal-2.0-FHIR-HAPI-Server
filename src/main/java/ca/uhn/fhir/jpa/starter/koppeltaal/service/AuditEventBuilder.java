@@ -41,6 +41,8 @@ public class AuditEventBuilder {
 	public static final Coding CODING_DESTINATION_ROLE_ID = new Coding("http://dicom.nema.org/resources/ontology/DCM", "110152", "Destination Role ID");
 	public static final Coding CODING_SOURCE_ROLE_ID = new Coding("http://dicom.nema.org/resources/ontology/DCM", "110153", "Source Role ID");
 
+  public final static String META_PROFILE_URL = "http://koppeltaal.nl/fhir/StructureDefinition/KT2AuditEvent";
+
 	private final FhirServerAuditLogConfiguration fhirServerAuditLogConfiguration;
 	private final IFhirResourceDao<Device> deviceDao;
 
@@ -61,7 +63,7 @@ public class AuditEventBuilder {
 
 	AuditEvent build(AuditEventDto dto) {
 		AuditEvent auditEvent = new AuditEvent();
-		AuditEventDto.EventType eventType = dto.getEventType();
+    AuditEventDto.EventType eventType = dto.getEventType();
 		buildEventType(auditEvent, eventType);
 		List<Resource> resources = dto.getResources();
 		for (Resource resource : resources) {
@@ -84,10 +86,17 @@ public class AuditEventBuilder {
 		} else {
 			auditEvent.setAgent(singletonList(buildAgent(self)));
 		}
-		return auditEvent;
+    setMetaWithProfileUrl(auditEvent);
+    return auditEvent;
 	}
 
-	private AuditEvent.AuditEventAgentComponent buildAgent(Device device) {
+  private void setMetaWithProfileUrl(AuditEvent auditEvent) {
+    Meta profileMeta = new Meta();
+    profileMeta.setProfile(Collections.singletonList(new CanonicalType(META_PROFILE_URL)));
+    auditEvent.setMeta(profileMeta);
+  }
+
+  private AuditEvent.AuditEventAgentComponent buildAgent(Device device) {
 		AuditEvent.AuditEventAgentComponent rv = new AuditEvent.AuditEventAgentComponent();
 		rv.setWho(newReference(device));
 		rv.setType(new CodeableConcept(CODING_APPLICATION));
@@ -101,11 +110,12 @@ public class AuditEventBuilder {
 		Reference reference = newReference(entity);
 		component.setWhat(reference);
 		component.setType(new Coding("http://hl7.org/fhir/resource-types", reference.getType(), reference.getDisplay()));
-		component.setName(reference.getType());
-		String query = auditEvent.getQuery();
+    String query = auditEvent.getQuery();
 		if (StringUtils.isNotEmpty(query)) {
 			component.setQuery(query.getBytes(StandardCharsets.UTF_8));
-		}
+		} else {
+		  component.setName(reference.getType()); //it's not allowed to both set the name and query http://hl7.org/fhir/R4B/auditevent-definitions.html#AuditEvent.entity.name
+    }
 		return component;
 	}
 
