@@ -9,6 +9,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventService;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.api.server.ResponseDetails;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseOperationOutcome;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -33,16 +34,6 @@ public class AuditEventInterceptor extends AbstactAuditEventInterceptor {
     super(auditEventService, daoRegistry);
 
   }
-
-//	@Hook(Pointcut.SERVER_INCOMING_REQUEST_PRE_HANDLED)
-//	public void start(ServletRequestDetails requestDetails) {
-//		AuditEventDto dto = new AuditEventDto();
-//		if (setRequestType(requestDetails, dto)) {
-//			setInteraction(requestDetails, dto);
-//			setDevice(requestDetails, dto);
-//			auditEventService.submitAuditEvent(dto);
-//		}
-//	}
 
   @Hook(Pointcut.STORAGE_PRECOMMIT_RESOURCE_CREATED)
   public void creating(ServletRequestDetails requestDetails, IBaseResource resource) {
@@ -73,7 +64,7 @@ public class AuditEventInterceptor extends AbstactAuditEventInterceptor {
     }
   }
 
-  @Hook(Pointcut.SERVER_INCOMING_REQUEST_PRE_HANDLED)
+  @Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)
   public void start(ServletRequestDetails requestDetails) {
 
     // traceId > transaction id
@@ -81,13 +72,11 @@ public class AuditEventInterceptor extends AbstactAuditEventInterceptor {
     // parentSpanId > userdata['parentSpanId']
 
     HttpServletRequest servletRequest = requestDetails.getServletRequest();
-    String traceId = servletRequest.getHeader("X-B3-TraceId");
-    String spanId = servletRequest.getHeader("X-B3-SpanId");
-    String parentSpanId = servletRequest.getHeader("X-B3-ParentSpanId");
+    String traceId = servletRequest.getHeader("X-Trace-Id");
 
     // Set the requestId if not set. It is the spanId of this request.
     if (StringUtils.isBlank(requestDetails.getRequestId())) {
-      requestDetails.setRequestId(UUID.randomUUID().toString());
+      requestDetails.setRequestId(RandomStringUtils.randomAlphanumeric(16));
     }
 
     // Set the traceId, generate one if none exists.
@@ -97,12 +86,7 @@ public class AuditEventInterceptor extends AbstactAuditEventInterceptor {
       requestDetails.setTransactionGuid(UUID.randomUUID().toString());
     }
 
-    // Move the incoming span id to the parentSpanId
-    requestDetails.getUserData().put("parentSpanId", spanId);
-
-    LOG.info(String.format("Incoming request, traceId='%s', spanId='%s', parentSpanId='%s'", requestDetails.getTransactionGuid(), requestDetails.getRequestId(), parentSpanId));
-
-
+    LOG.info(String.format("Incoming request, traceId='%s', spanId='%s', parentSpanId='%s'", requestDetails.getTransactionGuid(), requestDetails.getRequestId(), requestDetails.getUserData().get("parentSpanId")));
   }
 
   @Hook(Pointcut.STORAGE_PRECOMMIT_RESOURCE_UPDATED)

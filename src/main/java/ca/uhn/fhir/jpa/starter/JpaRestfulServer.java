@@ -28,6 +28,10 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 	private SmartBackendServiceConfiguration smartBackendServiceConfiguration;
 	@Autowired
 	private AuditEventInterceptor auditEventInterceptor;
+  @Autowired
+  private InjectCorrelationIdInterceptor injectCorrelationIdInterceptor;
+	@Autowired
+  private InjectTraceIdInterceptor injectTraceIdInterceptor;
 	@Autowired
 	private AuditEventSubscriptionInterceptor auditEventSubscriptionInterceptor;
 
@@ -70,6 +74,8 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 
 		if (fhirServerAuditLogConfiguration.isEnabled()) {
 			registerInterceptor(auditEventInterceptor);
+      registerInterceptor(injectCorrelationIdInterceptor);
+      registerInterceptor(injectTraceIdInterceptor);
 			// Yes, this is ANOTHER interceptor.
 			interceptorService.registerInterceptor(auditEventSubscriptionInterceptor);
 			registerInterceptor(auditEventIntergityInterceptor);
