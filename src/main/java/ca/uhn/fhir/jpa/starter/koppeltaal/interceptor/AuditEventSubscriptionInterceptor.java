@@ -37,6 +37,7 @@ public class AuditEventSubscriptionInterceptor extends AbstactAuditEventIntercep
 	@Hook(value = Pointcut.SUBSCRIPTION_BEFORE_DELIVERY, order = Integer.MAX_VALUE)
 	public void outgoingSubscription(CanonicalSubscription canonicalSubscription, ResourceDeliveryMessage message) {
 		String traceId = message.getTransactionId();
+
     String requestId = RandomStringUtils.randomAlphanumeric(16); //async, so always generate a new requestId
 
     //TODO: Ideally, the request-id provided by the request that triggered this subscription is passed down as a X-Correlation-Id header. However, the requestId seems inaccessible (see ca.uhn.fhir.rest.server.messaging.BaseResourceModifiedMessage.BaseResourceModifiedMessage(ca.uhn.fhir.context.FhirContext, org.hl7.fhir.instance.model.api.IBaseResource, ca.uhn.fhir.rest.server.messaging.BaseResourceMessage.OperationTypeEnum, ca.uhn.fhir.rest.api.server.RequestDetails)
@@ -49,7 +50,7 @@ public class AuditEventSubscriptionInterceptor extends AbstactAuditEventIntercep
 			AuditEventDto dto = new AuditEventDto();
 			dto.setEventType(AuditEventDto.EventType.SendNotification);
 			dto.setTraceId(traceId);
-			dto.setSpanId(requestId);
+			dto.setRequestId(requestId);
 			dto.setOutcome("0");
 			dto.addResource(resource);
 			dto.setQuery(canonicalSubscription.getCriteriaString());

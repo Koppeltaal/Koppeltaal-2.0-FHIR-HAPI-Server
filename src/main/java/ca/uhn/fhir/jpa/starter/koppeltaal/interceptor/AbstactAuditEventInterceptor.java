@@ -61,9 +61,9 @@ public abstract class AbstactAuditEventInterceptor {
   }
 
   protected void setInteraction(ServletRequestDetails requestDetails, AuditEventDto dto) {
-    dto.setSpanId(requestDetails.getRequestId());
+    dto.setRequestId(requestDetails.getRequestId());
     dto.setTraceId(requestDetails.getTransactionGuid());
-    dto.setParentSpanId((String) requestDetails.getUserData().get("parentSpanId"));
+    dto.setCorrelationId((String) requestDetails.getUserData().get("correlationId"));
   }
 
   protected boolean setRequestType(ServletRequestDetails requestDetails, AuditEventDto dto) {

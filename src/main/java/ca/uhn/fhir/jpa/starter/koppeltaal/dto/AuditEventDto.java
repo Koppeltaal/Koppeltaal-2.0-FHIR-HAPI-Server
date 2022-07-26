@@ -28,19 +28,19 @@ public class AuditEventDto {
 	 */
 	String traceId;
 	/**
-	 * The span ID should remain the same over the processing within the same system and should be
+	 * The request ID should remain the same over the processing within the same system and should be
 	 * set on ENTRY.
 	 * Rules of the thumb:
 	 * 1) On entry, a new span ID is generated.
-	 * 2) If an incoming call contains a span id, this id should be moved to the parentSpanId.
-	 * 3) The value of the span ID and parentSpanId should be propagated to all calls to subsystems.
+	 * 2) If an incoming call contains a request id, this id should be moved to the correlationId.
+	 * 3) The value of the request ID and correlationId should be propagated to all calls to subsystems.
 	 */
-	String spanId;
+	String requestId;
 	/**
-	 * The parentSpanId should be filled with the spanId of the incoming call. If the incoming
-	 * call does not have a span ID, it should NOT be filled.
+	 * The correlationId should be filled with the requestId of the incoming call if the server changes the requestId.
+   * If the incoming call does not have a request ID, it should NOT be filled.
 	 */
-	String parentSpanId;
+	String correlationId;
 	Device device;
 	String query;
 	List<Resource> resources = new ArrayList<>();
@@ -81,12 +81,12 @@ public class AuditEventDto {
 		this.outcome = outcome;
 	}
 
-	public String getParentSpanId() {
-		return parentSpanId;
+	public String getCorrelationId() {
+		return correlationId;
 	}
 
-	public void setParentSpanId(String parentSpanId) {
-		this.parentSpanId = parentSpanId;
+	public void setCorrelationId(String correlationId) {
+		this.correlationId = correlationId;
 	}
 
 	public String getQuery() {
@@ -101,12 +101,12 @@ public class AuditEventDto {
 		return new ArrayList<>(resources);
 	}
 
-	public String getSpanId() {
-		return spanId;
+	public String getRequestId() {
+		return requestId;
 	}
 
-	public void setSpanId(String spanId) {
-		this.spanId = spanId;
+	public void setRequestId(String requestId) {
+		this.requestId = requestId;
 	}
 
 	public String getTraceId() {

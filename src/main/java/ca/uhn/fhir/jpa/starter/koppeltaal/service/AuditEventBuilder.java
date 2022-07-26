@@ -71,9 +71,9 @@ public class AuditEventBuilder {
 		}
 		auditEvent.setSource(buildEventSource());
 		auditEvent.setRecorded(dto.getDateTime());
-		auditEvent.addExtension("b3:traceId", new IdType(dto.getTraceId()));
-		auditEvent.addExtension("b3:spanId", new IdType(dto.getSpanId()));
-		auditEvent.addExtension("b3:parentSpanId", new IdType(dto.getParentSpanId()));
+		auditEvent.addExtension("https://www.w3.org/TR/trace-context/#trace-id", new IdType(dto.getTraceId()));
+		auditEvent.addExtension("https://www.w3.org/TR/trace-context/#parent-id", new IdType(dto.getRequestId()));
+		auditEvent.addExtension("https://www.w3.org/TR/trace-context/#traceparent-header", new IdType(dto.getCorrelationId()));
 
 		if (StringUtils.isNotEmpty(dto.getOutcome())) {
 			auditEvent.setOutcome(AuditEvent.AuditEventOutcome.fromCode(dto.getOutcome()));

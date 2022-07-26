@@ -67,14 +67,10 @@ public class AuditEventInterceptor extends AbstactAuditEventInterceptor {
   @Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)
   public void start(ServletRequestDetails requestDetails) {
 
-    // traceId > transaction id
-    // spanId > request id
-    // parentSpanId > userdata['parentSpanId']
-
     HttpServletRequest servletRequest = requestDetails.getServletRequest();
     String traceId = servletRequest.getHeader("X-Trace-Id");
 
-    // Set the requestId if not set. It is the spanId of this request.
+    // Set the requestId if not set.
     if (StringUtils.isBlank(requestDetails.getRequestId())) {
       requestDetails.setRequestId(RandomStringUtils.randomAlphanumeric(16));
     }
@@ -86,7 +82,7 @@ public class AuditEventInterceptor extends AbstactAuditEventInterceptor {
       requestDetails.setTransactionGuid(UUID.randomUUID().toString());
     }
 
-    LOG.info(String.format("Incoming request, traceId='%s', spanId='%s', parentSpanId='%s'", requestDetails.getTransactionGuid(), requestDetails.getRequestId(), requestDetails.getUserData().get("parentSpanId")));
+    LOG.info(String.format("Incoming request, traceId='%s', requestId='%s', correlationId='%s'", requestDetails.getTransactionGuid(), requestDetails.getRequestId(), requestDetails.getUserData().get("correlationId")));
   }
 
   @Hook(Pointcut.STORAGE_PRECOMMIT_RESOURCE_UPDATED)
