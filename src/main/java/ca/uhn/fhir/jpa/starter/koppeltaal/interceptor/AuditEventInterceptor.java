@@ -6,6 +6,7 @@ import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuditEventDto;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventService;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.RequestIdHolder;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.api.server.ResponseDetails;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
@@ -71,8 +72,10 @@ public class AuditEventInterceptor extends AbstactAuditEventInterceptor {
     String traceId = servletRequest.getHeader("X-Trace-Id");
 
     // Set the requestId if not set.
-    if (StringUtils.isBlank(requestDetails.getRequestId())) {
-      requestDetails.setRequestId(RandomStringUtils.randomAlphanumeric(16));
+    String requestId = requestDetails.getRequestId();
+    if (StringUtils.isBlank(requestId)) {
+      requestId = RandomStringUtils.randomAlphanumeric(16);
+      requestDetails.setRequestId(requestId);
     }
 
     // Set the traceId, generate one if none exists.
@@ -82,7 +85,9 @@ public class AuditEventInterceptor extends AbstactAuditEventInterceptor {
       requestDetails.setTransactionGuid(UUID.randomUUID().toString());
     }
 
-    LOG.info(String.format("Incoming request, traceId='%s', requestId='%s', correlationId='%s'", requestDetails.getTransactionGuid(), requestDetails.getRequestId(), requestDetails.getUserData().get("correlationId")));
+    RequestIdHolder.addMapping(requestDetails.getTransactionGuid(), requestId);
+
+    LOG.info(String.format("Incoming request, traceId='%s', requestId='%s', correlationId='%s'", requestDetails.getTransactionGuid(), requestId, requestDetails.getUserData().get("correlationId")));
   }
 
   @Hook(Pointcut.STORAGE_PRECOMMIT_RESOURCE_UPDATED)

@@ -41,6 +41,9 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 	@Autowired
 	private OpenApiConfiguration openApiConfiguration;
 
+  @Autowired
+  private CleanupRequestIdHolderInterceptor cleanupRequestIdHolderInterceptor;
+
 	public JpaRestfulServer() {
 		super();
 	}
@@ -76,6 +79,7 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 			registerInterceptor(auditEventInterceptor);
       registerInterceptor(injectCorrelationIdInterceptor);
       registerInterceptor(injectTraceIdInterceptor);
+      registerInterceptor(cleanupRequestIdHolderInterceptor);
 			// Yes, this is ANOTHER interceptor.
 			interceptorService.registerInterceptor(auditEventSubscriptionInterceptor);
 			registerInterceptor(auditEventIntergityInterceptor);
