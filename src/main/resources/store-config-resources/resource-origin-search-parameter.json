@@ -19,6 +19,6 @@
   ],
   "target": ["Device"],
   "type": "reference",
-  "expression": "ActivityDefinition.extension('https://koppeltaal.nl/resource-origin') | CareTeam.extension('https://koppeltaal.nl/resource-origin') | Task.extension('https://koppeltaal.nl/resource-origin') | Patient.extension('https://koppeltaal.nl/resource-origin') | Practitioner.extension('https://koppeltaal.nl/resource-origin') | RelatedPerson.extension('https://koppeltaal.nl/resource-origin') | Endpoint.extension('https://koppeltaal.nl/resource-origin') | Device.extension('https://koppeltaal.nl/resource-origin') | Subscription.extension('https://koppeltaal.nl/resource-origin')",
+  "expression": "ActivityDefinition.extension('http://koppeltaal.nl/resource-origin') | CareTeam.extension('http://koppeltaal.nl/resource-origin') | Task.extension('http://koppeltaal.nl/resource-origin') | Patient.extension('http://koppeltaal.nl/resource-origin') | Practitioner.extension('http://koppeltaal.nl/resource-origin') | RelatedPerson.extension('http://koppeltaal.nl/resource-origin') | Endpoint.extension('http://koppeltaal.nl/resource-origin') | Device.extension('http://koppeltaal.nl/resource-origin') | Subscription.extension('http://koppeltaal.nl/resource-origin')",
   "xpathUsage": "normal"
 }

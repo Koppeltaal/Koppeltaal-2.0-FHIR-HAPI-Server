@@ -18,7 +18,9 @@ import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
+import static ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM;
 import static java.util.Collections.singletonList;
 
 /**
@@ -71,9 +73,13 @@ public class AuditEventBuilder {
 		}
 		auditEvent.setSource(buildEventSource());
 		auditEvent.setRecorded(dto.getDateTime());
-		auditEvent.addExtension("https://www.w3.org/TR/trace-context/#trace-id", new IdType(dto.getTraceId()));
-		auditEvent.addExtension("https://www.w3.org/TR/trace-context/#parent-id", new IdType(dto.getRequestId()));
-		auditEvent.addExtension("https://www.w3.org/TR/trace-context/#traceparent-header", new IdType(dto.getCorrelationId()));
+
+    getResourceOriginExtension(dto)
+      .ifPresent(auditEvent::addExtension);
+
+		auditEvent.addExtension("http://koppeltaal.nl/fhir/StructureDefinition/trace-id", new IdType(dto.getTraceId()));
+		auditEvent.addExtension("http://koppeltaal.nl/fhir/StructureDefinition/request-id", new IdType(dto.getRequestId()));
+		auditEvent.addExtension("http://koppeltaal.nl/fhir/StructureDefinition/correlation-id", new IdType(dto.getCorrelationId()));
 
 		if (StringUtils.isNotEmpty(dto.getOutcome())) {
 			auditEvent.setOutcome(AuditEvent.AuditEventOutcome.fromCode(dto.getOutcome()));
@@ -89,6 +95,19 @@ public class AuditEventBuilder {
     setMetaWithProfileUrl(auditEvent);
     return auditEvent;
 	}
+
+  @NotNull
+  private Optional<Extension> getResourceOriginExtension(AuditEventDto dto) {
+
+    if(dto.getDevice() == null) return Optional.empty();
+
+    final Extension resourceOriginExtension = new Extension();
+    resourceOriginExtension.setUrl(RESOURCE_ORIGIN_SYSTEM);
+    final Reference deviceReference = new Reference(dto.getDevice());
+    deviceReference.setType(ResourceType.Device.name());
+    resourceOriginExtension.setValue(deviceReference);
+    return Optional.of(resourceOriginExtension);
+  }
 
   private void setMetaWithProfileUrl(AuditEvent auditEvent) {
     Meta profileMeta = new Meta();
