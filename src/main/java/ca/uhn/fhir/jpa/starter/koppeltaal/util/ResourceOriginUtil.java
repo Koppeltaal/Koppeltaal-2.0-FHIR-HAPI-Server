@@ -20,7 +20,7 @@ import org.hl7.fhir.r4.model.StructureDefinition;
 
 public class ResourceOriginUtil {
 
-	public final static String RESOURCE_ORIGIN_SYSTEM = "http://koppeltaal.nl/resource-origin";
+	public final static String RESOURCE_ORIGIN_SYSTEM = "http://koppeltaal.nl/fhir/StructureDefinition/resource-origin";
 
 	public static Optional<String> getRequesterClientId(RequestDetails requestDetails) {
 		String authorization = requestDetails.getHeader("Authorization");

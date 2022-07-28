@@ -42,7 +42,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * <p>Interceptor that injects the http://koppeltaal.nl/resource-origin extension on
+ * <p>Interceptor that injects the http://koppeltaal.nl/fhir/StructureDefinition/resource-origin extension on
  * newly created {@link DomainResource} entities.</p>
  *
  * <p>This can be used to determine if applications have a granted permission on entities
@@ -233,7 +233,7 @@ public class InjectResourceOriginInterceptor {
 			final Iterator<ResourceType> resourceTypeIterator = resourceTypes.iterator();
 			while(resourceTypeIterator.hasNext()) {
 				expressionBuilder.append(resourceTypeIterator.next());
-				expressionBuilder.append(".extension('http://koppeltaal.nl/resource-origin')");
+				expressionBuilder.append(".extension('"+RESOURCE_ORIGIN_SYSTEM+"')");
 
 				if(resourceTypeIterator.hasNext()) {
 					expressionBuilder.append(" | ");
