@@ -7,8 +7,8 @@ import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuditEventDto;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.RequestIdHolder;
+import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
-import ca.uhn.fhir.rest.api.server.ResponseDetails;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -58,10 +58,14 @@ public class AuditEventInterceptor extends AbstactAuditEventInterceptor {
   }
 
   @Hook(Pointcut.SERVER_OUTGOING_RESPONSE)
-  public void outgoingResponse(ServletRequestDetails requestDetails, IBaseResource resource, ResponseDetails responseDetails) {
-    if (resource.getIdElement() != null
+  public void outgoingResponse(RequestDetails responseDetails, ServletRequestDetails servletRequestDetails, IBaseResource resource) {
+    RestOperationTypeEnum restOperationType = responseDetails.getRestOperationType();
+    if (restOperationType != RestOperationTypeEnum.CREATE
+      && restOperationType != RestOperationTypeEnum.UPDATE
+      && restOperationType != RestOperationTypeEnum.DELETE
+      && resource.getIdElement() != null
       && resource.getIdElement().getValue() != null) {
-      storageEvent(requestDetails, resource);
+      storageEvent(servletRequestDetails, resource);
     }
   }
 

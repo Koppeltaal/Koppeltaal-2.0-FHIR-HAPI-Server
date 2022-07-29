@@ -21,7 +21,7 @@ public class RequestIdHolder {
   }
 
   public static Optional<String> getRequestId(String traceId) {
-    return Optional.of(traceIdToRequestIdMap.get(traceId));
+    return traceIdToRequestIdMap.containsKey(traceId) ? Optional.of(traceIdToRequestIdMap.get(traceId)) : Optional.empty();
   }
 
   public static void clearRequestId(String traceId) {
