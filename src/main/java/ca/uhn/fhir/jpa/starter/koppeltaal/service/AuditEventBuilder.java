@@ -70,7 +70,11 @@ public class AuditEventBuilder {
 		buildEventType(auditEvent, eventType);
 		List<Resource> resources = dto.getResources();
 		for (Resource resource : resources) {
-			auditEvent.addEntity(buildAuditEventEntityComponent(resource, dto));
+      AuditEvent.AuditEventEntityComponent entity = buildAuditEventEntityComponent(resource, dto);
+      if(dto.getEventType() == AuditEventDto.EventType.Delete) {
+        entity.setWhat(null); //remove as it's not allowed to reference to deleted objects
+      }
+      auditEvent.addEntity(entity);
 		}
 		auditEvent.setSource(buildEventSource());
 		auditEvent.setRecorded(dto.getDateTime());
