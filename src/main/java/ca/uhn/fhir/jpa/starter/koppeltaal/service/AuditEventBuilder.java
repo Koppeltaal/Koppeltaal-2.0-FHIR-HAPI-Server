@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM;
 import static java.util.Collections.singletonList;
@@ -81,11 +82,22 @@ public class AuditEventBuilder {
 		auditEvent.addExtension("http://koppeltaal.nl/fhir/StructureDefinition/request-id", new IdType(dto.getRequestId()));
 		auditEvent.addExtension("http://koppeltaal.nl/fhir/StructureDefinition/correlation-id", new IdType(dto.getCorrelationId()));
 
-		if (StringUtils.isNotEmpty(dto.getOutcome())) {
+    if(dto.getOperationOutcome() != null) {
+      AuditEvent.AuditEventEntityComponent entity = buildAuditEventEntityComponent(dto.getOperationOutcome(), dto);
+      entity.setWhat(null); //remove ad OperationOutcomes aren't persisted and can't be referenced to
+      auditEvent.addEntity(entity);
+      auditEvent.setOutcomeDesc(
+        dto.getOperationOutcome().getIssue().stream()
+          .map(issue -> issue.getDiagnostics() + "\n")
+          .collect(Collectors.joining())
+      );
+      auditEvent.setOutcome(AuditEvent.AuditEventOutcome.fromCode(dto.getOutcome()));
+    }
+
+    if (StringUtils.isNotEmpty(dto.getOutcome())) {
 			auditEvent.setOutcome(AuditEvent.AuditEventOutcome.fromCode(dto.getOutcome()));
-		} else {
-			int x = 1;
 		}
+
 		Device device = dto.getDevice();
 		if (device != null) {
 			auditEvent.setAgent(singletonList(buildAgent(device)));

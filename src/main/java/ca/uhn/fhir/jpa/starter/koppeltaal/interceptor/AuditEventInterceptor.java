@@ -53,6 +53,7 @@ public class AuditEventInterceptor extends AbstactAuditEventInterceptor {
       setInteraction(requestDetails, dto);
       setDevice(requestDetails, dto);
       setOutcome(operationOutcome, dto);
+      dto.setOperationOutcome((OperationOutcome) operationOutcome);
       auditEventService.submitAuditEvent(dto, requestDetails);
     }
   }

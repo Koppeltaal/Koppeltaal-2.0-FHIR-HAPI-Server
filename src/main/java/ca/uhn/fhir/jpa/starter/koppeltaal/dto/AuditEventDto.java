@@ -1,6 +1,8 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.dto;
 
+import org.hl7.fhir.instance.model.api.IBaseOperationOutcome;
 import org.hl7.fhir.r4.model.Device;
+import org.hl7.fhir.r4.model.OperationOutcome;
 import org.hl7.fhir.r4.model.Resource;
 
 import java.util.ArrayList;
@@ -14,6 +16,7 @@ public class AuditEventDto {
 	EventType eventType;
 	Date dateTime = new Date();
 	String outcome = "";
+  OperationOutcome operationOutcome;
 	/**
 	 * This ID should always remain the same over all systems involved in the event. An event
 	 * could be an update of a resource.
@@ -117,8 +120,15 @@ public class AuditEventDto {
 		this.traceId = traceId;
 	}
 
+  public OperationOutcome getOperationOutcome() {
+    return operationOutcome;
+  }
 
-	public enum EventType {
+  public void setOperationOutcome(OperationOutcome operationOutcome) {
+    this.operationOutcome = operationOutcome;
+  }
+
+  public enum EventType {
 		Read,
 		Update,
 		Delete,
