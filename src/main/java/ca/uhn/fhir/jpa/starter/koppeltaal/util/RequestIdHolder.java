@@ -1,5 +1,9 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.util;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -12,19 +16,34 @@ import java.util.Optional;
  * calls. This is error-prone as new requests have the risk of overwriting the requestId before the interceptor
  * consumed the requestId.
  */
+@Component
 public class RequestIdHolder {
 
-  private static final Map<String, String> traceIdToRequestIdMap = new HashMap<>();
+  private static final Logger LOG = LoggerFactory.getLogger(RequestIdHolder.class);
 
-  public static void addMapping(String traceId, String requestId) {
+  private final Map<String, String> traceIdToRequestIdMap = new HashMap<>();
+
+  public void addMapping(String traceId, String requestId) {
+    LOG.info("Mapping trace id [{}] to request id [{}]", traceId, requestId);
     traceIdToRequestIdMap.put(traceId, requestId);
   }
 
-  public static Optional<String> getRequestId(String traceId) {
-    return traceIdToRequestIdMap.containsKey(traceId) ? Optional.of(traceIdToRequestIdMap.get(traceId)) : Optional.empty();
+  public Optional<String> getRequestId(String traceId) {
+
+    boolean hasRequestId = traceIdToRequestIdMap.containsKey(traceId);
+
+    if(hasRequestId) {
+      String requestId = traceIdToRequestIdMap.get(traceId);
+      LOG.info("Found request id [{}] found based on trace id [{}]", requestId, traceId);
+      return Optional.of(requestId);
+    }
+
+    LOG.info("Did not find request id based on trace id [{}]", traceId);
+    return Optional.empty();
   }
 
-  public static void clearRequestId(String traceId) {
+  public void clearRequestId(String traceId) {
+    LOG.info("Clearing request id mapped to trace id [{}]", traceId);
     traceIdToRequestIdMap.remove(traceId);
   }
 }

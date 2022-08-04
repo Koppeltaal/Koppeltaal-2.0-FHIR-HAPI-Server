@@ -30,11 +30,13 @@ import java.util.stream.Collectors;
 public class AuditEventSubscriptionInterceptor extends AbstactAuditEventInterceptor {
 	private static final Logger LOG = LoggerFactory.getLogger(AuditEventSubscriptionInterceptor.class);
 	protected final FhirContext fhirContext;
+  private final RequestIdHolder requestIdHolder;
 
-	public AuditEventSubscriptionInterceptor(DaoRegistry daoRegistry, AuditEventService auditEventService, FhirContext fhirContext) {
+	public AuditEventSubscriptionInterceptor(DaoRegistry daoRegistry, AuditEventService auditEventService, FhirContext fhirContext, RequestIdHolder requestIdHolder) {
 		super(auditEventService, daoRegistry);
 		this.fhirContext = fhirContext;
-	}
+    this.requestIdHolder = requestIdHolder;
+  }
 
 	@Hook(value = Pointcut.SUBSCRIPTION_BEFORE_DELIVERY, order = Integer.MAX_VALUE)
 	public void outgoingSubscription(CanonicalSubscription canonicalSubscription, ResourceDeliveryMessage message) {
@@ -42,7 +44,7 @@ public class AuditEventSubscriptionInterceptor extends AbstactAuditEventIntercep
 
     String requestId = RandomStringUtils.randomAlphanumeric(16); //async, so always generate a new requestId
 
-    Optional<String> correlationIdOptional = RequestIdHolder.getRequestId(traceId);
+    Optional<String> correlationIdOptional = requestIdHolder.getRequestId(traceId);
 
     Resource resource = (Resource)message.getPayload(fhirContext);
 

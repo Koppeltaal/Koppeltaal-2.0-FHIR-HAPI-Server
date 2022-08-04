@@ -15,12 +15,18 @@ import org.springframework.stereotype.Component;
 @Interceptor
 public class CleanupRequestIdHolderInterceptor {
 
+  private final RequestIdHolder requestIdHolder;
+
+  public CleanupRequestIdHolderInterceptor(RequestIdHolder requestIdHolder) {
+    this.requestIdHolder = requestIdHolder;
+  }
+
   @Hook(value = Pointcut.SERVER_PROCESSING_COMPLETED)
   public void cleanup(RequestDetails requestDetails) {
     String traceId = requestDetails.getTransactionGuid();
 
     if(StringUtils.isNotBlank(traceId)) {
-      RequestIdHolder.clearRequestId(traceId);
+      requestIdHolder.clearRequestId(traceId);
     }
   }
 

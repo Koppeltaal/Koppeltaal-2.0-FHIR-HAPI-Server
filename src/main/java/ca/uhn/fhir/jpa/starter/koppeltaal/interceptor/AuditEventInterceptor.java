@@ -30,10 +30,12 @@ import java.util.UUID;
 @Interceptor
 public class AuditEventInterceptor extends AbstactAuditEventInterceptor {
   private static final Logger LOG = LoggerFactory.getLogger(AuditEventInterceptor.class);
+  private final RequestIdHolder requestIdHolder;
 
-  public AuditEventInterceptor(DaoRegistry daoRegistry, AuditEventService auditEventService) {
+  public AuditEventInterceptor(DaoRegistry daoRegistry, AuditEventService auditEventService, RequestIdHolder requestIdHolder) {
     super(auditEventService, daoRegistry);
 
+    this.requestIdHolder = requestIdHolder;
   }
 
   @Hook(Pointcut.STORAGE_PRECOMMIT_RESOURCE_CREATED)
@@ -90,7 +92,7 @@ public class AuditEventInterceptor extends AbstactAuditEventInterceptor {
       requestDetails.setTransactionGuid(UUID.randomUUID().toString());
     }
 
-    RequestIdHolder.addMapping(requestDetails.getTransactionGuid(), requestId);
+    requestIdHolder.addMapping(requestDetails.getTransactionGuid(), requestId);
 
     LOG.info(String.format("Incoming request, traceId='%s', requestId='%s', correlationId='%s'", requestDetails.getTransactionGuid(), requestId, requestDetails.getUserData().get("correlationId")));
   }
