@@ -4,9 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * This holder contains the request id for incoming requests mapped to the trace-id.
@@ -26,6 +24,8 @@ public class RequestIdHolder {
   public void addMapping(String traceId, String requestId) {
     LOG.info("Mapping trace id [{}] to request id [{}]", traceId, requestId);
     traceIdToRequestIdMap.put(traceId, requestId);
+
+    autoCleanup(traceId);
   }
 
   public Optional<String> getRequestId(String traceId) {
@@ -45,5 +45,17 @@ public class RequestIdHolder {
   public void clearRequestId(String traceId) {
     LOG.info("Clearing request id mapped to trace id [{}]", traceId);
     traceIdToRequestIdMap.remove(traceId);
+  }
+
+  private void autoCleanup(String traceId) {
+
+    LOG.info("Cleaning up trace id [{}] in 20 seconds", traceId);
+
+    new Timer().schedule(new TimerTask() {
+      @Override
+      public void run() {
+        clearRequestId(traceId);
+      }
+    }, 20 * 1000L); //cleanup after 20 seconds
   }
 }
