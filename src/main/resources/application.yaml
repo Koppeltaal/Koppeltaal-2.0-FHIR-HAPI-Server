@@ -133,7 +133,7 @@ hapi:
       requests_enabled: true
       responses_enabled: false
       # custom addition to not load SDs and require them for the specified resource
-      buildUsingStoredStructureDefinitions: true
+      buildUsingStoredStructureDefinitions: false
 #    binary_storage_enabled: true
     bulk_export_enabled: true
     subscription:
