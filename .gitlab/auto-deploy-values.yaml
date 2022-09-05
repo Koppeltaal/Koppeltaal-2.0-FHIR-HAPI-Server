@@ -1,7 +1,6 @@
 service:
   internalPort: 8080
   externalPort: 8080
-  type: LoadBalancer # expose service IP so that it can be whitelisted in firewalls for outbound Subscriptions
 
 livenessProbe:
   probeType: "tcpSocket"
