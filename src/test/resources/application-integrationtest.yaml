@@ -25,6 +25,7 @@ hapi:
 #    default_encoding: JSON
 #    default_pretty_print: true
 #    default_page_size: 20
+#    delete_expunge_enabled: true
 #    enable_index_missing_fields: false
 #    enforce_referential_integrity_on_delete: false
 #    enforce_referential_integrity_on_write: false
@@ -34,6 +35,8 @@ hapi:
 #    fhirpath_interceptor_enabled: false
 #    filter_search_enabled: true
 #    graphql_enabled: true
+#    local_base_urls:
+#      - http://hapi.fhir.org/baseR4
     #partitioning:
     #  cross_partition_reference_mode: true
     #  multitenancy_enabled: true

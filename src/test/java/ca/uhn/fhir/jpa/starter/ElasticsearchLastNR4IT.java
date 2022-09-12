@@ -1,11 +1,18 @@
 package ca.uhn.fhir.jpa.starter;
 
-import ca.uhn.fhir.context.ConfigurationException;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.jpa.search.lastn.ElasticsearchSvcImpl;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.client.api.ServerValidationModeEnum;
 import ca.uhn.fhir.rest.client.interceptor.LoggingInterceptor;
+import java.io.IOException;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import javax.annotation.PreDestroy;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.DateTimeType;
@@ -27,18 +34,6 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.testcontainers.elasticsearch.ElasticsearchContainer;
-import org.testcontainers.junit.jupiter.Container;
-
-import javax.annotation.PreDestroy;
-import java.io.IOException;
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
-import java.util.Date;
-import java.util.GregorianCalendar;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, classes = Application.class, properties =
@@ -47,12 +42,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
     "spring.datasource.url=jdbc:h2:mem:dbr4",
     "hapi.fhir.fhir_version=r4",
     "hapi.fhir.lastn_enabled=true",
+	 "hapi.fhir.store_resource_in_lucene_index_enabled=true",
+	 "hapi.fhir.advanced_lucene_indexing=true",
     "elasticsearch.enabled=true",
     // Because the port is set randomly, we will set the rest_url using the Initializer.
     // "elasticsearch.rest_url='http://localhost:9200'",
     "elasticsearch.username=SomeUsername",
     "elasticsearch.password=SomePassword",
-	 "elasticsearch.protocol=http"
+    "elasticsearch.debug.refresh_after_write=true",
+	 "elasticsearch.protocol=http",
+	  "spring.main.allow-bean-definition-overriding=true",
+	  "spring.jpa.properties.hibernate.search.enabled=true",
+	  "spring.jpa.properties.hibernate.search.backend.type=elasticsearch",
+	  "spring.jpa.properties.hibernate.search.backend.analysis.configurer=ca.uhn.fhir.jpa.search.elastic.HapiElasticsearchAnalysisConfigurer"
   })
 @ContextConfiguration(initializers = ElasticsearchLastNR4IT.Initializer.class)
 public class ElasticsearchLastNR4IT {
@@ -60,10 +62,9 @@ public class ElasticsearchLastNR4IT {
   private IGenericClient ourClient;
   private FhirContext ourCtx;
 
-  private static final String ELASTIC_VERSION = "7.10.2";
-	private static final String ELASTIC_IMAGE = "docker.elastic.co/elasticsearch/elasticsearch:" + ELASTIC_VERSION;
-
-	private static ElasticsearchContainer embeddedElastic;
+  private static final String ELASTIC_VERSION = "7.16.3";
+  private static final String ELASTIC_IMAGE = "docker.elastic.co/elasticsearch/elasticsearch:" + ELASTIC_VERSION;
+  private static ElasticsearchContainer embeddedElastic;
 
   @Autowired
   private ElasticsearchSvcImpl myElasticsearchSvc;
@@ -83,7 +84,8 @@ public class ElasticsearchLastNR4IT {
   private int port;
 
   @Test
-  void testLastN() throws IOException {
+  void testLastN() throws IOException, InterruptedException {
+	  Thread.sleep(2000);
 
     Patient pt = new Patient();
     pt.addName().setFamily("Lastn").addGiven("Arthur");
@@ -93,8 +95,10 @@ public class ElasticsearchLastNR4IT {
     obs.getSubject().setReferenceElement(id);
     String observationCode = "testobservationcode";
     String codeSystem = "http://testobservationcodesystem";
+
     obs.getCode().addCoding().setCode(observationCode).setSystem(codeSystem);
     obs.setValue(new StringType(observationCode));
+
     Date effectiveDtm = new GregorianCalendar().getTime();
     obs.setEffective(new DateTimeType(effectiveDtm));
     obs.getCategoryFirstRep().addCoding().setCode("testcategorycode").setSystem("http://testcategorycodesystem");
