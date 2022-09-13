@@ -27,6 +27,11 @@ FROM tomcat:9.0.38-jdk11-openjdk-slim-buster
 RUN mkdir -p /data/hapi/lucenefiles && chmod 775 /data/hapi/lucenefiles
 COPY --from=build-hapi /tmp/hapi-fhir-jpaserver-starter/target/*.war /usr/local/tomcat/webapps/
 
+COPY certificates/ximulator12.test.aorta-zorg.nl.cer $JAVA_HOME/lib/security
+RUN \
+    cd $JAVA_HOME/lib/security \
+    && keytool -keystore cacerts -storepass changeit -noprompt -trustcacerts -importcert -alias ximulator12.test.aorta-zorg.nl -file ximulator12.test.aorta-zorg.nl.cer
+
 EXPOSE 8080
 
 CMD ["catalina.sh", "run"]
