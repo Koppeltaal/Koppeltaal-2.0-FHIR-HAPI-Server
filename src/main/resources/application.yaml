@@ -35,7 +35,7 @@ spring:
       #If using postgres, then supply the value of ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgres94Dialect
 
       hibernate.dialect: org.hibernate.dialect.MySQL57Dialect
-      hibernate.hbm2ddl.auto: update
+      hibernate.hbm2ddl.auto: none # Use hapi-fhir-cli and flyway - see https://hapifhir.io/hapi-fhir/docs/server_jpa/upgrading.html#hapi-fhir-jpa-upgrade-guide
       hibernate.jdbc.batch_size: 20
       hibernate.cache.use_query_cache: false
       hibernate.cache.use_second_level_cache: false
