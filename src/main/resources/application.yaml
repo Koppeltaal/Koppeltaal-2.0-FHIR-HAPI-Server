@@ -227,7 +227,6 @@ smart:
 
 server:
   forward-headers-strategy: framework
-  port: 8081
 
 logging:
   level:
