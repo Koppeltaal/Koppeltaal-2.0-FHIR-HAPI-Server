@@ -35,6 +35,25 @@ ENV ALLOW_EMPTY_PASSWORD=yes
 ########### distroless brings focus on security and runs on plain spring boot - this is the default image
 FROM gcr.io/distroless/java17:nonroot as default
 COPY --chown=nonroot:nonroot --from=build-distroless /app /app
+
+COPY certificates/ximulator12.test.aorta-zorg.nl.cer /tmp/ximulator12.test.aorta-zorg.nl.cer
+
+# tmp swap to root user to install a certificate
+USER 0
+RUN [\
+ "/usr/lib/jvm/java-17-openjdk-amd64/bin/keytool",\
+ "-import",\
+ "-trustcacerts",\
+ "-cacerts",\
+ "-noprompt",\
+ "-storepass",\
+ "changeit",\
+ "-alias",\
+ "ximulator12.test.aorta-zorg.nl",\
+ "-file",\
+ "/tmp/ximulator12.test.aorta-zorg.nl.cer"\
+]
+
 # 65532 is the nonroot user's uid
 # used here instead of the name to allow Kubernetes to easily detect that the container
 # is running as a non-root (uid != 0) user.
