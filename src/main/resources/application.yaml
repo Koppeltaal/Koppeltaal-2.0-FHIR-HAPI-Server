@@ -1,4 +1,18 @@
+#Adds the option to go to eg. http://localhost:8080/actuator/health for seeing the running configuration
+#see https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html#actuator.endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,prometheus"
 spring:
+  main:
+    allow-circular-references: true
+    #allow-bean-definition-overriding: true
+  flyway:
+    enabled: false
+    check-location: false
+    baselineOnMigrate: true
   datasource:
     url: 'jdbc:mysql://host/database'
     username:
@@ -16,14 +30,18 @@ spring:
     properties:
       hibernate.format_sql: false
       hibernate.show_sql: false
+      #Hibernate dialect is automatically detected except Postgres and H2.
+      #If using H2, then supply the value of ca.uhn.fhir.jpa.model.dialect.HapiFhirH2Dialect
+      #If using postgres, then supply the value of ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgres94Dialect
+
       hibernate.dialect: org.hibernate.dialect.MySQL57Dialect
-      hibernate.hbm2ddl.auto: update
+      hibernate.hbm2ddl.auto: none # Use hapi-fhir-cli and flyway - see https://hapifhir.io/hapi-fhir/docs/server_jpa/upgrading.html#hapi-fhir-jpa-upgrade-guide
       hibernate.jdbc.batch_size: 20
       hibernate.cache.use_query_cache: false
       hibernate.cache.use_second_level_cache: false
       hibernate.cache.use_structured_entries: false
       hibernate.cache.use_minimal_puts: false
-###    These settings will enable fulltext search with lucene
+  ###    These settings will enable fulltext search with lucene
       hibernate.search.enabled: true
       hibernate.search.backend.type: lucene
       hibernate.search.backend.analysis.configurer: ca.uhn.fhir.jpa.search.HapiLuceneAnalysisConfigurer
@@ -36,6 +54,8 @@ spring:
 
 hapi:
   fhir:
+    ### This enables the swagger-ui at /fhir/swagger-ui/index.html as well as the /fhir/api-docs (see https://hapifhir.io/hapi-fhir/docs/server_plain/openapi.html)
+    openapi_enabled: true
     ### This is the FHIR version. Choose between, DSTU2, DSTU3, R4 or R5
     fhir_version: R4
 ### enable to use the ApacheProxyAddressStrategy which uses X-Forwarded-* headers
@@ -77,9 +97,15 @@ hapi:
     default_encoding: JSON
     default_pretty_print: true
     default_page_size: 20
+    #    delete_expunge_enabled: true
     enable_repository_validating_interceptor: true
     enable_index_missing_fields: false
-#    enable_index_contained_resource: false
+    #    enable_index_of_type: true
+    #    enable_index_contained_resource: false
+    ###  !!Extended Lucene/Elasticsearch Indexing is still a experimental feature, expect some features (e.g. _total=accurate) to not work as expected!!
+    ###  more information here: https://hapifhir.io/hapi-fhir/docs/server_jpa/elastic.html
+    advanced_lucene_indexing: false
+    # This is an experimental feature, and does not fully support _total and other FHIR features.
     enforce_referential_integrity_on_delete: true
     enforce_referential_integrity_on_write: true
     etag_support_enabled: true
@@ -104,6 +130,10 @@ hapi:
     search-coord-core-pool-size: 20
     search-coord-max-pool-size: 100
     search-coord-queue-capacity: 200
+
+    # Threadpool size for BATCH'ed GETs in a bundle.
+#    bundle_batch_pool_size: 10
+#    bundle_batch_pool_max_size: 50
 
 #    logger:
 #      error_format: 'ERROR - ${requestVerb} ${requestUrl}'
@@ -150,6 +180,7 @@ hapi:
 #        startTlsRequired:
 #        quitWait:
 #    lastn_enabled: true
+#    store_resource_in_lucene_index_enabled: true
 ###  This is configuration for normalized quantity serach level default is 0
 ###   0: NORMALIZED_QUANTITY_SEARCH_NOT_SUPPORTED - default
 ###   1: NORMALIZED_QUANTITY_STORAGE_SUPPORTED

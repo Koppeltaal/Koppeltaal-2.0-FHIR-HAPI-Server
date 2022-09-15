@@ -2,9 +2,9 @@
 
 This project is a complete starter project you can use to deploy a FHIR server using HAPI FHIR JPA.
 
-Note that this project is specifically intended for end users of the HAPI FHIR JPA server module (in other words, it helps you implement HAPI FHIR, it is not the source of the library itself). If you are looking for the main HAPI FHIR project, see here: https://github.com/jamesagnew/hapi-fhir
+Note that this project is specifically intended for end users of the HAPI FHIR JPA server module (in other words, it helps you implement HAPI FHIR, it is not the source of the library itself). If you are looking for the main HAPI FHIR project, see here: https://github.com/hapifhir/hapi-fhir
 
-Need Help? Please see: https://github.com/jamesagnew/hapi-fhir/wiki/Getting-Help
+Need Help? Please see: https://github.com/hapifhir/hapi-fhir/wiki/Getting-Help
 
 ## Prerequisites
 
@@ -189,6 +189,13 @@ spring:
     password: admin
     driverClassName: com.mysql.jdbc.Driver
 ```
+
+Also, make sure you are not setting the Hibernate dialect explicitly, in other words remove any lines similar to:
+
+```
+hibernate.dialect: {some none MySQL dialect}
+```
+
 On some systems, it might be necessary to override hibernate's default naming strategy. The naming strategy must be set using spring.jpa.hibernate.physical_naming_strategy. 
 
 ```yaml
@@ -214,6 +221,26 @@ spring:
 ```
 
 Because the integration tests within the project rely on the default H2 database configuration, it is important to either explicity skip the integration tests during the build process, i.e., `mvn install -DskipTests`, or delete the tests altogether. Failure to skip or delete the tests once you've configured PostgreSQL for the datasource.driver, datasource.url, and hibernate.dialect as outlined above will result in build errors and compilation failure.
+
+### Microsoft SQL Server configuration
+
+To configure the starter app to use MS SQL Server, instead of the default H2, update the application.yaml file to have the following:
+
+```yaml
+spring:
+  datasource:
+    url: 'jdbc:sqlserver://<server>:<port>;databaseName=<databasename>'
+    username: admin
+    password: admin
+    driverClassName: com.microsoft.sqlserver.jdbc.SQLServerDriver
+```
+
+
+Because the integration tests within the project rely on the default H2 database configuration, it is important to either explicity skip the integration tests during the build process, i.e., `mvn install -DskipTests`, or delete the tests altogether. Failure to skip or delete the tests once you've configured PostgreSQL for the datasource.driver, datasource.url, and hibernate.dialect as outlined above will result in build errors and compilation failure.
+
+
+NOTE: MS SQL Server by default uses a case-insensitive codepage. This will cause errors with some operations - such as when expanding case-sensitive valuesets (UCUM) as there are unique indexes defined on the terminology tables for codes. 
+It is recommended to deploy a case-sensitive database prior to running HAPI FHIR when using MS SQL Server to avoid these and potentially other issues. 
 
 ## Customizing The Web Testpage UI
 
@@ -278,6 +305,8 @@ spring:
     password: admin
     driverClassName: com.mysql.jdbc.Driver
 ```
+
+Also, make sure you are not setting the Hibernate Dialect explicitly, see more details in the section about MySQL.
 
 ## Running hapi-fhir-jpaserver directly from IntelliJ as Spring Boot
 Make sure you run with the maven profile called ```boot``` and NOT also ```jetty```. Then you are ready to press debug the project directly without any extra Application Servers.
@@ -354,10 +383,14 @@ elasticsearch.schema_management_strategy=CREATE
 
 Set `hapi.fhir.lastn_enabled=true` in the [application.yaml](https://github.com/hapifhir/hapi-fhir-jpaserver-starter/blob/master/src/main/resources/application.yaml) file to enable the $lastn operation on this server.  Note that the $lastn operation relies on Elasticsearch, so for $lastn to work, indexing must be enabled using Elasticsearch.
 
+## Enabling Resource to be stored in Lucene Index
+
+Set `hapi.fhir.store_resource_in_lucene_index_enabled` in the [application.yaml](https://github.com/hapifhir/hapi-fhir-jpaserver-starter/blob/master/src/main/resources/application.yaml) file to enable storing of resource json along with Lucene/Elasticsearch index mappings.
+
 ## Changing cached search results time
 
-It is possible to change the cached search results time. The option `reuse_cached_search_results_millis` in the [application.yaml] is 6000 miliseconds by default.
-Set `reuse_cached_search_results_millis: -1` in the [application.yaml] file to ignore the cache time every search. 
+It is possible to change the cached search results time. The option `reuse_cached_search_results_millis` in the [application.yaml](https://github.com/hapifhir/hapi-fhir-jpaserver-starter/blob/master/src/main/resources/application.yaml) is 6000 miliseconds by default.
+Set `reuse_cached_search_results_millis: -1` in the [application.yaml](https://github.com/hapifhir/hapi-fhir-jpaserver-starter/blob/master/src/main/resources/application.yaml) file to ignore the cache time every search. 
 
 ## Build the distroless variant of the image (for lower footprint and improved security)
 
@@ -368,7 +401,7 @@ using the `gcr.io/distroless/java-debian10:11` base image:
 docker build --target=release-distroless -t hapi-fhir:distroless .
 ```
 
-Note that distroless images are also automatically build and pushed to the container registry,
+Note that distroless images are also automatically built and pushed to the container registry,
 see the `-distroless` suffix in the image tags.
 
 ## Adding custom operations
