@@ -1,5 +1,6 @@
 package ca.uhn.fhir.jpa.starter;
 
+import ca.uhn.fhir.jpa.api.config.DaoConfig;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.*;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.*;
@@ -95,5 +96,7 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 		if (openApiConfiguration.isEnabled()) {
 			registerInterceptor(new OpenApiInterceptor());
 		}
+
+    daoConfig.setResourceServerIdStrategy(DaoConfig.IdStrategyEnum.UUID);
 	}
 }
