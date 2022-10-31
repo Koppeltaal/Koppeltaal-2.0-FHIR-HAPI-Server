@@ -2,6 +2,7 @@ package ca.uhn.fhir.jpa.starter;
 
 import ca.uhn.fhir.jpa.api.config.DaoConfig;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
+import ca.uhn.fhir.jpa.interceptor.OverridePathBasedReferentialIntegrityForDeletesInterceptor;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.*;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.*;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizationService;
@@ -42,6 +43,9 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 	@Autowired
 	private OpenApiConfiguration openApiConfiguration;
 
+  @Autowired
+  private OverridePathBasedReferentialIntegrityForDeletesInterceptor referentialIntegrityDeleteInterceptor;
+
 	public JpaRestfulServer() {
 		super();
 	}
@@ -70,7 +74,6 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 			// {code}
 			// And one JPA version. They both do DIFFERENT things. The horror.
 			interceptorService.registerInterceptor(new SubscriptionInterceptor(daoRegistry, deviceDao, smartBackendServiceAuthorizationService));
-
 		}
 
 		if (fhirServerAuditLogConfiguration.isEnabled()) {
@@ -96,6 +99,10 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 		if (openApiConfiguration.isEnabled()) {
 			registerInterceptor(new OpenApiInterceptor());
 		}
+
+    // Disable referential integrity for AuditEvent.entity.what
+    referentialIntegrityDeleteInterceptor.addPath("AuditEvent.entity.what");
+    registerInterceptor(referentialIntegrityDeleteInterceptor);
 
     daoConfig.setResourceServerIdStrategy(DaoConfig.IdStrategyEnum.UUID);
 	}
