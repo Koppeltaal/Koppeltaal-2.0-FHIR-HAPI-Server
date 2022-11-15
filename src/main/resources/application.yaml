@@ -88,13 +88,16 @@ hapi:
       - ActivityDefinition
       - AuditEvent
       - CareTeam
+      - CodeSystem
       - Device
       - Endpoint
       - Organization
       - Patient
       - Practitioner
       - Subscription
+      - StructureDefinition
       - Task
+      - ValueSet
     allow_cascading_deletes: true
     allow_contains_searches: true
     allow_external_references: true
