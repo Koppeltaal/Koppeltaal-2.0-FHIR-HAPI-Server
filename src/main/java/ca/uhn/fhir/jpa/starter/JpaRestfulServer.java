@@ -44,6 +44,9 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 	private OpenApiConfiguration openApiConfiguration;
 
   @Autowired
+  private CapabilityStatementInterceptor capabilityStatementInterceptor;
+
+  @Autowired
   private OverridePathBasedReferentialIntegrityForDeletesInterceptor referentialIntegrityDeleteInterceptor;
 
 	public JpaRestfulServer() {
@@ -85,6 +88,7 @@ public class JpaRestfulServer extends BaseJpaRestfulServer {
 			registerInterceptor(auditEventIntergityInterceptor);
 		}
 
+    registerInterceptor(capabilityStatementInterceptor);
 
 		registerInterceptor(new EnforceIfMatchHeaderInterceptor());
 		registerInterceptor(new Oauth2UrisStatementInterceptorForR4(fhirServerSecurityConfiguration));
