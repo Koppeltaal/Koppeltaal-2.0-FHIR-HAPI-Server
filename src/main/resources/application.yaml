@@ -14,10 +14,10 @@ spring:
     check-location: false
     baselineOnMigrate: true
   datasource:
-    url: 'jdbc:mysql://host/database'
-    username:
-    password:
-    driverClassName: com.mysql.jdbc.Driver
+    url: jdbc:postgresql://127.0.0.1:5432/hapi_fhir_server_dev
+    username: admin
+    password: ""
+    driverClassName: org.postgresql.Driver
     #    max-active: 15
 
     # database connection pool size
@@ -34,8 +34,8 @@ spring:
       #If using H2, then supply the value of ca.uhn.fhir.jpa.model.dialect.HapiFhirH2Dialect
       #If using postgres, then supply the value of ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgres94Dialect
 
-      hibernate.dialect: org.hibernate.dialect.MySQL57Dialect
-      hibernate.hbm2ddl.auto: none # Use hapi-fhir-cli and flyway - see https://hapifhir.io/hapi-fhir/docs/server_jpa/upgrading.html#hapi-fhir-jpa-upgrade-guide
+      hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgres94Dialect
+      hibernate.hbm2ddl.auto: update
       hibernate.jdbc.batch_size: 20
       hibernate.cache.use_query_cache: false
       hibernate.cache.use_second_level_cache: false
