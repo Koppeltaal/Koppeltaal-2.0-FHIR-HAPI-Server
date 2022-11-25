@@ -210,6 +210,7 @@ public class AuditEventBuilder {
 		String system = fhirServerAuditLogConfiguration.getObserver().getIdentifier().getSystem();
 		String value = fhirServerAuditLogConfiguration.getObserver().getIdentifier().getValue();
 		RequestDetails requestDetails = new SystemRequestDetails();
+    requestDetails.setTenantId("DEFAULT");
 		SearchParameterMap map = new SearchParameterMap();
 		map.add("identifier", new IdentifierDt(system, value));
 		IBundleProvider search = deviceDao.search(map, requestDetails);
