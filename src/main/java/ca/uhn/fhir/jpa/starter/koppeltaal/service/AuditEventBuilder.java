@@ -1,5 +1,6 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.service;
 
+import ca.uhn.fhir.interceptor.model.RequestPartitionId;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.api.model.DaoMethodOutcome;
 import ca.uhn.fhir.jpa.partition.SystemRequestDetails;
@@ -16,9 +17,11 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM;
@@ -195,14 +198,22 @@ public class AuditEventBuilder {
 	}
 
 	private Device createObserver() {
+    //FIXME: This SHOULD match the Device instance that is linked to its own SMART backend service
 		String system = fhirServerAuditLogConfiguration.getObserver().getIdentifier().getSystem();
 		String value = fhirServerAuditLogConfiguration.getObserver().getIdentifier().getValue();
 		Device myDevice = new Device();
+    myDevice.setId(UUID.randomUUID().toString());
 		Identifier identifier = new Identifier();
 		identifier.setSystem(system);
 		identifier.setValue(value);
 		myDevice.setIdentifier(Collections.singletonList(identifier));
-		DaoMethodOutcome outcome = deviceDao.create(myDevice);
+
+    SystemRequestDetails theRequestDetails = new SystemRequestDetails();
+    theRequestDetails.setRequestPartitionId(
+      RequestPartitionId.defaultPartition(LocalDate.now())
+    );
+
+    DaoMethodOutcome outcome = deviceDao.update(myDevice, theRequestDetails);
 		return (Device) outcome.getResource();
 	}
 
