@@ -68,17 +68,11 @@ hapi:
     server_address: http://localhost:8080/fhir/
 #    defer_indexing_for_codesystems_of_size: 101
 #    install_transitive_ig_dependencies: true
-    implementationguides:
+#    implementationguides:
 ###    example from registry (packages.fhir.org)
-      zib2020:
-        name: nictiz.fhir.nl.r4.zib2020
-        version: 0.5.0-beta1
-      nlcore:
-        name: nictiz.fhir.nl.r4.nl-core
-        version: 0.5.0-beta1
-      kt2:
-        name: Koppeltaalv2.00
-        version: 0.7.3
+#      kt2:
+#        name: Koppeltaalv2.00
+#        version: 0.7.3
 #      example not from registry
 #      ips_1_0_0:
 #        url: https://build.fhir.org/ig/HL7/fhir-ips/package.tgz
@@ -92,6 +86,7 @@ hapi:
       - CodeSystem
       - Device
       - Endpoint
+      - NamingSystem
       - Organization
       - Patient
       - Practitioner
