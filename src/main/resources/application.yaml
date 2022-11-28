@@ -11,8 +11,8 @@ spring:
     #allow-bean-definition-overriding: true
   flyway:
     enabled: false
-    check-location: false
     baselineOnMigrate: true
+    fail-on-missing-locations: false
   datasource:
     url: jdbc:postgresql://127.0.0.1:5432/hapi_fhir_server_dev
     username: admin
@@ -44,7 +44,6 @@ spring:
   ###    These settings will enable fulltext search with lucene or elastic
       hibernate.search.enabled: true
       ### lucene parameters
-      hibernate.search.enabled: true
       hibernate.search.backend.type: lucene
       hibernate.search.backend.analysis.configurer: ca.uhn.fhir.jpa.search.HapiHSearchAnalysisConfigurers$HapiLuceneAnalysisConfigurer
       hibernate.search.backend.directory.type: local-filesystem
@@ -121,7 +120,6 @@ hapi:
     ###  !!Extended Lucene/Elasticsearch Indexing is still a experimental feature, expect some features (e.g. _total=accurate) to not work as expected!!
     ###  more information here: https://hapifhir.io/hapi-fhir/docs/server_jpa/elastic.html
     advanced_lucene_indexing: false
-    bulk_export_enabled: false
     bulk_import_enabled: false
     #    enforce_referential_integrity_on_delete: false
     # This is an experimental feature, and does not fully support _total and other FHIR features.
