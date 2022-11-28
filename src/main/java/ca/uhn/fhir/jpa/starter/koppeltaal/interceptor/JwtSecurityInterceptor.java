@@ -38,7 +38,7 @@ public class JwtSecurityInterceptor {
 	public void incomingRequestPreProcessed(HttpServletRequest request) {
 
 		final String requestURI = request.getRequestURI();
-		if (isFhirApiRequest(requestURI)) {
+		if (requiresBearerToken(requestURI)) {
 			try {
 				String authorization = request.getHeader("Authorization");
 				String token = StringUtils.trim(StringUtils.removeStartIgnoreCase(authorization, "Bearer"));
@@ -57,10 +57,9 @@ public class JwtSecurityInterceptor {
 		}
 	}
 
-	private boolean isFhirApiRequest(String servletPath) {
-		return StringUtils.startsWith(servletPath, "/fhir")
-			&& !StringUtils.startsWith(servletPath, "/fhir/metadata")
-			&& !StringUtils.startsWith(servletPath, "/fhir/swagger-ui")
-			&& !StringUtils.startsWith(servletPath, "/fhir/api-docs");
+	private boolean requiresBearerToken(String servletPath) {
+
+    return StringUtils.startsWith(servletPath, "/fhir")
+			&& !servletPath.matches("^/fhir/[a-zA-Z0-9_-]+/(?:metadata|swagger-ui|api-docs).*"); //exclude public endpoints for multi-tenant setup - [a-zA-Z0-9_-]+ is the name of the tenant
 	}
 }
