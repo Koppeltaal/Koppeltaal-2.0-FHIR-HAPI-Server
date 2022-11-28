@@ -86,6 +86,7 @@ hapi:
       - Binary
       - ActivityDefinition
       - AuditEvent
+      - CapabilityStatement
       - CareTeam
       - CodeSystem
       - Device
