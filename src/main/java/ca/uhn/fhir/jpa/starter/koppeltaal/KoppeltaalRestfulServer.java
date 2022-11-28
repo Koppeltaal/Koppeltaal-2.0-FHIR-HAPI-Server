@@ -6,7 +6,10 @@ import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.interceptor.OverridePathBasedReferentialIntegrityForDeletesInterceptor;
 import ca.uhn.fhir.jpa.starter.AppProperties;
-import ca.uhn.fhir.jpa.starter.koppeltaal.config.*;
+import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerAuditLogConfiguration;
+import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration;
+import ca.uhn.fhir.jpa.starter.koppeltaal.config.OpenApiConfiguration;
+import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.*;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.Oauth2AccessTokenService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizationService;
@@ -68,10 +71,6 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 	@Override
 	protected void initialize() throws ServletException {
 		super.initialize();
-
-//		final FhirContext fhirContext = getFhirContext();
-//		fhirContext.setParserErrorHandler(new StrictErrorHandler());
-//		setFhirContext(fhirContext);
 
 		// Add your own customization here
 		if (fhirServerSecurityConfiguration.isEnabled()) {
