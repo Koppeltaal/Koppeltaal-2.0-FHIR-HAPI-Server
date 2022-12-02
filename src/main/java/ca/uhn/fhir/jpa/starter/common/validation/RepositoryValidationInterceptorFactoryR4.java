@@ -53,15 +53,17 @@ public class RepositoryValidationInterceptorFactoryR4 implements IRepositoryVali
   public RepositoryValidatingInterceptor buildUsingStoredStructureDefinitions() {
 
     IBundleProvider results = structureDefinitionResourceProvider.search(new SearchParameterMap().add(StructureDefinition.SP_KIND, new TokenParam("resource")));
-    Map<String, List<StructureDefinition>> structureDefintions = results.getResources(0, results.size())
-      .stream()
-      .map(StructureDefinition.class::cast)
-      .collect(Collectors.groupingBy(StructureDefinition::getType));
+    if(results.size() != null && !results.isEmpty()) {
+      Map<String, List<StructureDefinition>> structureDefintions = results.getResources(0, results.size())
+        .stream()
+        .map(StructureDefinition.class::cast)
+        .collect(Collectors.groupingBy(StructureDefinition::getType));
 
-		structureDefintions.forEach((key, value) -> {
-			String[] urls = value.stream().map(StructureDefinition::getUrl).toArray(String[]::new);
-			repositoryValidatingRuleBuilder.forResourcesOfType(key).requireAtLeastOneProfileOf(urls).and().requireValidationToDeclaredProfiles();
-		});
+      structureDefintions.forEach((key, value) -> {
+        String[] urls = value.stream().map(StructureDefinition::getUrl).toArray(String[]::new);
+        repositoryValidatingRuleBuilder.forResourcesOfType(key).requireAtLeastOneProfileOf(urls).and().requireValidationToDeclaredProfiles();
+      });
+    }
 
     List<IRepositoryValidatingRule> rules = repositoryValidatingRuleBuilder.build();
     return new RepositoryValidatingInterceptor(fhirContext, rules);
