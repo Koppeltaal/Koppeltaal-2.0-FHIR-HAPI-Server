@@ -4,8 +4,10 @@ service:
 
 livenessProbe:
   probeType: "tcpSocket"
-  initialDelaySeconds: 160
+  initialDelaySeconds: 60
+  failureThreshold: 30
 
 readinessProbe:
   probeType: "tcpSocket"
-  initialDelaySeconds: 180
+  initialDelaySeconds: 80
+  failureThreshold: 30
