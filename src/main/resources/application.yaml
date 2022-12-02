@@ -72,20 +72,21 @@ hapi:
     server_address: http://localhost:8080/fhir/
 #    defer_indexing_for_codesystems_of_size: 101
 #    install_transitive_ig_dependencies: true
-#    implementationguides:
+    implementationguides:
 ###    example from registry (packages.fhir.org)
-#      kt2:
-#        name: Koppeltaalv2.00
-#        version: 0.7.3
+      kt2:
+        name: Koppeltaalv2.00
+        version: 0.7.3
 #      example not from registry
 #      ips_1_0_0:
 #        url: https://build.fhir.org/ig/HL7/fhir-ips/package.tgz
 #        name: hl7.fhir.uv.ips
 #        version: 1.0.0
     supported_resource_types:
-      - Binary
       - ActivityDefinition
       - AuditEvent
+      - Binary
+      - Bundle
       - CapabilityStatement
       - CareTeam
       - CodeSystem
@@ -181,8 +182,6 @@ hapi:
     validation:
       requests_enabled: true
       responses_enabled: false
-      # custom addition to not load SDs and require them for the specified resource
-      buildUsingStoredStructureDefinitions: false
 #    binary_storage_enabled: true
     inline_resource_storage_below_size: 4000
     bulk_export_enabled: true
