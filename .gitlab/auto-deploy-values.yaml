@@ -4,8 +4,8 @@ service:
 
 livenessProbe:
   probeType: "tcpSocket"
-  initialDelaySeconds: 60
+  initialDelaySeconds: 160
 
 readinessProbe:
   probeType: "tcpSocket"
-  initialDelaySeconds: 80
+  initialDelaySeconds: 180
