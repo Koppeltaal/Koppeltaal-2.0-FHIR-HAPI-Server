@@ -53,14 +53,14 @@ public class ResourceOriginUtil {
 		final Optional<String> clientIdOptional = getRequesterClientId(requestDetails);
 		if(!clientIdOptional.isPresent()) return Optional.empty();
 
-		return getDevice(clientIdOptional.get(), deviceDao);
+		return getDevice(clientIdOptional.get(), deviceDao, requestDetails);
 	}
 
-	private static Optional<Device> getDevice(String clientId, IFhirResourceDao<Device> deviceDao) {
+	private static Optional<Device> getDevice(String clientId, IFhirResourceDao<Device> deviceDao, RequestDetails requestDetails) {
 		final SearchParameterMap searchParameterMap = new SearchParameterMap();
 		searchParameterMap.add(StructureDefinition.SP_IDENTIFIER, new TokenParam(clientId));
 
-		final IBundleProvider searchResults = deviceDao.search(searchParameterMap);
+		final IBundleProvider searchResults = deviceDao.search(searchParameterMap, requestDetails);
 
 		if(searchResults != null && !searchResults.isEmpty()) {
 			return Optional.of((Device) searchResults.getAllResources().get(0));
