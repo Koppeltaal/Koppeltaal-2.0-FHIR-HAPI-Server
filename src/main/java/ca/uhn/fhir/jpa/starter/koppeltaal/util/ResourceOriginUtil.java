@@ -1,29 +1,25 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.util;
 
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
-import ca.uhn.fhir.jpa.api.model.DaoMethodOutcome;
 import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
 import ca.uhn.fhir.rest.api.server.IBundleProvider;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.param.TokenParam;
-import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
-import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
-import org.hl7.fhir.r4.model.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.Collections;
-import java.util.Optional;
+import org.hl7.fhir.r4.model.Device;
+import org.hl7.fhir.r4.model.DomainResource;
+import org.hl7.fhir.r4.model.Extension;
+import org.hl7.fhir.r4.model.Reference;
+import org.hl7.fhir.r4.model.StructureDefinition;
 
 public class ResourceOriginUtil {
 
-  private static final Logger LOG = LoggerFactory.getLogger(ResourceOriginUtil.class);
 	public final static String RESOURCE_ORIGIN_SYSTEM = "http://koppeltaal.nl/fhir/StructureDefinition/resource-origin";
 
 	public static Optional<String> getRequesterClientId(RequestDetails requestDetails) {
@@ -55,33 +51,10 @@ public class ResourceOriginUtil {
 	public static Optional<Device> getDevice(RequestDetails requestDetails, IFhirResourceDao<Device> deviceDao) {
 
 		final Optional<String> clientIdOptional = getRequesterClientId(requestDetails);
-		if(clientIdOptional.isEmpty()) return Optional.empty();
+		if(!clientIdOptional.isPresent()) return Optional.empty();
 
 		return getDevice(clientIdOptional.get(), deviceDao, requestDetails);
 	}
-
-  public static Device createDevice(RequestDetails requestDetails, IFhirResourceDao<Device> deviceDao) {
-
-    String clientId = getRequesterClientId(requestDetails)
-      .orElseThrow(() -> new AuthenticationException("client_id not present"));
-
-    LOG.info("Creating a Device instance for client_id [{}]", clientId);
-
-    Device device = new Device();
-    Identifier clientIdIdentifier = new Identifier();
-    clientIdIdentifier.setSystem(ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM);
-    clientIdIdentifier.setValue(clientId);
-    device.setIdentifier(Collections.singletonList(clientIdIdentifier));
-
-    DaoMethodOutcome daoMethodOutcome = deviceDao.create(device, requestDetails);
-    if(!daoMethodOutcome.getCreated()) throw new InternalErrorException("Failed to create Device");
-
-    Device resource = (Device) daoMethodOutcome.getResource();
-
-    LOG.info("Created Device/{} for client_id [{}]", resource.getIdElement().getIdPart(), clientId);
-
-    return resource;
-  }
 
 	private static Optional<Device> getDevice(String clientId, IFhirResourceDao<Device> deviceDao, RequestDetails requestDetails) {
 		final SearchParameterMap searchParameterMap = new SearchParameterMap();

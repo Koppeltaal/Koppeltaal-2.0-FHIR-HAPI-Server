@@ -13,15 +13,15 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
+import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.interceptor.auth.AuthorizationInterceptor;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.Device;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Optional;
 
 /**
  * Not using the {@link AuthorizationInterceptor} as custom {@link org.hl7.fhir.CompartmentDefinition} objects are not allowed.
@@ -58,9 +58,8 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 			if(StringUtils.equals(smartBackendServiceConfiguration.getDomainAdminClientId(), requesterClientId)) return;
 		}
 
-    //We simply ensure the Device if it doesn't have a corresponding Device yet. If we trust the JWT, this should be allowed
 		Device requestingDevice = ResourceOriginUtil.getDevice(requestDetails, deviceDao)
-			.orElse(ResourceOriginUtil.createDevice(requestDetails, deviceDao));
+			.orElseThrow(() -> new InvalidRequestException("Device not present"));
 
 		validate(requestDetails, requestingDevice);
 	}
@@ -71,7 +70,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 
 		final Optional<PermissionDto> permissionOptional = smartBackendServiceAuthorizationService.getPermission(requestingDeviceId, requestDetails);
 
-		if(permissionOptional.isEmpty()) {
+		if(!permissionOptional.isPresent()) {
 			LOG.info("Device [{}] executed [{}] on [{}] but no permission was found", requestingDeviceId,
 				requestDetails.getRequestType(), resourceName);
 			throw new ForbiddenOperationException("Unauthorized");
