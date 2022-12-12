@@ -122,7 +122,7 @@ public class InjectResourceOriginInterceptor {
 
 	private void ensureResourceOrigin(RequestDetails requestDetails, DomainResource resource) {
 		final IFhirResourceDao<?> resourceDao = daoRegistry.getResourceDao(requestDetails.getResourceName());
-		final IBaseResource existingResource = resourceDao.read(requestDetails.getId());
+		final IBaseResource existingResource = resourceDao.read(requestDetails.getId(), requestDetails);
 
 		final List<Extension> extensionsByUrl = ((DomainResource) existingResource).getExtensionsByUrl(RESOURCE_ORIGIN_SYSTEM);
 
@@ -143,7 +143,7 @@ public class InjectResourceOriginInterceptor {
 		final IIdType requestBodyResourceOriginDevice = getResourceOriginDeviceId((DomainResource) requestBodyResource, requestDetails);
 
 		final IFhirResourceDao<?> resourceDao = daoRegistry.getResourceDao(requestDetails.getResourceName());
-		final IBaseResource existingResource = resourceDao.read(requestDetails.getId());
+		final IBaseResource existingResource = resourceDao.read(requestDetails.getId(), requestDetails);
 
 		final IIdType existingResourceOriginDevice = getResourceOriginDeviceId((DomainResource) existingResource, requestDetails);
 

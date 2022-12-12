@@ -80,7 +80,7 @@ class ResourceOriginAuthorizationInterceptorTest {
 		final Device device = new Device();
 		device.setIdElement(new IdType("Device", 123L));
 
-		lenient().when(deviceDao.read(any(IdType.class)))
+		lenient().when(deviceDao.read(any(IdType.class), any(RequestDetails.class)))
 			.thenReturn(device);
 
 		resourceOriginUtil.when(() -> ResourceOriginUtil.getDevice(any(RequestDetails.class), any()))
@@ -163,7 +163,7 @@ class ResourceOriginAuthorizationInterceptorTest {
 		final Device otherDevice = new Device();
 		otherDevice.setId(otherDeviceId);
 
-		when(deviceDao.read(otherDeviceId))
+		when(deviceDao.read(eq(otherDeviceId), any(RequestDetails.class)))
 			.thenReturn(otherDevice);
 
 		assertThrows(ForbiddenOperationException.class, () ->
@@ -185,7 +185,7 @@ class ResourceOriginAuthorizationInterceptorTest {
 		final Device otherDevice = new Device();
 		otherDevice.setId(otherDeviceId);
 
-		when(deviceDao.read(otherDeviceId))
+		when(deviceDao.read(eq(otherDeviceId), any(RequestDetails.class)))
 			.thenReturn(otherDevice);
 
 		interceptor.authorizeRequest(requestDetails);
@@ -214,7 +214,7 @@ class ResourceOriginAuthorizationInterceptorTest {
 		final Device resourceOriginDevice = new Device();
 		resourceOriginDevice.setId(resourceOriginDeviceId);
 
-		when(deviceDao.read(resourceOriginDeviceId))
+		when(deviceDao.read(eq(resourceOriginDeviceId), any(RequestDetails.class)))
 			.thenReturn(resourceOriginDevice);
 
 		// below grants Device/1 and Device/2
@@ -275,7 +275,7 @@ class ResourceOriginAuthorizationInterceptorTest {
 					.getDeclaredConstructor()
 					.newInstance();
 
-				when(resourceDaoMock.read(any(IIdType.class)))
+				when(resourceDaoMock.read(any(IIdType.class), any(RequestDetails.class)))
 					.thenReturn(instance);
 			} catch (Exception e) {
 				throw new RuntimeException("Failed to create an instance of org.hl7.fhir.r4.model." + resourceId.getResourceType(), e);

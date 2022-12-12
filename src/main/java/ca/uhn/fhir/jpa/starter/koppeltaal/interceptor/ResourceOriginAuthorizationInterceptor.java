@@ -83,7 +83,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 		final IIdType resourceId = requestDetails.getId();
 		if(resourceId != null) {
 			final IFhirResourceDao<?> resourceDao = daoRegistry.getResourceDao(resourceName);
-			existingResource = resourceDao.read(resourceId);
+			existingResource = resourceDao.read(resourceId, requestDetails);
 		}
 
 		switch (permission.getScope()) {
@@ -93,7 +93,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 				// Create will inject the resource-origin and READ all will be handled by the ResourceOriginSearchNarrowingInterceptor
 				if(operation == CrudOperation.CREATE || (operation == CrudOperation.READ && resourceId == null)) return;  //valid
 
-				Device resourceOriginDevice = getResourceOriginDevice(existingResource);
+				Device resourceOriginDevice = getResourceOriginDevice(existingResource, requestDetails);
 				String resourceOriginDeviceId = resourceOriginDevice.getIdElement().getIdPart();
 
 				if(resourceOriginDeviceId.equals(requestingDeviceId)) return; //valid
@@ -110,7 +110,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 				if(operation == CrudOperation.CREATE) { //will be ensured by the InjectResourceOriginInterceptor
 					resourceOriginDeviceId = requestingDeviceId;
 				} else {
-					resourceOriginDevice = getResourceOriginDevice(existingResource);
+					resourceOriginDevice = getResourceOriginDevice(existingResource, requestDetails);
 					resourceOriginDeviceId = resourceOriginDevice.getIdElement().getIdPart();
 				}
 
@@ -127,7 +127,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 		throw new ForbiddenOperationException("Unauthorized");
 	}
 
-	Device getResourceOriginDevice(IBaseResource requestDetailsResource) {
+	Device getResourceOriginDevice(IBaseResource requestDetailsResource, RequestDetails requestDetails) {
 		Optional<IIdType> resourceOriginOptional = ResourceOriginUtil.getResourceOriginDeviceId(requestDetailsResource);
 
 		if(!resourceOriginOptional.isPresent()) {
@@ -136,6 +136,6 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 		}
 
 		IIdType resourceOriginDeviceId = resourceOriginOptional.get();
-		return deviceDao.read(resourceOriginDeviceId);
+		return deviceDao.read(resourceOriginDeviceId, requestDetails);
 	}
 }

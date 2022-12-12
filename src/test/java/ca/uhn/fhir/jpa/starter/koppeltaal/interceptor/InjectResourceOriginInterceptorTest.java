@@ -111,7 +111,7 @@ class InjectResourceOriginInterceptorTest {
 		final String resourceOriginDeviceIdFromDb = "Device/4342436";
 		final Patient resourceFromDatabase = createPatientWithResourceOrigin(resourceOriginDeviceIdFromDb);
 
-		when(resourceDao.read(any(IIdType.class)))
+		when(resourceDao.read(any(IIdType.class), any(RequestDetails.class)))
 			.thenReturn(resourceFromDatabase);
 
 		List<Extension> extensionsByUrl = resource.getExtensionsByUrl(RESOURCE_ORIGIN_SYSTEM);
@@ -139,7 +139,7 @@ class InjectResourceOriginInterceptorTest {
 		when(daoRegistry.getResourceDao(anyString()))
 			.thenReturn(resourceDao);
 
-		when(resourceDao.read(any(IIdType.class)))
+		when(resourceDao.read(any(IIdType.class), any(RequestDetails.class)))
 			.thenReturn(resourceFromDatabase);
 
 		assertThrows(ForbiddenOperationException.class, () ->
