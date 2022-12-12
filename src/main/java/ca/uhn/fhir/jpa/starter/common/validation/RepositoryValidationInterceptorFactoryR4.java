@@ -65,16 +65,15 @@ public class RepositoryValidationInterceptorFactoryR4 implements IRepositoryVali
       });
     }
 
+    addKoppeltaalProfileRequirements();
+
     List<IRepositoryValidatingRule> rules = repositoryValidatingRuleBuilder.build();
     return new RepositoryValidatingInterceptor(fhirContext, rules);
   }
 
-  @Override
-  public RepositoryValidatingInterceptor build() {
+  private void addKoppeltaalProfileRequirements() {
 
-    // Customize the ruleBuilder here to have the rules you want! We will give a simple example
-    // of enabling validation for all Patient resources
-    repositoryValidatingRuleBuilder
+    this.repositoryValidatingRuleBuilder
       .forResourcesOfType("ActivityDefinition")
         .requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2ActivityDefinition")
       .forResourcesOfType("AuditEvent")
@@ -99,6 +98,15 @@ public class RepositoryValidationInterceptorFactoryR4 implements IRepositoryVali
         .requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2Task")
       .and()
         .requireValidationToDeclaredProfiles();
+  }
+
+  @Override
+  public RepositoryValidatingInterceptor build() {
+
+    /* !This seems bugged, does not enter here! */
+
+    // Customize the ruleBuilder here to have the rules you want! We will give a simple example
+    // of enabling validation for all Patient resources
 
     // Do not customize below this line
     List<IRepositoryValidatingRule> rules = repositoryValidatingRuleBuilder.build();
