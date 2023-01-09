@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * This interceptor customizes the generated {@link CapabilityStatement}. This is used to apply specific Koppeltaal-rules
@@ -27,6 +28,12 @@ public class CapabilityStatementInterceptor {
     LOG.info("Applying Koppeltaal-specific changes to the CapabilityStatement");
 
     CapabilityStatement capabilityStatement = (CapabilityStatement) theCapabilityStatement;
+
+    capabilityStatement.setFormat(
+      capabilityStatement.getFormat().stream().filter(format ->
+        format.getValue().contains("xml") || format.getValue().contains("json")
+      ).collect(Collectors.toList())
+    );
 
     capabilityStatement.setContained(Collections.emptyList());
 
