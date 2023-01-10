@@ -64,6 +64,9 @@ public class KoppeltaalRestfulServer extends RestfulServer {
   @Autowired
   private OverridePathBasedReferentialIntegrityForDeletesInterceptor referentialIntegrityDeleteInterceptor;
 
+  @Autowired
+  private MimeTypeInterceptor mimeTypeInterceptor;
+
 	public KoppeltaalRestfulServer(FhirContext context) {
 		super(context);
 	}
@@ -73,6 +76,8 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 		super.initialize();
 
 		// Add your own customization here
+    registerInterceptor(mimeTypeInterceptor);
+
 		if (fhirServerSecurityConfiguration.isEnabled()) {
 			registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
 

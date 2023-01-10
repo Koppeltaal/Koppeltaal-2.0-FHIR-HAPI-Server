@@ -5,10 +5,12 @@ import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
 import org.hl7.fhir.instance.model.api.IBaseConformance;
 import org.hl7.fhir.r4.model.CapabilityStatement;
+import org.hl7.fhir.r4.model.CodeType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -20,6 +22,25 @@ import java.util.stream.Collectors;
 @Component
 @Interceptor
 public class CapabilityStatementInterceptor {
+  public static final List<String> SUPPORTED_MIME_TYPES = Arrays.asList(
+    "*/*",
+    "xml",
+    "json",
+    "application/fhir+xml",
+    "application/xml",
+    "application/fhir+json",
+    "application/json",
+    "html/json",
+    "html/xml"
+  );
+
+  public static final List<String> UNSUPPORTED_MIME_TYPES = Arrays.asList(
+    "application/x-turtle",
+    "application/fhir+turtle",
+    "ttl",
+    "html/turtle"
+  );
+
   private static final Logger LOG = LoggerFactory.getLogger(CapabilityStatementInterceptor.class);
 
   @Hook(Pointcut.SERVER_CAPABILITY_STATEMENT_GENERATED)
@@ -29,11 +50,11 @@ public class CapabilityStatementInterceptor {
 
     CapabilityStatement capabilityStatement = (CapabilityStatement) theCapabilityStatement;
 
-    capabilityStatement.setFormat(
-      capabilityStatement.getFormat().stream().filter(format ->
-        format.getValue().contains("xml") || format.getValue().contains("json")
-      ).collect(Collectors.toList())
-    );
+    List<CodeType> mimeCodeTypes = SUPPORTED_MIME_TYPES.stream()
+      .map(CodeType::new)
+      .collect(Collectors.toList());
+
+    capabilityStatement.setFormat(mimeCodeTypes);
 
     capabilityStatement.setContained(Collections.emptyList());
 
