@@ -28,7 +28,7 @@ import java.util.UUID;
  */
 @Component
 @Interceptor
-public class AuditEventInterceptor extends AbstactAuditEventInterceptor {
+public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
   private static final Logger LOG = LoggerFactory.getLogger(AuditEventInterceptor.class);
   private final RequestIdHolder requestIdHolder;
 
@@ -49,14 +49,23 @@ public class AuditEventInterceptor extends AbstactAuditEventInterceptor {
   }
 
   @Hook(Pointcut.SERVER_OUTGOING_FAILURE_OPERATIONOUTCOME)
-  public void outgoingException(ServletRequestDetails requestDetails, IBaseOperationOutcome operationOutcome) {
-    AuditEventDto dto = new AuditEventDto();
-    if (setRequestType(requestDetails, dto)) {
-      setInteraction(requestDetails, dto);
-      setDevice(requestDetails, dto);
-      setOutcome(operationOutcome, dto);
-      dto.setOperationOutcome((OperationOutcome) operationOutcome);
-      auditEventService.submitAuditEvent(dto, requestDetails);
+  public void outgoingException(RequestDetails requestDetails, ServletRequestDetails servletRequestDetails, IBaseOperationOutcome operationOutcome) {
+
+    //FIXME: The tenant id is not retained throughout the interceptor. It's in the URL but not in the request.getTenantId()
+
+    try {
+      AuditEventDto dto = new AuditEventDto();
+      if (setRequestType(servletRequestDetails, dto)) {
+        setInteraction(servletRequestDetails, dto);
+        setDevice(servletRequestDetails, dto);
+        setOutcome(operationOutcome, dto);
+        dto.setOperationOutcome((OperationOutcome) operationOutcome);
+        auditEventService.submitAuditEvent(dto, servletRequestDetails);
+      }
+    } catch (Exception e) {
+      // this is a best-effort to create an audit event, but we do not want it to impact the original error response.
+      // for example, if the Device is not found, it will override the original error code with a 404
+      LOG.error("Failed to create an AuditEvent in the SERVER_OUTGOING_FAILURE_OPERATIONOUTCOME Pointcut", e);
     }
   }
 
@@ -127,7 +136,6 @@ public class AuditEventInterceptor extends AbstactAuditEventInterceptor {
           default:
             dto.setOutcome("0");
             break;
-
         }
       }
     }

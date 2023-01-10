@@ -14,20 +14,18 @@ import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.http.HttpServletRequest;
 import java.util.List;
-import java.util.UUID;
 
 /**
  *
  */
-public abstract class AbstactAuditEventInterceptor {
-  private static final Logger LOG = LoggerFactory.getLogger(AbstactAuditEventInterceptor.class);
+public abstract class AbstractAuditEventInterceptor {
+  private static final Logger LOG = LoggerFactory.getLogger(AbstractAuditEventInterceptor.class);
   protected final AuditEventService auditEventService;
   protected final IFhirResourceDao<Device> deviceDao;
   protected final DaoRegistry daoRegistry;
 
-  public AbstactAuditEventInterceptor(AuditEventService auditEventService, DaoRegistry daoRegistry) {
+  public AbstractAuditEventInterceptor(AuditEventService auditEventService, DaoRegistry daoRegistry) {
     this.auditEventService = auditEventService;
     this.deviceDao = daoRegistry.getResourceDao(Device.class);
     this.daoRegistry = daoRegistry;
@@ -43,12 +41,6 @@ public abstract class AbstactAuditEventInterceptor {
 
   private Device buildDevice(RequestDetails requestDetails) {
     return ResourceOriginUtil.getDevice(requestDetails, deviceDao).orElse(null);
-  }
-
-  protected void ensureTransactionGuid(RequestDetails requestDetails) {
-    if (StringUtils.isBlank(requestDetails.getTransactionGuid())) {
-      requestDetails.setTransactionGuid(UUID.randomUUID().toString());
-    }
   }
 
   private String getResourceQuery(ServletRequestDetails requestDetails) {
@@ -113,45 +105,38 @@ public abstract class AbstactAuditEventInterceptor {
   }
 
   protected void storageEvent(ServletRequestDetails requestDetails, IBaseResource resource) {
-    if (!(resource instanceof AuditEvent)) {
-      AuditEventDto dto = new AuditEventDto();
-      if (setRequestType(requestDetails, dto)) {
-        setInteraction(requestDetails, dto);
-        setDevice(requestDetails, dto);
-        addResources(dto, resource);
-        if (resource instanceof Bundle) {
-          Bundle bundle = (Bundle) resource;
-          List<Bundle.BundleEntryComponent> entry = bundle.getEntry();
-          if (entry != null) {
-            for (Bundle.BundleEntryComponent bundleEntryComponent : entry) {
-              addResources(dto, bundleEntryComponent.getResource());
-            }
 
+    try {
+      if (!(resource instanceof AuditEvent)) {
+        AuditEventDto dto = new AuditEventDto();
+        if (setRequestType(requestDetails, dto)) {
+          setInteraction(requestDetails, dto);
+          setDevice(requestDetails, dto);
+          addResources(dto, resource);
+          if (resource instanceof Bundle) {
+            Bundle bundle = (Bundle) resource;
+            List<Bundle.BundleEntryComponent> entry = bundle.getEntry();
+            if (entry != null) {
+              for (Bundle.BundleEntryComponent bundleEntryComponent : entry) {
+                addResources(dto, bundleEntryComponent.getResource());
+              }
+
+            }
           }
+          dto.setQuery(getResourceQuery(requestDetails));
+          dto.setOutcome("0");
+          auditEventService.submitAuditEvent(dto, requestDetails);
         }
-        dto.setQuery(getResourceQuery(requestDetails));
-        dto.setOutcome("0");
-        auditEventService.submitAuditEvent(dto, requestDetails);
+      }
+    } catch (Exception e) {
+      // this is a best-effort to create an audit event, but we do not want it to impact the original error response.
+      // for example, if the Device is not found, it will override the original error code with a 404
+      if(resource != null) {
+        LOG.error(String.format("Failed to store AuditEvent for resource [%s]", resource.getIdElement().getValue()), e);
+      } else {
+        LOG.error("Failed to store AuditEvent for resource [null]", e);
       }
     }
   }
 
-  private void storeActionKey(HttpServletRequest servletRequest, String actionKey) {
-    if (StringUtils.isNotEmpty(actionKey)) {
-      servletRequest.setAttribute(actionKey, true);
-    }
-  }
-
-  private boolean hasActionKey(HttpServletRequest servletRequest, String actionKey) {
-    return StringUtils.isNotEmpty(actionKey) && servletRequest.getAttribute(actionKey) != null;
-  }
-
-  private String getActionKey(AuditEventDto dto) {
-    AuditEventDto.EventType eventType = dto.getEventType();
-    if (dto.getResources().size() == 1) {
-      Resource resource = dto.getResources().get(0);
-      return eventType.name() + "/" + resource.getId();
-    }
-    return null;
-  }
 }

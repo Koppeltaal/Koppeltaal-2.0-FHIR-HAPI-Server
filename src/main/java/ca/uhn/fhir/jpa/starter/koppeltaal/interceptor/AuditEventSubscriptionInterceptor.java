@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
  */
 @Component
 @Interceptor
-public class AuditEventSubscriptionInterceptor extends AbstactAuditEventInterceptor {
+public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterceptor {
 	private static final Logger LOG = LoggerFactory.getLogger(AuditEventSubscriptionInterceptor.class);
 	protected final FhirContext fhirContext;
   private final RequestIdHolder requestIdHolder;
