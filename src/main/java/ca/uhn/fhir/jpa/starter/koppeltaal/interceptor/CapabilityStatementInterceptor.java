@@ -22,6 +22,14 @@ import java.util.stream.Collectors;
 @Component
 @Interceptor
 public class CapabilityStatementInterceptor {
+  public static final List<String> SUPPORTED_PATCH_MIME_TYPES = Arrays.asList(
+    "*/*",
+    "application/fhir+json",
+    "application/fhir+xml",
+    "application/json-patch+json",
+    "application/xml-patch+xml"
+  );
+
   public static final List<String> SUPPORTED_MIME_TYPES = Arrays.asList(
     "*/*",
     "xml",

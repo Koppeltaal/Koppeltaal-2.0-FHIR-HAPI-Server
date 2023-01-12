@@ -14,8 +14,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 
-import static ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.CapabilityStatementInterceptor.SUPPORTED_MIME_TYPES;
-import static ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.CapabilityStatementInterceptor.UNSUPPORTED_MIME_TYPES;
+import static ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.CapabilityStatementInterceptor.*;
 
 /**
  * Interceptor that makes sure the <code>Content-Type</code> header is supported
@@ -48,13 +47,16 @@ public class MimeTypeInterceptor {
       // the Accept header can contain additional information, seperated with a semicolon
       headerValue = StringUtils.substringBefore(headerValue, ";");
 
-      if(SUPPORTED_MIME_TYPES.contains(headerValue)) {
+      if(
+        ("PATCH".equals(request.getMethod()) && SUPPORTED_PATCH_MIME_TYPES.contains(headerValue)) ||
+          (!"PATCH".equals(request.getMethod()) && SUPPORTED_MIME_TYPES.contains(headerValue))
+      ) {
         foundSupported = true;
         break;
       }
 
       //known unsupported mime types
-      if(UNSUPPORTED_MIME_TYPES.contains(headerValue)) {
+      if (UNSUPPORTED_MIME_TYPES.contains(headerValue)) {
         foundUnsupported = true;
       }
     }
