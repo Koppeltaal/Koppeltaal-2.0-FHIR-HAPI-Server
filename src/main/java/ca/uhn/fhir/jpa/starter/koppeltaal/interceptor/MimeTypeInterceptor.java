@@ -34,22 +34,40 @@ public class MimeTypeInterceptor {
 
   private static void validateMineTypeSupport(String header, HttpServletRequest request) {
 
-    String headerValue = request.getHeader(header);
+    String rawHeaderValue = request.getHeader(header);
 
-    if(StringUtils.isBlank(headerValue)) return; //server defaults to application/fhir+json
+    if(StringUtils.isBlank(rawHeaderValue)) return; //server defaults to application/fhir+json
 
-    // the Accept header can contain additional information, seperated with a semicolon
-    headerValue = StringUtils.substringBefore(headerValue, ";");
+    String[] headerValues = rawHeaderValue.split(",");
 
-    if(SUPPORTED_MIME_TYPES.contains(headerValue)) return;
+    boolean foundUnsupported = false;
+    boolean foundSupported = false;
 
-    //known unsupported mime types
-    if(UNSUPPORTED_MIME_TYPES.contains(headerValue)) {
-      LOG.warn("Client sent known unsupported Accept header value: [{}]", headerValue);
-      throw new UnclassifiedServerFailureException(415, String.format("Unsupported Media Type [%s] provided in header [%s]. Supported media types are %s", headerValue, header, SUPPORTED_MIME_TYPES));
+    for (String headerValue : headerValues) {
+
+      // the Accept header can contain additional information, seperated with a semicolon
+      headerValue = StringUtils.substringBefore(headerValue, ";");
+
+      if(SUPPORTED_MIME_TYPES.contains(headerValue)) {
+        foundSupported = true;
+        break;
+      }
+
+      //known unsupported mime types
+      if(UNSUPPORTED_MIME_TYPES.contains(headerValue)) {
+        foundUnsupported = true;
+      }
+    }
+
+    if(foundSupported) return;
+
+    if(foundUnsupported) {
+      LOG.warn("Client sent known unsupported Accept header value: [{}]", rawHeaderValue);
+      throw new UnclassifiedServerFailureException(415, String.format("Unsupported Media Type [%s] provided in header [%s]. Supported media types are %s", rawHeaderValue, header, SUPPORTED_MIME_TYPES));
     }
 
     //alternatively, we don't mark the mime type as unknown
-    throw new UnclassifiedServerFailureException(400, String.format("Unknown Media Type [%s] provided in header [%s]. Supported media types are %s", headerValue, header, SUPPORTED_MIME_TYPES));
-  }
+    throw new UnclassifiedServerFailureException(400, String.format("Unknown Media Type [%s] provided in header [%s]. Supported media types are %s", rawHeaderValue, header, SUPPORTED_MIME_TYPES));
+    }
+
 }
