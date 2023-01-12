@@ -60,6 +60,7 @@ public class JwtSecurityInterceptor {
 	private boolean requiresBearerToken(String servletPath) {
 
     return StringUtils.startsWith(servletPath, "/fhir")
-			&& !servletPath.matches("^/fhir/[a-zA-Z0-9_-]+/(?:metadata|swagger-ui|api-docs).*"); //exclude public endpoints for multi-tenant setup - [a-zA-Z0-9_-]+ is the name of the tenant
+			&& !servletPath.matches("^/fhir/[a-zA-Z0-9_-]+/metadata.*") //allow multi-tenant /metadata requests
+      && !servletPath.matches("^/fhir/(?:swagger-ui|api-docs).*"); // allow swagger/openapi endpoints
 	}
 }
