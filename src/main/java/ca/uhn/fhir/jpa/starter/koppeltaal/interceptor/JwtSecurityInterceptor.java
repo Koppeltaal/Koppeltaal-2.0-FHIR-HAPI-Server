@@ -61,6 +61,6 @@ public class JwtSecurityInterceptor {
 
     return StringUtils.startsWith(servletPath, "/fhir")
 			&& !servletPath.matches("^/fhir/[a-zA-Z0-9_-]+/metadata.*") //allow multi-tenant /metadata requests
-      && !servletPath.matches("^/fhir/(?:swagger-ui|api-docs).*"); // allow swagger/openapi endpoints
+      && !servletPath.matches("^/fhir//?(?:swagger-ui|api-docs).*"); // allow swagger/openapi endpoints - the interface sometimes adds two slashes
 	}
 }
