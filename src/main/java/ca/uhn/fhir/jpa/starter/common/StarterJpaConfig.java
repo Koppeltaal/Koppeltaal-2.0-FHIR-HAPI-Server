@@ -370,6 +370,7 @@ public class StarterJpaConfig {
 		if (validatorModule != null) {
 			if (appProperties.getValidation().getRequests_enabled()) {
 				RequestValidatingInterceptor interceptor = new RequestValidatingInterceptor();
+        interceptor.setIgnoreValidatorExceptions(true); //KOP-431 customization
 				interceptor.setFailOnSeverity(ResultSeverityEnum.ERROR);
 				interceptor.setValidatorModules(Collections.singletonList(validatorModule));
 				fhirServer.registerInterceptor(interceptor);
