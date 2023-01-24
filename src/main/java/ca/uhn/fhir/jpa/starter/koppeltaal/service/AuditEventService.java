@@ -1,7 +1,9 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.service;
 
+import ca.uhn.fhir.interceptor.model.RequestPartitionId;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.api.model.DaoMethodOutcome;
+import ca.uhn.fhir.jpa.partition.SystemRequestDetails;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuditEventDto;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import org.hl7.fhir.r4.model.AuditEvent;
@@ -47,7 +49,11 @@ public class AuditEventService {
       try {
 
         Thread.sleep(2000); //introduce a delay as this runs async and can cause a concurrency issue where the referenced entity doesn't exist yet, causing referential integrity issues
-        DaoMethodOutcome outcome = auditEventDao.create(auditEvent, requestDetails);
+
+        SystemRequestDetails systemRequestDetails = new SystemRequestDetails();
+        systemRequestDetails.setRequestPartitionId(RequestPartitionId.defaultPartition()); //FIXME: Solution isn't multi-tenant
+
+        DaoMethodOutcome outcome = auditEventDao.create(auditEvent, systemRequestDetails);
         if (!outcome.getCreated()) {
           LOG.warn("Unexpected outcome");
         }

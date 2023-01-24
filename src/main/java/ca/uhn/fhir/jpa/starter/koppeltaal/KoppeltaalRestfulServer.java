@@ -1,6 +1,7 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.interceptor.api.IInterceptorService;
 import ca.uhn.fhir.jpa.api.config.DaoConfig;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
@@ -67,41 +68,44 @@ public class KoppeltaalRestfulServer extends RestfulServer {
   @Autowired
   private MimeTypeInterceptor mimeTypeInterceptor;
 
+  @Autowired
+  private IInterceptorService myInterceptorRegistry;
+
 	public KoppeltaalRestfulServer(FhirContext context) {
 		super(context);
 	}
 
 	@Override
 	protected void initialize() throws ServletException {
-		super.initialize();
 
 		// Add your own customization here
     registerInterceptor(mimeTypeInterceptor);
 
+			IFhirResourceDao<Device> deviceDao = daoRegistry.getResourceDao(Device.class);
 		if (fhirServerSecurityConfiguration.isEnabled()) {
 			registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
 
-			IFhirResourceDao<Device> deviceDao = daoRegistry.getResourceDao(Device.class);
 			registerInterceptor(new InjectResourceOriginInterceptor(daoRegistry, deviceDao, smartBackendServiceConfiguration)); // can only determine this from the Bearer token
 			registerInterceptor(new ResourceOriginAuthorizationInterceptor(daoRegistry, deviceDao, smartBackendServiceAuthorizationService, smartBackendServiceConfiguration));
 			registerInterceptor(new ResourceOriginSearchNarrowingInterceptor(daoRegistry, deviceDao, smartBackendServiceAuthorizationService));
 
+		}
 			//The SubscriptionInterceptor is somehow not properly registered with `registerInterceptor`, but does work via the `interceptorService`
 			// Figured it out, there a 2 InterceptorService(s). One in the constructor of {@RestfulServer}:
 			// {code}
 			// new InterceptorService("RestfulServer")
 			// {code}
 			// And one JPA version. They both do DIFFERENT things. The horror.
-//			interceptorService.registerInterceptor(new SubscriptionInterceptor(daoRegistry, deviceDao, smartBackendServiceAuthorizationService));
-			registerInterceptor(new SubscriptionInterceptor(daoRegistry, deviceDao, smartBackendServiceAuthorizationService));
-		}
+      SubscriptionInterceptor subscriptionInterceptor = new SubscriptionInterceptor(daoRegistry, deviceDao, smartBackendServiceAuthorizationService);
+      myInterceptorRegistry.registerInterceptor(subscriptionInterceptor);
+      registerInterceptor(subscriptionInterceptor);
 
 		if (fhirServerAuditLogConfiguration.isEnabled()) {
 			registerInterceptor(auditEventInterceptor);
       registerInterceptor(injectCorrelationIdInterceptor);
       registerInterceptor(injectTraceIdInterceptor);
 			// Yes, this is ANOTHER interceptor.
-//			interceptorService.registerInterceptor(auditEventSubscriptionInterceptor);
+      myInterceptorRegistry.registerInterceptor(auditEventSubscriptionInterceptor);
 			registerInterceptor(auditEventSubscriptionInterceptor);
 			registerInterceptor(auditEventIntergityInterceptor);
 		}
