@@ -69,6 +69,7 @@ public abstract class AbstractAuditEventInterceptor {
         case READ:
           dto.setEventType(AuditEventDto.EventType.Read);
           return true;
+        case GET_PAGE:
         case SEARCH_TYPE:
           dto.setEventType(AuditEventDto.EventType.Search);
           return true;
