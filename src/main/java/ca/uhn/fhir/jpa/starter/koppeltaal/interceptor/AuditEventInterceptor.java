@@ -128,8 +128,10 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
         OperationOutcome.IssueSeverity severity = outcome.getSeverity();
         switch (severity) {
           case WARNING:
-          case ERROR:
             dto.setOutcome("4");
+            break;
+          case ERROR:
+            dto.setOutcome("8");
             break;
           case INFORMATION:
           case NULL:
