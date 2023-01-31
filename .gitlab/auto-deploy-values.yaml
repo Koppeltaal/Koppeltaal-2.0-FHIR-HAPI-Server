@@ -4,8 +4,10 @@ service:
 
 livenessProbe:
   probeType: "tcpSocket"
-  initialDelaySeconds: 160
+  initialDelaySeconds: 30
+#  initialDelaySeconds: 160 #enable when new npm profiles have to be loaded
 
 readinessProbe:
   probeType: "tcpSocket"
-  initialDelaySeconds: 180
+  initialDelaySeconds: 40
+#  initialDelaySeconds: 180 #enable when new npm profiles have to be loaded
