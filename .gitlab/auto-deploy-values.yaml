@@ -16,9 +16,6 @@ readinessProbe:
 persistence:
   enabled: true
   persistence:
-    volumes[0]:
-      name: lucene-data
-      claim:
-        size: 1Gi
-      mount:
-        path: /data/lucene
+    volumes[0].name: lucene-data
+    volumes[0].claim.size: 1Gi
+    volumes[0].mount.path: /data/lucene
