@@ -11,3 +11,7 @@ readinessProbe:
   probeType: "tcpSocket"
   initialDelaySeconds: 60
 #  initialDelaySeconds: 180 #enable when new npm profiles have to be loaded
+
+# Enable PV & PVC creation to mount Lucene db
+persistence.enabled: true
+persistence.volumes[0].claim.size: 1Gi
