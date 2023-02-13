@@ -13,11 +13,12 @@ readinessProbe:
 #  initialDelaySeconds: 180 #enable when new npm profiles have to be loaded
 
 # AD PV & PVC creation to mount Lucene db
-extraVolumes: |
-  - name: lucene-volume
-    persistentVolumeClaim:
-      claimName: lucene-pvc
-
-extraVolumeMounts: |
-  - name: lucene-volume-mount
-    mountPath: /data/lucene
+persistence:
+  enabled: true
+  persistence:
+    volumes[0]:
+      name: lucene-data
+      claim:
+        size: 1Gi
+      mount:
+        path: /data/lucene
