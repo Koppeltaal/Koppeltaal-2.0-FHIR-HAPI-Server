@@ -14,4 +14,3 @@ readinessProbe:
 
 # Enable PV & PVC creation to mount Lucene db
 persistence.enabled: true
-persistence.volumes[0].claim.size: 1Gi
