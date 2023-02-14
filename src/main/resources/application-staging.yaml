@@ -1,0 +1,4 @@
+spring:
+  jpa:
+    properties:
+      hibernate.search.backend.directory.root: /pvc-mount/staging/lucene/
