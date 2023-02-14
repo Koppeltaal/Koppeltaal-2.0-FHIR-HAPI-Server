@@ -57,6 +57,8 @@ RUN [\
  "/tmp/ximulator12.test.aorta-zorg.nl.cer"\
 ]
 
+RUN chown 65532:65532 /pvc-mount
+
 # 65532 is the nonroot user's uid
 # used here instead of the name to allow Kubernetes to easily detect that the container
 # is running as a non-root (uid != 0) user.
