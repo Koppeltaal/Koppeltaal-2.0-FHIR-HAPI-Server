@@ -36,13 +36,15 @@ COPY --from=build-hapi --chown=1001:1001 /tmp/hapi-fhir-jpaserver-starter/opente
 ENV ALLOW_EMPTY_PASSWORD=yes
 
 ########### distroless brings focus on security and runs on plain spring boot - this is the default image
-FROM gcr.io/distroless/java17-debian11:nonroot as default
-COPY --chown=nonroot:nonroot --from=build-distroless /app /app
+#FROM gcr.io/distroless/java17-debian11:nonroot as default
+#COPY --chown=nonroot:nonroot --from=build-distroless /app /app
+FROM gcr.io/distroless/java17-debian11:latest as default
+COPY --from=build-distroless /app /app
 
 COPY certificates/ximulator12.test.aorta-zorg.nl.cer /tmp/ximulator12.test.aorta-zorg.nl.cer
 
 # tmp swap to root user to install a certificate
-USER 0
+#USER 0
 RUN [\
  "/usr/lib/jvm/java-17-openjdk-amd64/bin/keytool",\
  "-import",\
@@ -57,14 +59,14 @@ RUN [\
  "/tmp/ximulator12.test.aorta-zorg.nl.cer"\
 ]
 
-RUN chown 65532:65532 /pvc-mount
-
 # 65532 is the nonroot user's uid
 # used here instead of the name to allow Kubernetes to easily detect that the container
 # is running as a non-root (uid != 0) user.
-USER 65532:65532
+#USER 65532:65532
 WORKDIR /app
 
+#COPY --chown=nonroot:nonroot --from=build-distroless /app /app
+#COPY --chown=nonroot:nonroot --from=build-hapi /tmp/hapi-fhir-jpaserver-starter/opentelemetry-javaagent.jar /app
 COPY --chown=nonroot:nonroot --from=build-distroless /app /app
 COPY --chown=nonroot:nonroot --from=build-hapi /tmp/hapi-fhir-jpaserver-starter/opentelemetry-javaagent.jar /app
 
