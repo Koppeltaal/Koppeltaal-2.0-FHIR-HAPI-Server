@@ -4,12 +4,12 @@ service:
 
 livenessProbe:
   probeType: "tcpSocket"
-  initialDelaySeconds: 50
+  initialDelaySeconds: 80
 #  initialDelaySeconds: 160 #enable when new npm profiles have to be loaded
 
 readinessProbe:
   probeType: "tcpSocket"
-  initialDelaySeconds: 60
+  initialDelaySeconds: 90
 #  initialDelaySeconds: 180 #enable when new npm profiles have to be loaded
 
 # AD PV & PVC creation to mount Lucene db
