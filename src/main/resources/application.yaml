@@ -238,6 +238,34 @@ fhir:
           value: "koppeltaal-server-001"
 
 smart:
+  configuration:
+    issuer: https://auth-service.koppeltaal.headease.nl
+    jwks_uri: https://auth-service.koppeltaal.headease.nl/.well-known/jwks.json
+    authorization_endpoint: https://auth-service.koppeltaal.headease.nl/oauth2/authorize
+    grant_types_supported:
+      - authorization_code
+      - client_credentials
+    token_endpoint: https://auth-service.koppeltaal.headease.nl/oauth2/token
+    token_endpoint_auth_methods_supported:
+      - authorization_code
+      - client_credentials
+    scopes_supported:
+      - openid
+      - launch
+      - fhirUser
+      - system/*.cruds
+    response_types_supported:
+      - code
+    introspection_endpoint: https://auth-service.koppeltaal.headease.nl/oauth2/introspect
+    capabilities:
+      - launch-ehr
+      - authorize-post
+      - client-confidential-asymmetric
+      - sso-openid-connect
+      - context-ehr-hti
+      - permission-v2
+    code_challenge_methods_supported:
+      - S256
   backend:
     service:
       baseUrl: "http://127.0.0.1:8086"

@@ -6,6 +6,7 @@ import ca.uhn.fhir.jpa.starter.annotations.OnEitherVersion;
 import ca.uhn.fhir.jpa.starter.koppeltaal.KoppeltaalRestfulServer;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration;
 import ca.uhn.fhir.jpa.starter.common.FhirTesterConfig;
+import ca.uhn.fhir.jpa.starter.koppeltaal.controller.SmartConfigurationController;
 import ca.uhn.fhir.jpa.starter.mdm.MdmConfig;
 import ca.uhn.fhir.jpa.subscription.channel.config.SubscriptionChannelConfig;
 import ca.uhn.fhir.jpa.subscription.match.config.SubscriptionProcessorConfig;
@@ -89,5 +90,23 @@ public class Application extends SpringBootServletInitializer {
     registrationBean.setLoadOnStartup(1);
     return registrationBean;
 
+  }
+
+  @Bean
+  public ServletRegistrationBean smartConfigurationBean() {
+
+    AnnotationConfigWebApplicationContext annotationConfigWebApplicationContext = new AnnotationConfigWebApplicationContext();
+    DispatcherServlet dispatcherServlet = new DispatcherServlet(annotationConfigWebApplicationContext);
+    dispatcherServlet.setContextClass(AnnotationConfigWebApplicationContext.class);
+    dispatcherServlet.setContextConfigLocation(SmartConfigurationController.class.getName());
+
+    ServletRegistrationBean registrationBean = new ServletRegistrationBean();
+    registrationBean.setName("wellknown");
+    registrationBean.setServlet(dispatcherServlet);
+
+    //TODO: Read all partitions and add a mapping in the varargs below
+    registrationBean.addUrlMappings("/fhir/DEFAULT/.well-known/*");
+    registrationBean.setLoadOnStartup(1);
+    return registrationBean;
   }
 }
