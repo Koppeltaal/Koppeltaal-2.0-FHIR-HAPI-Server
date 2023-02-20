@@ -2,3 +2,11 @@ spring:
   jpa:
     properties:
       hibernate.search.backend.directory.root: /pvc-mount/staging/lucene/
+
+smart:
+  configuration:
+    issuer: https://staging-auth-service.koppeltaal.headease.nl
+    jwks_uri: https://staging-auth-service.koppeltaal.headease.nl/.well-known/jwks.json
+    authorization_endpoint: https://staging-auth-service.koppeltaal.headease.nl/oauth2/authorize
+    token_endpoint: https://staging-auth-service.koppeltaal.headease.nl/oauth2/token
+    introspection_endpoint: https://staging-auth-service.koppeltaal.headease.nl/oauth2/introspect
