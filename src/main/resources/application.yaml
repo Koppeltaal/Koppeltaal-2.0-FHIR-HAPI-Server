@@ -247,8 +247,7 @@ smart:
       - client_credentials
     token_endpoint: http://localhost:8083/oauth2/token
     token_endpoint_auth_methods_supported:
-      - authorization_code
-      - client_credentials
+      - private_key_jwt
     scopes_supported:
       - openid
       - launch
