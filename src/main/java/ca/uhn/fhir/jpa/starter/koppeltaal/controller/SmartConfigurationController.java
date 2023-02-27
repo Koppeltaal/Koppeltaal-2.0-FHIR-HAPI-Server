@@ -22,7 +22,7 @@ public class SmartConfigurationController {
     }
   }
 
-  @GetMapping(value = "/smart-configuration", produces = "application/json")
+  @GetMapping(value = "/smart-configuration", headers = "Accept=*/*", produces = "application/json")
   public String getSmartConfiguration() {
     return smartConfiguration;
   }
