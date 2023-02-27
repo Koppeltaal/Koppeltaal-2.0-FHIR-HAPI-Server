@@ -10,3 +10,4 @@ smart:
     authorization_endpoint: https://auth-service.koppeltaal.headease.nl/oauth2/authorize
     token_endpoint: https://auth-service.koppeltaal.headease.nl/oauth2/token
     introspection_endpoint: https://auth-service.koppeltaal.headease.nl/oauth2/introspect
+    management_endpoint: https://domain-admin.koppeltaal.headease.nl

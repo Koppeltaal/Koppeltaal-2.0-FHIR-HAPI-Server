@@ -15,6 +15,7 @@ public class SmartConfigurationProperties {
   private String issuer;
   private String jwks_uri;
   private String authorization_endpoint;
+  private String management_endpoint;
   private List<String> grant_types_supported = new ArrayList<>();
   private String token_endpoint;
   private List<String> token_endpoint_auth_methods_supported = new ArrayList<>();
@@ -46,6 +47,14 @@ public class SmartConfigurationProperties {
 
   public void setAuthorization_endpoint(String authorization_endpoint) {
     this.authorization_endpoint = authorization_endpoint;
+  }
+
+  public String getManagement_endpoint() {
+    return management_endpoint;
+  }
+
+  public void setManagement_endpoint(String management_endpoint) {
+    this.management_endpoint = management_endpoint;
   }
 
   public List<String> getGrant_types_supported() {

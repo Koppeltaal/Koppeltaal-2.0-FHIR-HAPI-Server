@@ -266,6 +266,7 @@ smart:
       - permission-v2
     code_challenge_methods_supported:
       - S256
+    management_endpoint: http://localhost:8085
   backend:
     service:
       baseUrl: "http://127.0.0.1:8086"
