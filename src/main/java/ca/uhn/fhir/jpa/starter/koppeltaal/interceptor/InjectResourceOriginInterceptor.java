@@ -90,6 +90,7 @@ public class InjectResourceOriginInterceptor {
 			final String requesterClientId = ResourceOriginUtil.getRequesterClientId(requestDetails)
 				.orElseThrow(() -> new IllegalStateException("client_id not present"));
 
+      //FIXME: KOP-533 - resource-origin is now never set from domain admin, this should only be done when the initial device is missing
 			if(StringUtils.equals(smartBackendServiceConfiguration.getDomainAdminClientId(), requesterClientId)) return;
 		}
 
@@ -98,16 +99,16 @@ public class InjectResourceOriginInterceptor {
 		Device device = ResourceOriginUtil.getDevice(requestDetails, deviceDao)
 			.orElseThrow(() -> new InvalidRequestException("Device not present"));
 
-		final Extension resourceOriginExtension = new Extension();
-		resourceOriginExtension.setUrl(RESOURCE_ORIGIN_SYSTEM);
-		final Reference deviceReference = new Reference(device);
-		deviceReference.setType(ResourceType.Device.name());
-		resourceOriginExtension.setValue(deviceReference);
+    final Extension resourceOriginExtension = new Extension();
+    resourceOriginExtension.setUrl(RESOURCE_ORIGIN_SYSTEM);
+    final Reference deviceReference = new Reference(device);
+    deviceReference.setType(ResourceType.Device.name());
+    resourceOriginExtension.setValue(deviceReference);
 
-		domainResource.addExtension(resourceOriginExtension);
-	}
+    domainResource.addExtension(resourceOriginExtension);
+  }
 
-	private void ensureResourceOriginIsUnmodifiedOrEnsureResourceOrigin(RequestDetails requestDetails, DomainResource frontendResource) {
+  private void ensureResourceOriginIsUnmodifiedOrEnsureResourceOrigin(RequestDetails requestDetails, DomainResource frontendResource) {
 
 		final List<Extension> frontendResourceOriginExtension = frontendResource.getExtensionsByUrl(RESOURCE_ORIGIN_SYSTEM);
 

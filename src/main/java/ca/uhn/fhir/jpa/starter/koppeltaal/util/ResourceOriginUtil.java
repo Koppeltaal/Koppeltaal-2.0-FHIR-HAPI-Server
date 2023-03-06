@@ -58,6 +58,7 @@ public class ResourceOriginUtil {
 
 	private static Optional<Device> getDevice(String clientId, IFhirResourceDao<Device> deviceDao, RequestDetails requestDetails) {
 		final SearchParameterMap searchParameterMap = new SearchParameterMap();
+    //FIXME: KOP-535 - should include system
 		searchParameterMap.add(StructureDefinition.SP_IDENTIFIER, new TokenParam(clientId));
 
 		final IBundleProvider searchResults = deviceDao.search(searchParameterMap, requestDetails);
