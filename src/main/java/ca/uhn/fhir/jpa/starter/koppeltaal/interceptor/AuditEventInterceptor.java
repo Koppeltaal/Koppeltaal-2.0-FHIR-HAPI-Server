@@ -9,17 +9,20 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.RequestIdHolder;
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
+import ca.uhn.fhir.rest.server.exceptions.BaseServerResponseException;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseOperationOutcome;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.OperationOutcome;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -48,25 +51,63 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
     storageEvent(requestDetails, resource);
   }
 
-  @Hook(Pointcut.SERVER_OUTGOING_FAILURE_OPERATIONOUTCOME)
-  public void outgoingException(RequestDetails requestDetails, ServletRequestDetails servletRequestDetails, IBaseOperationOutcome operationOutcome) {
-
-    //FIXME: The tenant id is not retained throughout the interceptor. It's in the URL but not in the request.getTenantId()
+  @Hook(value = Pointcut.SERVER_PRE_PROCESS_OUTGOING_EXCEPTION, order = 100)
+  public void preOutgoingException(ServletRequestDetails servletRequestDetails, Throwable throwable) {
 
     try {
-      AuditEventDto dto = new AuditEventDto();
-      if (setRequestType(servletRequestDetails, dto)) {
-        setInteraction(servletRequestDetails, dto);
-        setDevice(servletRequestDetails, dto);
-        setOutcome(operationOutcome, dto);
-        dto.setOperationOutcome((OperationOutcome) operationOutcome);
-        auditEventService.submitAuditEvent(dto, servletRequestDetails);
+      if(throwable instanceof BaseServerResponseException) {
+        BaseServerResponseException serverResponseException = (BaseServerResponseException) throwable;
+
+        int statusCode = serverResponseException.getStatusCode();
+        boolean isSeriousFailure = statusCode >= 500;
+        boolean isMinorFailure = statusCode >= 400 && !isSeriousFailure;
+        if(!isSeriousFailure && !isMinorFailure) {
+          LOG.error("Found response code [{}] in SERVER_PRE_PROCESS_OUTGOING_EXCEPTION, assumed never be smaller than 400!", statusCode);
+        }
+
+        AuditEventDto dto = new AuditEventDto();
+        if (setRequestType(servletRequestDetails, dto)) {
+          setInteraction(servletRequestDetails, dto);
+          setDevice(servletRequestDetails, dto);
+          dto.setOutcome(isSeriousFailure ? "8" : "4");
+
+          OperationOutcome operationOutcome = (OperationOutcome) serverResponseException.getOperationOutcome();
+          if(operationOutcome == null) {
+            operationOutcome = generateOperationOutcome(serverResponseException.getMessage());
+          }
+
+          dto.setOperationOutcome(operationOutcome);
+          auditEventService.submitAuditEvent(dto, servletRequestDetails);
+        }
+      } else {
+        LOG.warn("AuditEvent in SERVER_PRE_PROCESS_OUTGOING_EXCEPTION not an instance of BaseServerResponseException - forging OperationOutcome");
+        AuditEventDto dto = new AuditEventDto();
+        if (setRequestType(servletRequestDetails, dto)) {
+          setInteraction(servletRequestDetails, dto);
+          setDevice(servletRequestDetails, dto);
+          OperationOutcome operationOutcome = generateOperationOutcome(throwable.getMessage());
+          dto.setOperationOutcome(operationOutcome);
+          dto.setOutcome("8");
+          auditEventService.submitAuditEvent(dto, servletRequestDetails);
+        }
       }
     } catch (Exception e) {
       // this is a best-effort to create an audit event, but we do not want it to impact the original error response.
       // for example, if the Device is not found, it will override the original error code with a 404
       LOG.error("Failed to create an AuditEvent in the SERVER_OUTGOING_FAILURE_OPERATIONOUTCOME Pointcut", e);
     }
+  }
+
+  @NotNull
+  private static OperationOutcome generateOperationOutcome(String errorDescription) {
+    OperationOutcome operationOutcome = new OperationOutcome();
+    OperationOutcome.OperationOutcomeIssueComponent issue = new OperationOutcome.OperationOutcomeIssueComponent();
+    issue.setSeverity(OperationOutcome.IssueSeverity.ERROR);
+    issue.setCode(OperationOutcome.IssueType.EXCEPTION);
+    issue.setDiagnostics(errorDescription);
+
+    operationOutcome.setIssue(Collections.singletonList(issue));
+    return operationOutcome;
   }
 
   @Hook(Pointcut.SERVER_OUTGOING_RESPONSE)
@@ -126,9 +167,13 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
       if (!issue.isEmpty()) {
         OperationOutcome.OperationOutcomeIssueComponent outcome = issue.get(0);
         OperationOutcome.IssueSeverity severity = outcome.getSeverity();
+
         switch (severity) {
           case WARNING:
             dto.setOutcome("4");
+            break;
+          case FATAL:
+            dto.setOutcome("12");
             break;
           case ERROR:
             dto.setOutcome("8");
