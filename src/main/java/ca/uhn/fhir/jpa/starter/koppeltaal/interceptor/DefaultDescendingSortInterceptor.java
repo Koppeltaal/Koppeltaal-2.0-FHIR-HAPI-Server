@@ -3,9 +3,8 @@ package ca.uhn.fhir.jpa.starter.koppeltaal.interceptor;
 import ca.uhn.fhir.interceptor.api.Hook;
 import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
-import ca.uhn.fhir.rest.api.RequestTypeEnum;
+import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
-import org.apache.commons.lang3.StringUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -20,9 +19,7 @@ public class DefaultDescendingSortInterceptor {
 	@Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)
 	protected void ensureDefaultSort(RequestDetails requestDetails) {
 
-    final String resourceName = requestDetails.getResourceName();
-
-    if(requestDetails.getRequestType() != RequestTypeEnum.GET || StringUtils.isBlank(resourceName)) return;
+    if(requestDetails.getRestOperationType() != RestOperationTypeEnum.SEARCH_TYPE) return;
 
 		final Map<String, String[]> requestDetailsParameters = requestDetails.getParameters();
 
