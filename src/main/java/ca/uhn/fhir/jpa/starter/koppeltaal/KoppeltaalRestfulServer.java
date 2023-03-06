@@ -130,6 +130,8 @@ public class KoppeltaalRestfulServer extends RestfulServer {
     referentialIntegrityDeleteInterceptor.addPath("AuditEvent.entity.what");
     registerInterceptor(referentialIntegrityDeleteInterceptor);
 
+    registerInterceptor(new DefaultDescendingSortInterceptor());
+
     daoConfig.setResourceServerIdStrategy(DaoConfig.IdStrategyEnum.UUID);
 	}
 }
