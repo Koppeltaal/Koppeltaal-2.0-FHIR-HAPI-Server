@@ -151,41 +151,4 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
   public void updating(ServletRequestDetails requestDetails, IBaseResource resource) {
     storageEvent(requestDetails, resource);
   }
-
-  private String getTransactionGuid(RequestDetails requestDetails) {
-    String transactionGuid = requestDetails.getTransactionGuid();
-    if (StringUtils.isEmpty(transactionGuid)) {
-      transactionGuid = UUID.randomUUID().toString();
-      requestDetails.setTransactionGuid(transactionGuid);
-    }
-    return transactionGuid;
-  }
-
-  private void setOutcome(IBaseOperationOutcome operationOutcome, AuditEventDto dto) {
-    if (operationOutcome instanceof OperationOutcome) {
-      List<OperationOutcome.OperationOutcomeIssueComponent> issue = ((OperationOutcome) operationOutcome).getIssue();
-      if (!issue.isEmpty()) {
-        OperationOutcome.OperationOutcomeIssueComponent outcome = issue.get(0);
-        OperationOutcome.IssueSeverity severity = outcome.getSeverity();
-
-        switch (severity) {
-          case WARNING:
-            dto.setOutcome("4");
-            break;
-          case FATAL:
-            dto.setOutcome("12");
-            break;
-          case ERROR:
-            dto.setOutcome("8");
-            break;
-          case INFORMATION:
-          case NULL:
-          default:
-            dto.setOutcome("0");
-            break;
-        }
-      }
-    }
-  }
-
 }
