@@ -1,30 +1,16 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.interceptor;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.when;
-
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
-import ca.uhn.fhir.jpa.starter.koppeltaal.dto.CrudOperation;
-import ca.uhn.fhir.jpa.starter.koppeltaal.dto.PermissionDto;
-import ca.uhn.fhir.jpa.starter.koppeltaal.dto.PermissionScope;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizationService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
-import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeSet;
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.algorithms.Algorithm;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.Device;
@@ -39,250 +25,285 @@ import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import javax.servlet.http.HttpServletRequest;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
 @ExtendWith(MockitoExtension.class)
 class ResourceOriginAuthorizationInterceptorTest {
 
-	private static MockedStatic<ResourceOriginUtil> resourceOriginUtil;
+  private static MockedStatic<ResourceOriginUtil> resourceOriginUtil;
 
-	private ResourceOriginAuthorizationInterceptor interceptor;
-	private DaoRegistry daoRegistry;
-	private IFhirResourceDao<Device> deviceDao;
-	private SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService;
+  private ResourceOriginAuthorizationInterceptor interceptor;
+  private DaoRegistry daoRegistry;
 
-	@BeforeAll
-	public static void initAll() {
-		resourceOriginUtil = mockStatic(ResourceOriginUtil.class);
-	}
+  private final IdType defaultDeviceRef = new IdType("Device", 123L);
 
-	@AfterAll
-	public static void afterAll() {
-		resourceOriginUtil.close();
-	}
+  @BeforeAll
+  public static void initAll() {
+    resourceOriginUtil = mockStatic(ResourceOriginUtil.class);
+  }
 
-	@BeforeEach
-	void init(@Mock DaoRegistry daoRegistry,
-		@Mock IFhirResourceDao<Device> deviceDao,
-		@Mock SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService,
-		@Mock SmartBackendServiceConfiguration smartBackendServiceConfiguration
-	) {
+  @AfterAll
+  public static void afterAll() {
+    resourceOriginUtil.close();
+  }
 
-		this.smartBackendServiceAuthorizationService = smartBackendServiceAuthorizationService;
-		this.daoRegistry = daoRegistry;
-		this.deviceDao = deviceDao;
+  @BeforeEach
+  void init(@Mock DaoRegistry daoRegistry,
+            @Mock IFhirResourceDao<Device> deviceDao,
+            @Mock SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService,
+            @Mock SmartBackendServiceConfiguration smartBackendServiceConfiguration
+  ) {
 
-		interceptor = new ResourceOriginAuthorizationInterceptor(
-			daoRegistry,
-			deviceDao,
-			smartBackendServiceAuthorizationService,
-			smartBackendServiceConfiguration
-		);
+    this.daoRegistry = daoRegistry;
 
-		final Device device = new Device();
-		device.setIdElement(new IdType("Device", 123L));
+    interceptor = new ResourceOriginAuthorizationInterceptor(
+      daoRegistry,
+      deviceDao,
+      smartBackendServiceAuthorizationService,
+      smartBackendServiceConfiguration
+    );
 
-		lenient().when(deviceDao.read(any(IdType.class), any(RequestDetails.class)))
-			.thenReturn(device);
+    resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(any(IBaseResource.class)))
+      .thenReturn(Optional.of(defaultDeviceRef));
+  }
 
-		resourceOriginUtil.when(() -> ResourceOriginUtil.getDevice(any(RequestDetails.class), any()))
-			.thenReturn(Optional.of(device));
-	}
+  @Test
+  public void shouldCreate() {
+    shouldAllow(RequestTypeEnum.POST, true);
+  }
 
-	@Test
-	public void shouldBeUnauthenticatedWhenDeviceNotFound() {
+  @Test
+  public void shouldNotCreate() {
+    shouldNotAllow(RequestTypeEnum.POST, true);
+  }
 
-		RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.POST,
-			CrudOperation.CREATE, ResourceType.Task, PermissionScope.ALL, null);
+  @Test
+  public void shouldReadOne() {
+    shouldAllow(RequestTypeEnum.GET, true);
+  }
 
-		resourceOriginUtil.when(() -> ResourceOriginUtil.getDevice(any(RequestDetails.class), any()))
-			.thenReturn(Optional.empty());
+  @Test
+  public void shouldNotReadOne() {
+    shouldNotAllow(RequestTypeEnum.GET, true);
+  }
 
-		assertThrows(InvalidRequestException.class, () ->
-			interceptor.authorizeRequest(requestDetails)
-		);
-	}
+  @Test
+  public void shouldReadAll() {
+    shouldAllow(RequestTypeEnum.GET, false);
+    shouldAllow(RequestTypeEnum.GET, false, "Device/456"); //should not fail as search narrowing handles this
+  }
 
-	@Test
-	public void testPermissionsWithAllScope() {
+  @Test
+  public void shouldNotReadAll() {
+    shouldNotAllow(RequestTypeEnum.GET, false);
+  }
 
-		final IdType resourceId = new IdType(ResourceType.Task.name(), 12L);
+  @Test
+  public void shouldUpdate() {
+    shouldAllow(RequestTypeEnum.PUT, true);
+  }
 
-		RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.POST,
-			CrudOperation.CREATE, ResourceType.Task, PermissionScope.ALL, resourceId);
+  @Test
+  public void shouldNotUpdate() {
+    shouldNotAllow(RequestTypeEnum.PUT, true);
+  }
 
-		interceptor.authorizeRequest(requestDetails);
+  @Test
+  public void shouldDelete() {
+    shouldAllow(RequestTypeEnum.DELETE, true);
+  }
 
-		requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.GET,
-			CrudOperation.READ, ResourceType.Task, PermissionScope.ALL, resourceId);
+  @Test
+  public void shouldNotDelete() {
+    shouldNotAllow(RequestTypeEnum.DELETE, true);
+  }
 
-		interceptor.authorizeRequest(requestDetails);
+  private void shouldAllow(RequestTypeEnum requestType, boolean hasResource, String... resourceOrigins) {
+    final IdType resourceId = hasResource ? new IdType(ResourceType.Task.name(), 12L) : null;
 
-		requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.PUT,
-			CrudOperation.UPDATE, ResourceType.Task, PermissionScope.ALL, resourceId);
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(requestType, ResourceType.Task, resourceId);
 
-		interceptor.authorizeRequest(requestDetails);
+    String crudsValue;
+    switch (requestType) {
+      case GET: crudsValue = "rs"; break;
+      case POST: crudsValue = "c"; break;
+      case PUT: crudsValue = "u"; break;
+      case DELETE: crudsValue = "d"; break;
+      default: throw new RuntimeException("invalid request type");
+    }
 
-		requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.DELETE,
-			CrudOperation.DELETE, ResourceType.Task, PermissionScope.ALL, resourceId);
+    HttpServletRequest request = mockRequest(requestDetails, crudsValue);
+    interceptor.authorizeRequest(requestDetails, request); //without resource-origin, the ALL permission
 
-		interceptor.authorizeRequest(requestDetails);
-	}
+    request = mockRequest(requestDetails, crudsValue, defaultDeviceRef.getValue()); //with OWN permission
+    interceptor.authorizeRequest(requestDetails, request);
 
-	@Test
-	public void shouldAllowCreateOwn() {
-		RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.POST,
-			CrudOperation.CREATE, ResourceType.Task, PermissionScope.OWN, null);
+    if(resourceOrigins != null) {
+      request = mockRequest(requestDetails, crudsValue, resourceOrigins); //with GRANTED permission
+      interceptor.authorizeRequest(requestDetails, request);
+    }
+  }
 
-		interceptor.authorizeRequest(requestDetails);
-	}
+  private void shouldNotAllow(RequestTypeEnum requestType, boolean hasResource, String... resourceOrigins) {
+    final IdType resourceId = hasResource ? new IdType(ResourceType.Task.name(), 12L) : null;
 
-	@Test
-	public void shouldNotAllowWithoutPermission() {
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(requestType, ResourceType.Task, resourceId);
 
-		RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.POST,
-			CrudOperation.UPDATE, ResourceType.Task, PermissionScope.OWN, null);
-
-		when(smartBackendServiceAuthorizationService.getPermission(anyString(), eq(requestDetails)))
-			.thenReturn(Optional.empty());
-
-		assertThrows(ForbiddenOperationException.class, () ->
-			interceptor.authorizeRequest(requestDetails)
-		);
-	}
-
-	@Test
-	public void shouldNotBeAbleToModifyOtherResourceWithOwnScope() {
-		final IdType resourceId = new IdType(ResourceType.Task.name(), 12L);
-
-		RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.POST,
-			CrudOperation.UPDATE, ResourceType.Task, PermissionScope.OWN, resourceId);
-
-		final IdType otherDeviceId = new IdType("Device", 567L);
-		resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(any(IBaseResource.class)))
-			.thenReturn(Optional.of(otherDeviceId));
-
-		final Device otherDevice = new Device();
-		otherDevice.setId(otherDeviceId);
-
-		when(deviceDao.read(eq(otherDeviceId), any(RequestDetails.class)))
-			.thenReturn(otherDevice);
-
-		assertThrows(ForbiddenOperationException.class, () ->
-			interceptor.authorizeRequest(requestDetails)
-		);
-	}
-
-	@Test
-	public void shouldBeAbleToModifyOtherResourceWithOwnScope() {
-		final IdType resourceId = new IdType(ResourceType.Task.name(), 12L);
-
-		RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.POST,
-			CrudOperation.UPDATE, ResourceType.Task, PermissionScope.OWN, resourceId);
-
-		final IdType otherDeviceId = new IdType("Device", 123L);
-		resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(any(IBaseResource.class)))
-			.thenReturn(Optional.of(otherDeviceId));
-
-		final Device otherDevice = new Device();
-		otherDevice.setId(otherDeviceId);
-
-		when(deviceDao.read(eq(otherDeviceId), any(RequestDetails.class)))
-			.thenReturn(otherDevice);
-
-		interceptor.authorizeRequest(requestDetails);
-	}
-
-	@Test
-	public void shouldNotBeAbleToModifyOtherResourceWithGrantedScope() {
-		final IdType resourceId = new IdType(ResourceType.Task.name(), 12L);
-
-		RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.POST,
-			CrudOperation.UPDATE, ResourceType.Task, PermissionScope.GRANTED, resourceId);
-
-		assertThrows(ForbiddenOperationException.class, () ->
-			interceptor.authorizeRequest(requestDetails)
-		);
-	}
-
-	@Test
-	public void shouldBeAbleToModifyOtherResourceWithGrantedScope() {
-		final IdType resourceId = new IdType(ResourceType.Task.name(), 12L);
-
-		final IdType resourceOriginDeviceId = new IdType("Device", 1L);
-		resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(any(IBaseResource.class)))
-			.thenReturn(Optional.of(resourceOriginDeviceId));
-
-		final Device resourceOriginDevice = new Device();
-		resourceOriginDevice.setId(resourceOriginDeviceId);
-
-		when(deviceDao.read(eq(resourceOriginDeviceId), any(RequestDetails.class)))
-			.thenReturn(resourceOriginDevice);
-
-		// below grants Device/1 and Device/2
-		RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.POST,
-			CrudOperation.UPDATE, ResourceType.Task, PermissionScope.GRANTED, resourceId);
-
-		interceptor.authorizeRequest(requestDetails);
-	}
-
-	/**
-	 * Created a configured {@link RequestDetails} and mocks the {@link
-	 * SmartBackendServiceAuthorizationService} to return the mocked permission when requested.
-	 *
-	 * @param requestType
-	 * @param crudOperation
-	 * @param resourceType
-	 * @param scope
-	 * @param resourceId    the id of the resource that the request is tied to. <code>null</code> for
-	 *                      an "ALL" call like GET /Patient
-	 * @return The configured {@link RequestDetails}.
-	 */
-	private RequestDetails getRequestDetailsAndConfigurePermission(
-		RequestTypeEnum requestType, CrudOperation crudOperation,
-		ResourceType resourceType,
-		PermissionScope scope,
-		IdType resourceId
-	) {
-
-		RequestDetails requestDetails = new ServletRequestDetails();
-		requestDetails.setResourceName(resourceType.name());
-		requestDetails.setRequestType(requestType);
-		requestDetails.setId(resourceId);
-
-		final PermissionDto permission = new PermissionDto();
-		permission.setScope(scope);
-		permission.setOperation(crudOperation);
-		permission.setResourceType(resourceType);
-
-		//Grant devices to try and trick the system when the permission isn't GRANTED, should be ignored.
-		final Set<String> grantedDeviceIds = new TreeSet<>();
-		grantedDeviceIds.add("1");
-		grantedDeviceIds.add("2");
-		permission.setGrantedDeviceIds(grantedDeviceIds);
-
-		lenient().when(
-				smartBackendServiceAuthorizationService.getPermission(anyString(), eq(requestDetails)))
-			.thenReturn(Optional.of(permission));
+    String crudsValue;
+    switch (requestType) {
+      case GET: crudsValue = "cud"; break;
+      case POST: crudsValue = "ruds"; break;
+      case PUT: crudsValue = "crds"; break;
+      case DELETE: crudsValue = "crus"; break;
+      default: throw new RuntimeException("invalid request type");
+    }
 
 
-		final IFhirResourceDao resourceDaoMock = mock(IFhirResourceDao.class);
-		lenient().when(daoRegistry.getResourceDao(eq(resourceType.name())))
-			.thenReturn(resourceDaoMock);
+    assertThrows(ForbiddenOperationException.class, () ->
+      interceptor.authorizeRequest(
+        requestDetails,
+        mockRequest(requestDetails, crudsValue) //without resource-origin, the ALL permission
+      )
+    );
 
-		// when the action is executed on a resource, we want the dao registry to return an actual instance of that resource type
-		if(resourceId != null) {
-			try {
-				final IBaseResource instance = (IBaseResource) Class.forName("org.hl7.fhir.r4.model." + resourceId.getResourceType())
-					.getDeclaredConstructor()
-					.newInstance();
+    assertThrows(ForbiddenOperationException.class, () ->
+      interceptor.authorizeRequest(
+        requestDetails,
+        mockRequest(requestDetails, crudsValue, defaultDeviceRef.getValue()) //with OWN permission
+      )
+    );
 
-				when(resourceDaoMock.read(any(IIdType.class), any(RequestDetails.class)))
-					.thenReturn(instance);
-			} catch (Exception e) {
-				throw new RuntimeException("Failed to create an instance of org.hl7.fhir.r4.model." + resourceId.getResourceType(), e);
-			}
-		}
+    if(resourceOrigins != null) {
+      assertThrows(ForbiddenOperationException.class, () ->
+        interceptor.authorizeRequest(
+          requestDetails,
+          mockRequest(requestDetails, crudsValue, resourceOrigins) //with GRANTED permission
+       )
+      );
+    }
+  }
 
-		return requestDetails;
-	}
+  @Test
+  public void shouldAllowCreateOwn() {
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.POST,
+      ResourceType.Task, null);
+
+    HttpServletRequest request = mockRequest(requestDetails, "cruds");
+
+    interceptor.authorizeRequest(requestDetails, request);
+  }
+
+  @Test
+  public void shouldBeAbleToModifyOtherResourceWithPermissionInScope() {
+    final IdType resourceId = new IdType(ResourceType.Task.name(), 12L);
+
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.PUT, ResourceType.Task, resourceId);
+    HttpServletRequest request = mockRequest(requestDetails, "cruds", "Device/456");
+
+    final IdType otherDeviceId = new IdType("Device", 456L);
+    resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(any(IBaseResource.class)))
+      .thenReturn(Optional.of(otherDeviceId));
+
+    interceptor.authorizeRequest(requestDetails, request);
+  }
+
+  @Test
+  public void shouldFailWhenDeviceIdHasSameStartButIsDifferent() {
+    final IdType resourceId = new IdType(ResourceType.Task.name(), 12L);
+
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.PUT, ResourceType.Task, resourceId);
+    HttpServletRequest request = mockRequest(requestDetails, "cruds", "Device/4567");
+
+    final IdType otherDeviceId = new IdType("Device", 456L);
+    resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(any(IBaseResource.class)))
+      .thenReturn(Optional.of(otherDeviceId));
+
+    assertThrows(ForbiddenOperationException.class, () ->
+      interceptor.authorizeRequest(requestDetails, request)
+    );
+  }
+
+
+  private HttpServletRequest mockRequest(RequestDetails requestDetails, String crudsValue, String... resourceOrigins) {
+
+    StringBuilder permission = new StringBuilder(String.format("system/%s.%s", requestDetails.getResourceName(), crudsValue));
+
+    if (resourceOrigins != null && resourceOrigins.length > 0) {
+
+      permission.append("?resource-origin=");
+
+      for (int i = 0; i < resourceOrigins.length; i++) {
+        String resourceOrigin = resourceOrigins[i];
+
+        permission.append(resourceOrigin);
+
+        if (i + 1 < resourceOrigins.length) {
+          permission.append(",");
+        }
+      }
+    }
+
+    //surround the "actual" permission with 2 gibberish permissions
+    String jwtWithScope = JWT.create()
+      .withClaim("scope", String.format("system/Unused.cru?resource-origin=Device/123 %s system/Unused2.cd?resource-origin=Device/456", permission))
+      .sign(Algorithm.HMAC256("super-secret"));
+
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    when(request.getHeader(eq("Authorization"))).thenReturn("Bearer " + jwtWithScope);
+
+    return request;
+  }
+
+  /**
+   * Creates a configured {@link RequestDetails} and mocks the resource dao to return the mocked entity when the
+   * resource-origin is requested.
+   *
+   * @param requestType request type enum
+   * @param resourceType resource type enum
+   * @param resourceId   the id of the resource that the request is tied to. <code>null</code> for
+   *                     an "ALL" call like GET /Patient
+   * @return The configured {@link RequestDetails}.
+   */
+  private RequestDetails getRequestDetailsAndConfigurePermission(
+    RequestTypeEnum requestType,
+    ResourceType resourceType,
+    IdType resourceId
+  ) {
+
+    RequestDetails requestDetails = new ServletRequestDetails();
+    requestDetails.setResourceName(resourceType.name());
+    requestDetails.setRequestType(requestType);
+    requestDetails.setId(resourceId);
+
+    final IFhirResourceDao resourceDaoMock = mock(IFhirResourceDao.class);
+    lenient().when(daoRegistry.getResourceDao(eq(resourceType.name())))
+      .thenReturn(resourceDaoMock);
+
+    // when the action is executed on a resource, we want the dao registry to return an actual instance of that resource type
+    if (resourceId != null) {
+      try {
+        final IBaseResource instance = (IBaseResource) Class.forName("org.hl7.fhir.r4.model." + resourceId.getResourceType())
+          .getDeclaredConstructor()
+          .newInstance();
+
+        requestDetails.setResource(instance);
+
+        if(requestType != RequestTypeEnum.POST) {
+          when(resourceDaoMock.read(any(IIdType.class), any(RequestDetails.class)))
+            .thenReturn(instance);
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to create an instance of org.hl7.fhir.r4.model." + resourceId.getResourceType(), e);
+      }
+    }
+
+    return requestDetails;
+  }
 
 }
