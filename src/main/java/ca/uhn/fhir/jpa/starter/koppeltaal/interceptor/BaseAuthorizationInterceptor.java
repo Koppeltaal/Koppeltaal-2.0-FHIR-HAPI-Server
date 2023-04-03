@@ -9,14 +9,11 @@ public abstract class BaseAuthorizationInterceptor {
 
 	protected final DaoRegistry daoRegistry;
 	protected final IFhirResourceDao<Device> deviceDao;
-	protected final SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService;
 
 	protected BaseAuthorizationInterceptor(DaoRegistry daoRegistry,
-		IFhirResourceDao<Device> deviceDao,
-		SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService) {
+		IFhirResourceDao<Device> deviceDao) {
 
 		this.daoRegistry = daoRegistry;
 		this.deviceDao = deviceDao;
-		this.smartBackendServiceAuthorizationService = smartBackendServiceAuthorizationService;
 	}
 }
