@@ -24,8 +24,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockHttpServletRequest;
 
-import javax.servlet.http.HttpServletRequest;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -127,8 +127,6 @@ class ResourceOriginAuthorizationInterceptorTest {
   private void shouldAllow(RequestTypeEnum requestType, boolean hasResource, String... resourceOrigins) {
     final IdType resourceId = hasResource ? new IdType(ResourceType.Task.name(), 12L) : null;
 
-    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(requestType, ResourceType.Task, resourceId);
-
     String crudsValue;
     switch (requestType) {
       case GET: crudsValue = "rs"; break;
@@ -138,22 +136,23 @@ class ResourceOriginAuthorizationInterceptorTest {
       default: throw new RuntimeException("invalid request type");
     }
 
-    HttpServletRequest request = mockRequest(requestDetails, crudsValue);
-    interceptor.authorizeRequest(requestDetails, request); //without resource-origin, the ALL permission
+    //without resource-origin, the ALL permission
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(requestType, ResourceType.Task, resourceId, crudsValue);
+    interceptor.authorizeRequest(requestDetails);
 
-    request = mockRequest(requestDetails, crudsValue, defaultDeviceRef.getValue()); //with OWN permission
-    interceptor.authorizeRequest(requestDetails, request);
+    //with OWN permission
+    requestDetails = getRequestDetailsAndConfigurePermission(requestType, ResourceType.Task, resourceId, crudsValue, defaultDeviceRef.getValue());
+    interceptor.authorizeRequest(requestDetails);
 
+    //with GRANTED permission
     if(resourceOrigins != null) {
-      request = mockRequest(requestDetails, crudsValue, resourceOrigins); //with GRANTED permission
-      interceptor.authorizeRequest(requestDetails, request);
+      requestDetails = getRequestDetailsAndConfigurePermission(requestType, ResourceType.Task, resourceId, crudsValue, resourceOrigins);
+      interceptor.authorizeRequest(requestDetails);
     }
   }
 
   private void shouldNotAllow(RequestTypeEnum requestType, boolean hasResource, String... resourceOrigins) {
     final IdType resourceId = hasResource ? new IdType(ResourceType.Task.name(), 12L) : null;
-
-    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(requestType, ResourceType.Task, resourceId);
 
     String crudsValue;
     switch (requestType) {
@@ -165,118 +164,78 @@ class ResourceOriginAuthorizationInterceptorTest {
     }
 
 
+    //without resource-origin, the ALL permission
     assertThrows(ForbiddenOperationException.class, () ->
       interceptor.authorizeRequest(
-        requestDetails,
-        mockRequest(requestDetails, crudsValue) //without resource-origin, the ALL permission
+        getRequestDetailsAndConfigurePermission(requestType, ResourceType.Task, resourceId, crudsValue)
       )
     );
 
+    //with OWN permission
     assertThrows(ForbiddenOperationException.class, () ->
       interceptor.authorizeRequest(
-        requestDetails,
-        mockRequest(requestDetails, crudsValue, defaultDeviceRef.getValue()) //with OWN permission
+        getRequestDetailsAndConfigurePermission(requestType, ResourceType.Task, resourceId, crudsValue, defaultDeviceRef.getValue())
       )
     );
 
+    //with GRANTED permission
     if(resourceOrigins != null) {
       assertThrows(ForbiddenOperationException.class, () ->
         interceptor.authorizeRequest(
-          requestDetails,
-          mockRequest(requestDetails, crudsValue, resourceOrigins) //with GRANTED permission
+          getRequestDetailsAndConfigurePermission(requestType, ResourceType.Task, resourceId, crudsValue, resourceOrigins)
        )
       );
     }
   }
 
   @Test
-  public void shouldAllowCreateOwn() {
-    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.POST,
-      ResourceType.Task, null);
-
-    HttpServletRequest request = mockRequest(requestDetails, "cruds");
-
-    interceptor.authorizeRequest(requestDetails, request);
-  }
-
-  @Test
   public void shouldBeAbleToModifyOtherResourceWithPermissionInScope() {
     final IdType resourceId = new IdType(ResourceType.Task.name(), 12L);
 
-    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.PUT, ResourceType.Task, resourceId);
-    HttpServletRequest request = mockRequest(requestDetails, "cruds", "Device/456");
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.PUT, ResourceType.Task, resourceId, "cruds", "Device/456");
 
     final IdType otherDeviceId = new IdType("Device", 456L);
     resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(any(IBaseResource.class)))
       .thenReturn(Optional.of(otherDeviceId));
 
-    interceptor.authorizeRequest(requestDetails, request);
+    interceptor.authorizeRequest(requestDetails);
   }
 
   @Test
   public void shouldFailWhenDeviceIdHasSameStartButIsDifferent() {
     final IdType resourceId = new IdType(ResourceType.Task.name(), 12L);
 
-    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.PUT, ResourceType.Task, resourceId);
-    HttpServletRequest request = mockRequest(requestDetails, "cruds", "Device/4567");
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.PUT, ResourceType.Task, resourceId, "cruds", "Device/4567");
 
     final IdType otherDeviceId = new IdType("Device", 456L);
     resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(any(IBaseResource.class)))
       .thenReturn(Optional.of(otherDeviceId));
 
     assertThrows(ForbiddenOperationException.class, () ->
-      interceptor.authorizeRequest(requestDetails, request)
+      interceptor.authorizeRequest(requestDetails)
     );
   }
 
-
-  private HttpServletRequest mockRequest(RequestDetails requestDetails, String crudsValue, String... resourceOrigins) {
-
-    StringBuilder permission = new StringBuilder(String.format("system/%s.%s", requestDetails.getResourceName(), crudsValue));
-
-    if (resourceOrigins != null && resourceOrigins.length > 0) {
-
-      permission.append("?resource-origin=");
-
-      for (int i = 0; i < resourceOrigins.length; i++) {
-        String resourceOrigin = resourceOrigins[i];
-
-        permission.append(resourceOrigin);
-
-        if (i + 1 < resourceOrigins.length) {
-          permission.append(",");
-        }
-      }
-    }
-
-    //surround the "actual" permission with 2 gibberish permissions
-    String jwtWithScope = JWT.create()
-      .withClaim("scope", String.format("system/Unused.cru?resource-origin=Device/123 %s system/Unused2.cd?resource-origin=Device/456", permission))
-      .sign(Algorithm.HMAC256("super-secret"));
-
-    HttpServletRequest request = mock(HttpServletRequest.class);
-    when(request.getHeader(eq("Authorization"))).thenReturn("Bearer " + jwtWithScope);
-
-    return request;
-  }
 
   /**
    * Creates a configured {@link RequestDetails} and mocks the resource dao to return the mocked entity when the
    * resource-origin is requested.
    *
-   * @param requestType request type enum
+   * @param requestType  request type enum
    * @param resourceType resource type enum
    * @param resourceId   the id of the resource that the request is tied to. <code>null</code> for
    *                     an "ALL" call like GET /Patient
+   * @param crudsValue
    * @return The configured {@link RequestDetails}.
    */
   private RequestDetails getRequestDetailsAndConfigurePermission(
     RequestTypeEnum requestType,
     ResourceType resourceType,
-    IdType resourceId
-  ) {
+    IdType resourceId,
+    String crudsValue,
+    String... resourceOrigins) {
 
-    RequestDetails requestDetails = new ServletRequestDetails();
+    ServletRequestDetails requestDetails = new ServletRequestDetails();
     requestDetails.setResourceName(resourceType.name());
     requestDetails.setRequestType(requestType);
     requestDetails.setId(resourceId);
@@ -302,6 +261,40 @@ class ResourceOriginAuthorizationInterceptorTest {
         throw new RuntimeException("Failed to create an instance of org.hl7.fhir.r4.model." + resourceId.getResourceType(), e);
       }
     }
+
+    addPermissions(requestDetails, crudsValue, resourceOrigins);
+
+    return requestDetails;
+  }
+
+  private RequestDetails addPermissions(ServletRequestDetails requestDetails, String crudsValue, String... resourceOrigins) {
+
+    StringBuilder permission = new StringBuilder(String.format("system/%s.%s", requestDetails.getResourceName(), crudsValue));
+
+    if (resourceOrigins != null && resourceOrigins.length > 0) {
+
+      permission.append("?resource-origin=");
+
+      for (int i = 0; i < resourceOrigins.length; i++) {
+        String resourceOrigin = resourceOrigins[i];
+
+        permission.append(resourceOrigin);
+
+        if (i + 1 < resourceOrigins.length) {
+          permission.append(",");
+        }
+      }
+    }
+
+    //surround the "actual" permission with 2 gibberish permissions
+    String jwtWithScope = JWT.create()
+      .withClaim("scope", String.format("system/Unused.cru?resource-origin=Device/123 %s system/Unused2.cd?resource-origin=Device/456", permission))
+      .sign(Algorithm.HMAC256("super-secret"));
+
+    MockHttpServletRequest request = new MockHttpServletRequest();
+    request.addHeader("Authorization", "Bearer " + jwtWithScope);
+
+    requestDetails.setServletRequest(request);
 
     return requestDetails;
   }

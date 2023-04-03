@@ -7,6 +7,7 @@ import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizationService;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.AccessTokenUtil;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
@@ -49,7 +50,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
   }
 
   @Hook(value = Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED, order = -10)
-  public void authorizeRequest(RequestDetails requestDetails, HttpServletRequest request) {
+  public void authorizeRequest(RequestDetails requestDetails) {
 
     final String resourceName = requestDetails.getResourceName();
 
@@ -65,24 +66,13 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
       if (StringUtils.equals(smartBackendServiceConfiguration.getDomainAdminClientId(), requesterClientId)) return;
     }
 
-    validate(requestDetails, request);
+    validate(requestDetails);
   }
 
-  private void validate(RequestDetails requestDetails, HttpServletRequest request) {
+  private void validate(RequestDetails requestDetails) {
     final String resourceName = requestDetails.getResourceName();
-
-    String authorization = request.getHeader("Authorization");
-    String token = StringUtils.trim(StringUtils.removeStartIgnoreCase(authorization, "Bearer"));
-    DecodedJWT decode = JWT.decode(token); //no need to validate, handled by the JwtSecurityInterceptor
-    Claim scopeClaim = decode.getClaim("scope");
-
+    List<String> relevantPermissions = AccessTokenUtil.getScopesForResourceType(requestDetails);
     RequestTypeEnum requestType = requestDetails.getRequestType();
-
-    String[] scopes = scopeClaim.asString().split(" ");
-
-    List<String> relevantPermissions = Arrays.stream(scopes)
-      .filter((scope) -> scope.startsWith("system/*.") || scope.startsWith("system/" + resourceName + "."))
-      .collect(Collectors.toList());
 
     if (requestType == RequestTypeEnum.POST) {
       // no need to validate resource-origin
