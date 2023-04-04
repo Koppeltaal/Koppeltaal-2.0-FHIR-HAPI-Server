@@ -96,9 +96,9 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 			// new InterceptorService("RestfulServer")
 			// {code}
 			// And one JPA version. They both do DIFFERENT things. The horror.
-      SubscriptionInterceptor subscriptionInterceptor = new SubscriptionInterceptor(daoRegistry, deviceDao, smartBackendServiceAuthorizationService);
-      myInterceptorRegistry.registerInterceptor(subscriptionInterceptor);
-      registerInterceptor(subscriptionInterceptor);
+      SubscriptionNarrowingInterceptor subscriptionNarrowingInterceptor = new SubscriptionNarrowingInterceptor(daoRegistry);
+      myInterceptorRegistry.registerInterceptor(subscriptionNarrowingInterceptor);
+      registerInterceptor(subscriptionNarrowingInterceptor);
 
 		if (fhirServerAuditLogConfiguration.isEnabled()) {
 			registerInterceptor(auditEventInterceptor);
