@@ -64,7 +64,7 @@ public class JwtValidationService {
 		DecodedJWT decode = JWT.decode(token);
 		String algorithmName = decode.getAlgorithm();
 		// Lookup the issuer.
-    // TODO: Now the issuer is just fetched as JWKS URL, need to whitelist.
+    // TODO: KOP-559 Now the issuer is just fetched as JWKS URL, need to whitelist.
 		String issuer = decode.getIssuer();
 
 		JwkProvider provider = new UrlJwkProvider(issuer);
