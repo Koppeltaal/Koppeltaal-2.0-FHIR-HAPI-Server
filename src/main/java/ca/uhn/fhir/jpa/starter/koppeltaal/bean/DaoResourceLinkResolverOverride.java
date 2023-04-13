@@ -10,6 +10,7 @@ import org.hl7.fhir.instance.model.api.IBaseReference;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.CapabilityStatement;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,8 +29,8 @@ public class DaoResourceLinkResolverOverride extends DaoResourceLinkResolver {
   @Override
   public IResourceLookup findTargetResource(@NotNull RequestPartitionId theRequestPartitionId, RuntimeSearchParam theSearchParam, String theSourcePath, IIdType theSourceResourceId, String theResourceType, Class<? extends IBaseResource> theType, IBaseReference theReference, RequestDetails theRequest, TransactionDetails theTransactionDetails) {
 
-    if(theType.isAssignableFrom(Bundle.class)) {
-      LOG.info("Skipping findTargetResource() as Bundle is excluded - custom KT2 addition!");
+    if(theType.isAssignableFrom(Bundle.class) || theType.isAssignableFrom(CapabilityStatement.class)) {
+      LOG.info("Skipping findTargetResource() as [{}] is excluded - custom KT2 addition!", theType.getSimpleName());
       return null;
     }
 
