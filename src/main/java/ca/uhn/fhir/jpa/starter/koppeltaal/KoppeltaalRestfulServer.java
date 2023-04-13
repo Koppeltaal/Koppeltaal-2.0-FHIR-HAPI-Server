@@ -18,6 +18,8 @@ import ca.uhn.fhir.rest.openapi.OpenApiInterceptor;
 import ca.uhn.fhir.rest.server.RestfulServer;
 import ca.uhn.fhir.rest.server.interceptor.CaptureResourceSourceFromHeaderInterceptor;
 import org.hl7.fhir.r4.model.Device;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.servlet.ServletException;
@@ -26,7 +28,7 @@ import java.util.UUID;
 
 @WebServlet(urlPatterns = { "/fhir/*" }, displayName = "Koppeltaal Resource Service")
 public class KoppeltaalRestfulServer extends RestfulServer {
-
+  private static final Logger ourLog = LoggerFactory.getLogger(KoppeltaalRestfulServer.class);
 	private static final long serialVersionUID = 1L;
 
   @Autowired
@@ -138,6 +140,7 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 
   @Override
   protected String newRequestId(int theRequestIdLength) {
+    ourLog.info("Setting UUID as generated request-id");
     return UUID.randomUUID().toString();
   }
 }
