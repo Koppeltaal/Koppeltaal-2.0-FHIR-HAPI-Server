@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
+import java.util.UUID;
 
 @WebServlet(urlPatterns = { "/fhir/*" }, displayName = "Koppeltaal Resource Service")
 public class KoppeltaalRestfulServer extends RestfulServer {
@@ -134,4 +135,9 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 
     daoConfig.setResourceServerIdStrategy(DaoConfig.IdStrategyEnum.UUID);
 	}
+
+  @Override
+  protected String newRequestId(int theRequestIdLength) {
+    return UUID.randomUUID().toString();
+  }
 }

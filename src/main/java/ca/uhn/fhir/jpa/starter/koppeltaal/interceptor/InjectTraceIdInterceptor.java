@@ -19,7 +19,7 @@ import javax.servlet.http.HttpServletResponse;
 @Component
 @Interceptor
 public class InjectTraceIdInterceptor {
-  private final static String TRACE_ID_HEADER_KEY = "X-Trace-Id";
+  public final static String TRACE_ID_HEADER_KEY = "X-Trace-Id";
 
   @Hook(value = Pointcut.SERVER_OUTGOING_RESPONSE, order = Integer.MAX_VALUE)
   public void injectTraceIdOnSuccess(RequestDetails requestDetails, ServletRequestDetails servletRequestDetails) {

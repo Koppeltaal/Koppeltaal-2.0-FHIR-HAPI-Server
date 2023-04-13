@@ -28,7 +28,7 @@ import javax.servlet.http.HttpServletResponse;
 @Component
 @Interceptor
 public class InjectCorrelationIdInterceptor {
-  private final static String CORRELATION_HEADER_KEY = "X-Correlation-Id";
+  public final static String CORRELATION_HEADER_KEY = "X-Correlation-Id";
 
   @Hook(value = Pointcut.SERVER_OUTGOING_RESPONSE, order = Integer.MAX_VALUE)
   public void injectCorrelationIdOnSuccess(RequestDetails requestDetails, ServletRequestDetails servletRequestDetails) {

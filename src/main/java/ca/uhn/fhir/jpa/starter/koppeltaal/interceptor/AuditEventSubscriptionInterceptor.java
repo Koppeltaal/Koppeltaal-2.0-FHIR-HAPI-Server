@@ -22,6 +22,10 @@ import java.util.Date;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.InjectCorrelationIdInterceptor.CORRELATION_HEADER_KEY;
+import static ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.InjectTraceIdInterceptor.TRACE_ID_HEADER_KEY;
+import static ca.uhn.fhir.rest.api.Constants.HEADER_REQUEST_ID;
+
 /**
  *
  */
@@ -71,15 +75,15 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
     //Cleaning up to make sure the previous in-memory results aren't sent as well
     canonicalSubscription.setHeaders(
       canonicalSubscription.getHeaders().stream()
-        .filter(header -> !header.startsWith("X-Trace-Id: ") && !header.startsWith("X-Request-Id: "))
+        .filter(header -> !header.startsWith(TRACE_ID_HEADER_KEY) && !header.startsWith(HEADER_REQUEST_ID))
         .map(StringType::new)
         .collect(Collectors.toList())
     );
 
-    canonicalSubscription.addHeader("X-Trace-Id: " + transactionId);
-    canonicalSubscription.addHeader("X-Request-Id: " + requestId);
+    canonicalSubscription.addHeader(TRACE_ID_HEADER_KEY + ": " + transactionId);
+    canonicalSubscription.addHeader(HEADER_REQUEST_ID + ": " + requestId);
     correlationIdOptional.ifPresent(correlationId ->
-      canonicalSubscription.addHeader("X-Correlation-Id: " + correlationId)
+      canonicalSubscription.addHeader(CORRELATION_HEADER_KEY + ": " + correlationId)
     );
   }
 
