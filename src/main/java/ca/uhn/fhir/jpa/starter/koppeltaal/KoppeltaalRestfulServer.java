@@ -17,6 +17,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizati
 import ca.uhn.fhir.rest.openapi.OpenApiInterceptor;
 import ca.uhn.fhir.rest.server.RestfulServer;
 import ca.uhn.fhir.rest.server.interceptor.CaptureResourceSourceFromHeaderInterceptor;
+import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.r4.model.Device;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +25,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServletRequest;
 import java.util.UUID;
+
+import static ca.uhn.fhir.rest.server.ServletRequestTracing.ATTRIBUTE_REQUEST_ID;
 
 @WebServlet(urlPatterns = { "/fhir/*" }, displayName = "Koppeltaal Resource Service")
 public class KoppeltaalRestfulServer extends RestfulServer {
@@ -139,8 +143,11 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 	}
 
   @Override
-  protected String newRequestId(int theRequestIdLength) {
-    ourLog.info("Setting UUID as generated request-id");
+  protected String getOrCreateRequestId(HttpServletRequest theRequest) {
+    String requestId = (String) theRequest.getAttribute(ATTRIBUTE_REQUEST_ID);
+
+    if(StringUtils.isNotBlank(requestId)) return requestId;
+
     return UUID.randomUUID().toString();
   }
 }
