@@ -11,9 +11,7 @@ import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.BaseServerResponseException;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.hl7.fhir.instance.model.api.IBaseOperationOutcome;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.jetbrains.annotations.NotNull;
@@ -23,7 +21,6 @@ import org.springframework.stereotype.Component;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.Collections;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -131,7 +128,7 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
     // Set the requestId if not set.
     String requestId = requestDetails.getRequestId();
     if (StringUtils.isBlank(requestId)) {
-      requestId = RandomStringUtils.randomAlphanumeric(16);
+      requestId = UUID.randomUUID().toString();
       requestDetails.setRequestId(requestId);
     }
 
