@@ -22,17 +22,22 @@ import java.util.UUID;
 public class InjectTraceIdInterceptor {
   public final static String TRACE_ID_HEADER_KEY = "X-Trace-Id";
 
+  @Hook(value = Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED, order = -10)
+  public void incomingRequestPreHandled(RequestDetails requestDetails, ServletRequestDetails servletRequestDetails) {
+    injectTraceId(requestDetails, servletRequestDetails);
+  }
+
   @Hook(value = Pointcut.SERVER_OUTGOING_RESPONSE, order = Integer.MAX_VALUE)
   public void injectTraceIdOnSuccess(RequestDetails requestDetails, ServletRequestDetails servletRequestDetails) {
-    injectTradeId(requestDetails, servletRequestDetails);
+    injectTraceId(requestDetails, servletRequestDetails);
   }
 
   @Hook(value = Pointcut.SERVER_OUTGOING_FAILURE_OPERATIONOUTCOME, order = Integer.MAX_VALUE)
   public void injectTraceIdOnError(RequestDetails requestDetails, ServletRequestDetails servletRequestDetails) {
-    injectTradeId(requestDetails, servletRequestDetails);
+    injectTraceId(requestDetails, servletRequestDetails);
   }
 
-  private void injectTradeId(RequestDetails requestDetails, ServletRequestDetails servletRequestDetails) {
+  private void injectTraceId(RequestDetails requestDetails, ServletRequestDetails servletRequestDetails) {
     String traceId = requestDetails.getTransactionGuid();
 
     if (StringUtils.isBlank(traceId)) {

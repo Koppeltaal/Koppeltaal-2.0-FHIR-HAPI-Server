@@ -122,21 +122,11 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
   @Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)
   public void start(ServletRequestDetails requestDetails) {
 
-    HttpServletRequest servletRequest = requestDetails.getServletRequest();
-    String traceId = servletRequest.getHeader("X-Trace-Id");
-
     // Set the requestId if not set.
     String requestId = requestDetails.getRequestId();
     if (StringUtils.isBlank(requestId)) {
       requestId = UUID.randomUUID().toString();
       requestDetails.setRequestId(requestId);
-    }
-
-    // Set the traceId, generate one if none exists.
-    if (StringUtils.isNotEmpty(traceId)) {
-      requestDetails.setTransactionGuid(traceId);
-    } else {
-      requestDetails.setTransactionGuid(UUID.randomUUID().toString());
     }
 
     requestIdHolder.addMapping(requestDetails.getTransactionGuid(), requestId);
