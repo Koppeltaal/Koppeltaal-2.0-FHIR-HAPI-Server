@@ -61,7 +61,6 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
   }
 
   private void validate(RequestDetails requestDetails) {
-    final String resourceName = requestDetails.getResourceName();
 
     List<String> relevantPermissions = PermissionUtil.getScopesForRequest(requestDetails);
     RequestTypeEnum requestType = requestDetails.getRequestType();

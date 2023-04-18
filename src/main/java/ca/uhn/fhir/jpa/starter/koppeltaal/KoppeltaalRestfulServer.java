@@ -13,7 +13,6 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.config.OpenApiConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.*;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.Oauth2AccessTokenService;
-import ca.uhn.fhir.jpa.starter.koppeltaal.service.SmartBackendServiceAuthorizationService;
 import ca.uhn.fhir.rest.openapi.OpenApiInterceptor;
 import ca.uhn.fhir.rest.server.RestfulServer;
 import ca.uhn.fhir.rest.server.interceptor.CaptureResourceSourceFromHeaderInterceptor;
@@ -43,8 +42,6 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 	FhirServerSecurityConfiguration fhirServerSecurityConfiguration;
 	@Autowired
 	FhirServerAuditLogConfiguration fhirServerAuditLogConfiguration;
-	@Autowired
-	private SmartBackendServiceAuthorizationService smartBackendServiceAuthorizationService;
 	@Autowired
 	private SmartBackendServiceConfiguration smartBackendServiceConfiguration;
 	@Autowired
