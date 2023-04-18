@@ -9,6 +9,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 import javax.servlet.http.HttpServletResponse;
+import java.util.UUID;
 
 /**
  * Koppeltaal supports the use of trace-ids, provided by the <code>X-Trace-Id</code> tag.
@@ -32,12 +33,21 @@ public class InjectTraceIdInterceptor {
   }
 
   private void injectTradeId(RequestDetails requestDetails, ServletRequestDetails servletRequestDetails) {
-    final String traceId = requestDetails.getTransactionGuid();
+    String traceId = requestDetails.getTransactionGuid();
 
-    if (StringUtils.isNotBlank(traceId)) {
-      HttpServletResponse response = servletRequestDetails.getServletResponse();
-      response.setHeader(TRACE_ID_HEADER_KEY, traceId);
+    if (StringUtils.isBlank(traceId)) {
+
+      traceId = requestDetails.getHeader(TRACE_ID_HEADER_KEY);
+
+      if(StringUtils.isBlank(traceId)) {
+        traceId = UUID.randomUUID().toString();
+      }
+
+      requestDetails.setTransactionGuid(traceId);
     }
+
+    HttpServletResponse response = servletRequestDetails.getServletResponse();
+    response.setHeader(TRACE_ID_HEADER_KEY, traceId);
   }
 
 }
