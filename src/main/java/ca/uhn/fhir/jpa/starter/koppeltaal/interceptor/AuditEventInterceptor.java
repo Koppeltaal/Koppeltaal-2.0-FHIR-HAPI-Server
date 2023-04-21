@@ -122,12 +122,8 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
   @Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)
   public void start(ServletRequestDetails requestDetails) {
 
-    // Set the requestId if not set.
+    // The requestId is always set @ ca.uhn.fhir.jpa.starter.koppeltaal.KoppeltaalRestfulServer.getOrCreateRequestId()
     String requestId = requestDetails.getRequestId();
-    if (StringUtils.isBlank(requestId)) {
-      requestId = UUID.randomUUID().toString();
-      requestDetails.setRequestId(requestId);
-    }
 
     requestIdHolder.addMapping(requestDetails.getTransactionGuid(), requestId);
 
