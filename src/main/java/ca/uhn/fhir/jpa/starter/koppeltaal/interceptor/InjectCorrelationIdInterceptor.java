@@ -41,18 +41,17 @@ public class InjectCorrelationIdInterceptor {
   }
 
   private void injectCorrelationId(RequestDetails requestDetails, ServletRequestDetails servletRequestDetails) {
-    final String serverRequestId = requestDetails.getRequestId();
-
     HttpServletResponse response = servletRequestDetails.getServletResponse();
 
-    final String clientRequestId = servletRequestDetails.getHeader(Constants.HEADER_REQUEST_ID);
-    final String clientCorrelationId = servletRequestDetails.getHeader(CORRELATION_HEADER_KEY);
+    final String serverRequestId = requestDetails.getRequestId();
+    if (StringUtils.isNoneBlank(serverRequestId)) {
+      response.addHeader(Constants.HEADER_REQUEST_ID, serverRequestId);
+    }
 
+    final String clientRequestId = servletRequestDetails.getHeader(Constants.HEADER_REQUEST_ID);
     final boolean serverChangedRequestId = !StringUtils.equals(clientRequestId, serverRequestId);
     if (StringUtils.isNotBlank(clientRequestId) && serverChangedRequestId) {
       response.addHeader(CORRELATION_HEADER_KEY, clientRequestId);
-    } else if(StringUtils.isNotBlank(clientCorrelationId)) {
-      response.addHeader(CORRELATION_HEADER_KEY, clientCorrelationId);
     }
   }
 }
