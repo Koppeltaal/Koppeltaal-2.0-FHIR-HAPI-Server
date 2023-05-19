@@ -51,7 +51,7 @@ public class SubscriptionNarrowingInterceptor {
 			final Optional<IIdType> optionalSubscriptionDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(subscription);
 
 			if(optionalSubscriptionDeviceId.isEmpty()) {
-				LOG.warn("No resource-origin found on canonicalSubscriptionIdElement [Subscription/{}]",
+				LOG.warn("No resource-origin found on canonicalSubscriptionIdElement [Subscription/{}]. Still sending notification.",
 					canonicalSubscriptionIdElement.getIdPart());
 				return true; //TODO: Decide whether we want this to break
 			}
@@ -66,12 +66,14 @@ public class SubscriptionNarrowingInterceptor {
 
       Optional<String> scope = PermissionUtil.getScope(clientId.getValue());
 
+      LOG.info("Scope for client_id [{}] not found in cache yet. Still sending notification.", clientId.getValue());
       if(scope.isEmpty()) return true; //cache not yet updated with permissions, simply send the notification
 
 			if(payload instanceof DomainResource) {
 				final Optional<IIdType> payloadOptionalDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(payload);
 
 				if(payloadOptionalDeviceId.isEmpty()) {
+        LOG.info("No Device found for [{}] (payload inside ResourceDeliveryMessage.mesage). Still sending notification.", payload.getIdElement().getValue());
 					return true; //TODO: Decide whether we want this to break
 				}
 
@@ -79,13 +81,14 @@ public class SubscriptionNarrowingInterceptor {
 
 				final ResourceType resourceType = ((DomainResource) payload).getResourceType();
 
+        LOG.info("Device [{}] found for [{}], determine if it has permission is possible", payloadDeviceId.getIdPart(), payload.getIdElement().getValue());
         return PermissionUtil.hasPermission(CrudOperation.READ, resourceType, payloadDeviceId.getIdPart(), scope.get());
-
 			}
 		} catch (Exception e) {
-			LOG.error("Failed to execute Notification Narrowing. Non-breaking, might have notified for inaccessible resources!\n\nMessage: {}", message);
+			LOG.error("Failed to execute Notification Narrowing. Non-breaking, might have notified for inaccessible resources! Still sending notification.\n\nMessage: {}", message);
 		}
 
+    LOG.warn("Final fallthrough code reached. Still sending notification.");
 		return true; //TODO: Decide whether we want this to break
 	}
 

@@ -9,12 +9,16 @@ import com.auth0.jwt.interfaces.Claim;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.r4.model.ResourceType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class PermissionUtil {
+
+  private static final Logger LOG = LoggerFactory.getLogger(PermissionUtil.class);
 
   //IMPORTANT: Keep in mind that this is a POC implementation, and we simply use an in-memory solution here.
   //Actual solutions should use quick storage mechanisms such as Redis to keep the start over multiple nodes and server reboots
@@ -123,7 +127,12 @@ public class PermissionUtil {
 
     String crudsRegex = getCrudsRegex(crudOperation);
 
-    return Arrays.stream(scopes)
-      .anyMatch((scope) -> scope.matches("^system\\/(?:\\*|"+resourceType.name()+")\\."+crudsRegex+"(?:\\?resource-origin=.*"+entityResourceOrigin+".*|$)"));
+    boolean hasPermission = Arrays.stream(scopes)
+      .anyMatch((scope) -> scope.matches("^system\\/(?:\\*|" + resourceType.name() + ")\\." + crudsRegex + "(?:\\?resource-origin=.*" + entityResourceOrigin + ".*|$)"));
+
+    LOG.info("Checked permission:\n\n\tCrudOperation=[{}]\n\tResourceType=[{}]\n\tentityResourceOrigin=[{}]\n\tscopes=[{}],\n\tcrudsRegex=[{}]\n\t\thasPermission=[{}]",
+      crudOperation, resourceType, entityResourceOrigin, scopes, crudsRegex,hasPermission);
+
+    return hasPermission;
   }
 }
