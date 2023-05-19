@@ -18,6 +18,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.UUID;
+
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -78,6 +80,7 @@ class SubscriptionNarrowingInterceptorTest {
     canonicalSubscription.setIdElement(new IdType("sub-id"));
 
     Task thePayload = new Task();
+    thePayload.setId(UUID.randomUUID().toString());
     thePayload.addExtension(new Extension(ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM, new Reference("Device/456")));
 
     resourceDeliveryMessage.setPayload(fhirContext, thePayload, EncodingEnum.JSON);
@@ -96,6 +99,7 @@ class SubscriptionNarrowingInterceptorTest {
     canonicalSubscription.setIdElement(new IdType("sub-id"));
 
     Task thePayload = new Task();
+    thePayload.setId(UUID.randomUUID().toString());
     thePayload.addExtension(new Extension(ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM, new Reference("Device/456")));
 
     resourceDeliveryMessage.setPayload(fhirContext, thePayload, EncodingEnum.JSON);

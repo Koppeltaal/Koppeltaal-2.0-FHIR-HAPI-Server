@@ -66,8 +66,10 @@ public class SubscriptionNarrowingInterceptor {
 
       Optional<String> scope = PermissionUtil.getScope(clientId.getValue());
 
-      LOG.info("Scope for client_id [{}] not found in cache yet. Still sending notification.", clientId.getValue());
-      if(scope.isEmpty()) return true; //cache not yet updated with permissions, simply send the notification
+      if(scope.isEmpty()) {
+        LOG.info("Scope for client_id [{}] not found in cache yet. Still sending notification.", clientId.getValue());
+        return true; //cache not yet updated with permissions, simply send the notification
+      }
 
 			if(payload instanceof DomainResource) {
 				final Optional<IIdType> payloadOptionalDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(payload);
@@ -81,7 +83,7 @@ public class SubscriptionNarrowingInterceptor {
 
 				final ResourceType resourceType = ((DomainResource) payload).getResourceType();
 
-        LOG.info("Device [{}] found for [{}], determine if it has permission is possible", payloadDeviceId.getIdPart(), payload.getIdElement().getValue());
+        LOG.info("Device [{}] found for [{}], determine if it has permission next", payloadDeviceId.getIdPart(), payload.getIdElement().getValue());
         return PermissionUtil.hasPermission(CrudOperation.READ, resourceType, payloadDeviceId.getIdPart(), scope.get());
 			}
 		} catch (Exception e) {
