@@ -46,7 +46,10 @@ public class SubscriptionNarrowingInterceptor {
 			final IBaseResource payload = message.getPayload(context);
 
 			final IIdType canonicalSubscriptionIdElement = canonicalSubscription.getIdElement(context);
-			final Subscription subscription = subscriptionDao.read(canonicalSubscriptionIdElement, new SystemRequestDetails());
+      SystemRequestDetails theRequestDetails = new SystemRequestDetails();
+      theRequestDetails.setTenantId("DEFAULT");
+
+      final Subscription subscription = subscriptionDao.read(canonicalSubscriptionIdElement, theRequestDetails);
 
 			final Optional<IIdType> optionalSubscriptionDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(subscription);
 
@@ -57,7 +60,7 @@ public class SubscriptionNarrowingInterceptor {
 			}
 
 			final IIdType subscriptionDeviceId = optionalSubscriptionDeviceId.get();
-      Device subscriptionOriginDevice = deviceDao.read(subscriptionDeviceId, new SystemRequestDetails());
+      Device subscriptionOriginDevice = deviceDao.read(subscriptionDeviceId, theRequestDetails);
 
       Identifier clientId = subscriptionOriginDevice.getIdentifier().stream()
         .filter((identifier -> "http://vzvz.nl/fhir/NamingSystem/koppeltaal-client-id".equals(identifier.getSystem())))
