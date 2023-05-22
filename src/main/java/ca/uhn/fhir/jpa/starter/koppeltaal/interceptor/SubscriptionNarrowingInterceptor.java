@@ -87,7 +87,7 @@ public class SubscriptionNarrowingInterceptor {
         return PermissionUtil.hasPermission(CrudOperation.READ, resourceType, payloadDeviceId.getIdPart(), scope.get());
 			}
 		} catch (Exception e) {
-			LOG.error("Failed to execute Notification Narrowing. Non-breaking, might have notified for inaccessible resources! Still sending notification.\n\nMessage: {}", message);
+			LOG.error(String.format("Failed to execute Notification Narrowing. Non-breaking, might have notified for inaccessible resources! Still sending notification.\n\nMessage: %s", message), e);
 		}
 
     LOG.warn("Final fallthrough code reached. Still sending notification.");
