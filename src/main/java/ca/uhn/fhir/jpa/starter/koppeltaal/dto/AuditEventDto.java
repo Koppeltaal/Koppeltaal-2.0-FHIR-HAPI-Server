@@ -142,4 +142,19 @@ public class AuditEventDto {
 		StatusChange
 	}
 
+  @Override
+  public String toString() {
+    return "AuditEventDto{" +
+      "eventType=" + eventType +
+      ", dateTime=" + dateTime +
+      ", outcome='" + outcome + '\'' +
+      ", operationOutcome=" + operationOutcome +
+      ", traceId='" + traceId + '\'' +
+      ", requestId='" + requestId + '\'' +
+      ", correlationId='" + correlationId + '\'' +
+      ", device=" + device +
+      ", query='" + query + '\'' +
+      ", resources=" + resources +
+      '}';
+  }
 }

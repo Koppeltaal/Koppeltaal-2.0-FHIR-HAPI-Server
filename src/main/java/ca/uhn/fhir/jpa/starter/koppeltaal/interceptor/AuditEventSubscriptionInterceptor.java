@@ -44,7 +44,10 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
 
   @Hook(value = Pointcut.SUBSCRIPTION_BEFORE_DELIVERY, order = Integer.MAX_VALUE)
   public void outgoingSubscription(CanonicalSubscription canonicalSubscription, ResourceDeliveryMessage message) {
+
     String traceId = message.getTransactionId();
+
+    LOG.info("Starting AuditEvent creation for subscription with trade id [{}]", traceId);
 
     String requestId = UUID.randomUUID().toString(); //async, so always generate a new requestId
 
@@ -65,7 +68,12 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
       dto.addResource(resource);
       dto.setQuery(canonicalSubscription.getCriteriaString());
       dto.setDateTime(new Date());
+
+      LOG.info("Creating: {}", dto);
+
       auditEventService.submitAuditEvent(dto, null);
+    } else {
+      LOG.debug("Not creating AuditEvent as the resource is an instance of AuditEvent");
     }
 
   }
