@@ -16,7 +16,7 @@
 		<appender-ref ref="STDOUT" />
 	</logger>
 
-	<root level="INFO">
+	<root level="${LOGBACK_ROOT_LOG_LEVEL:-INFO}">
 		<appender-ref ref="STDOUT" />
 	</root>
 
