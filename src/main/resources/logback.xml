@@ -2,21 +2,21 @@
 
 	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
 		<filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-			<level>INFO</level>
+			<level>${LOGBACK_LOG_LEVEL:-DEBUG}</level>
 		</filter>
 		<encoder>
 			<pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%file:%line] %msg%n</pattern>
 		</encoder>
 	</appender>
 
-	<logger name="org.springframework.beans" level="INFO">
+	<logger name="org.springframework.beans" level="${LOGBACK_LOG_LEVEL:-DEBUG}">
 		<appender-ref ref="STDOUT" />
 	</logger>
-	<logger name="org.springframework.core" level="INFO">
+	<logger name="org.springframework.core" level="${LOGBACK_LOG_LEVEL:-DEBUG}">
 		<appender-ref ref="STDOUT" />
 	</logger>
 
-	<root level="${LOGBACK_ROOT_LOG_LEVEL:-INFO}">
+	<root level="${LOGBACK_LOG_LEVEL:-DEBUG}">
 		<appender-ref ref="STDOUT" />
 	</root>
 
