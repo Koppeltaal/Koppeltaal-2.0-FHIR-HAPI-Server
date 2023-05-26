@@ -2,8 +2,6 @@ name: Build Container Images
 
 on:
   push:
-    branches:
-      - master
     tags:
       - "image/v*"
     paths-ignore:
@@ -26,6 +24,9 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ env.IMAGES }}
+          tags: |
+            type=match,pattern=image-(.*),group=1,enable=${{github.event_name != 'pull_request'}}
+           
 
       - name: Container meta for tomcat image
         id: docker_tomcat_meta
@@ -34,7 +35,6 @@ jobs:
           images: ${{ env.IMAGES }}
           tags: |
             type=match,pattern=image-(.*),group=1,enable=${{github.event_name != 'pull_request'}}
-            type=ref,event=branch
           flavor: |
             suffix=-tomcat,onlatest=true
 
