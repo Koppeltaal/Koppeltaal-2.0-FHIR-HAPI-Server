@@ -2,6 +2,7 @@ spring:
   jpa:
     properties:
       hibernate.search.backend.directory.root: /pvc-mount/prd/lucene/
+      hibernate.search.automatic_indexing.synchronization.strategy: read-sync
 
 smart:
   configuration:
