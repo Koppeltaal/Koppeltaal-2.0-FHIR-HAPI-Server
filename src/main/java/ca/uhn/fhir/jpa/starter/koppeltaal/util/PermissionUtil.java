@@ -42,10 +42,7 @@ public class PermissionUtil {
   public static List<String> getScopesForRequest(RequestDetails requestDetails) {
     final String resourceName = requestDetails.getResourceName();
 
-    DecodedJWT decodedAccessToken = getDecodedAccessToken(requestDetails);
-
-    Claim scopeClaim = decodedAccessToken.getClaim("scope");
-    String scopeString = scopeClaim.asString();
+    String scopeString = getFullScope(requestDetails);
 
     //update the cache
     ResourceOriginUtil.getRequesterClientId(requestDetails).ifPresent((clientId) ->
@@ -59,6 +56,13 @@ public class PermissionUtil {
     return Arrays.stream(scopes)
       .filter((scope) -> scope.matches("^system\\/(?:\\*|"+resourceName+")\\."+crudsRegex+".*"))
       .collect(Collectors.toList());
+  }
+
+  public static String getFullScope(RequestDetails requestDetails) {
+    DecodedJWT decodedAccessToken = getDecodedAccessToken(requestDetails);
+
+    Claim scopeClaim = decodedAccessToken.getClaim("scope");
+    return scopeClaim.asString();
   }
 
   public static String getCrudsRegex(RequestTypeEnum requestTypeEnum) {
@@ -97,6 +101,7 @@ public class PermissionUtil {
     String token = StringUtils.trim(StringUtils.removeStartIgnoreCase(authorization, "Bearer"));
 
     if(StringUtils.isBlank(token)) {
+      LOG.warn("Request without `Authorization` header found, can not determine access.");
       throw new ForbiddenOperationException("Unauthorized");
     }
 

@@ -68,6 +68,8 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     if (requestType == RequestTypeEnum.POST) {
 
       if (relevantPermissions.isEmpty()) {
+        LOG.warn("No permission found, user tried to [{}] a [{}], but the found scopes are [{}]",
+          requestType, requestDetails.getResourceName(), PermissionUtil.getFullScope(requestDetails));
         throw new ForbiddenOperationException("Unauthorized");
       }
       return;
@@ -91,6 +93,8 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     }
 
     if (!hasPermission) {
+      LOG.warn("No permission found, user tried to [{}] a [{}], but the found scopes are [{}]",
+        requestType, requestDetails.getResourceName(), PermissionUtil.getFullScope(requestDetails));
       throw new ForbiddenOperationException("Unauthorized");
     }
   }
