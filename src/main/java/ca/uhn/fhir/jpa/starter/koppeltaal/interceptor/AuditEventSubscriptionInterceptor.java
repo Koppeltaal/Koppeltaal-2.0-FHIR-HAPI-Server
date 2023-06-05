@@ -8,9 +8,12 @@ import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuditEventDto;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.RequestIdHolder;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.jpa.subscription.model.CanonicalSubscription;
 import ca.uhn.fhir.jpa.subscription.model.ResourceDeliveryMessage;
+import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.AuditEvent;
+import org.hl7.fhir.r4.model.Reference;
 import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.StringType;
 import org.slf4j.Logger;
@@ -35,6 +38,7 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
   private static final Logger LOG = LoggerFactory.getLogger(AuditEventSubscriptionInterceptor.class);
   protected final FhirContext fhirContext;
   private final RequestIdHolder requestIdHolder;
+
 
   public AuditEventSubscriptionInterceptor(DaoRegistry daoRegistry, AuditEventService auditEventService, FhirContext fhirContext, RequestIdHolder requestIdHolder) {
     super(auditEventService, daoRegistry);
@@ -65,9 +69,13 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
       correlationIdOptional
         .ifPresent(dto::setCorrelationId);
       dto.setOutcome("0");
-      dto.addResource(resource);
+      dto.addResource(new Reference(resource));
+      dto.addResource(new Reference(canonicalSubscription.getIdElement(fhirContext)));
       dto.setQuery(canonicalSubscription.getCriteriaString());
       dto.setDateTime(new Date());
+
+      Optional<IIdType> resourceOriginDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(resource);
+      resourceOriginDeviceId.ifPresent(iIdType -> dto.setAgent(new Reference(iIdType)));
 
       LOG.info("Creating: {}", dto);
 

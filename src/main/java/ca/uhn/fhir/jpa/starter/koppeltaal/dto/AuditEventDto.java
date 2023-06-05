@@ -1,9 +1,7 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.dto;
 
-import org.hl7.fhir.instance.model.api.IBaseOperationOutcome;
-import org.hl7.fhir.r4.model.Device;
 import org.hl7.fhir.r4.model.OperationOutcome;
-import org.hl7.fhir.r4.model.Resource;
+import org.hl7.fhir.r4.model.Reference;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -44,11 +42,11 @@ public class AuditEventDto {
    * If the incoming call does not have a request ID, it should NOT be filled.
 	 */
 	String correlationId;
-	Device device;
+	Reference agent;
 	String query;
-	List<Resource> resources = new ArrayList<>();
+	List<Reference> resources = new ArrayList<>();
 
-	public void addResource(Resource r) {
+	public void addResource(Reference r) {
 		this.resources.add(r);
 	}
 
@@ -60,12 +58,12 @@ public class AuditEventDto {
 		this.dateTime = dateTime;
 	}
 
-	public Device getDevice() {
-		return device;
+	public Reference getAgent() {
+		return agent;
 	}
 
-	public void setDevice(Device device) {
-		this.device = device;
+	public void setAgent(Reference agent) {
+		this.agent = agent;
 	}
 
 	public EventType getEventType() {
@@ -100,7 +98,7 @@ public class AuditEventDto {
 		this.query = query;
 	}
 
-	public List<Resource> getResources() {
+	public List<Reference> getResources() {
 		return new ArrayList<>(resources);
 	}
 
@@ -128,6 +126,22 @@ public class AuditEventDto {
     this.operationOutcome = operationOutcome;
   }
 
+  @Override
+  public String toString() {
+    return "AuditEventDto{" +
+      "eventType=" + eventType +
+      ", dateTime=" + dateTime +
+      ", outcome='" + outcome + '\'' +
+      ", operationOutcome=" + operationOutcome +
+      ", traceId='" + traceId + '\'' +
+      ", requestId='" + requestId + '\'' +
+      ", correlationId='" + correlationId + '\'' +
+      ", device=" + agent +
+      ", query='" + query + '\'' +
+      ", resources=" + resources +
+      '}';
+  }
+
   public enum EventType {
 		Read,
 		Update,
@@ -141,20 +155,4 @@ public class AuditEventDto {
 		ReceiveNotification,
 		StatusChange
 	}
-
-  @Override
-  public String toString() {
-    return "AuditEventDto{" +
-      "eventType=" + eventType +
-      ", dateTime=" + dateTime +
-      ", outcome='" + outcome + '\'' +
-      ", operationOutcome=" + operationOutcome +
-      ", traceId='" + traceId + '\'' +
-      ", requestId='" + requestId + '\'' +
-      ", correlationId='" + correlationId + '\'' +
-      ", device=" + device +
-      ", query='" + query + '\'' +
-      ", resources=" + resources +
-      '}';
-  }
 }

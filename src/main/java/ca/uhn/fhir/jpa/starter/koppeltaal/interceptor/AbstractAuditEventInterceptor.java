@@ -34,7 +34,7 @@ public abstract class AbstractAuditEventInterceptor {
   private void addResources(AuditEventDto dto, IBaseResource... resources) {
     for (IBaseResource resource : resources) {
       if (resource instanceof Resource) {
-        dto.addResource((Resource) resource);
+        dto.addResource(new Reference((Resource) resource));
       }
     }
   }
@@ -48,8 +48,8 @@ public abstract class AbstractAuditEventInterceptor {
     return StringUtils.removeStart(completeUrl, requestDetails.getFhirServerBase());
   }
 
-  protected void setDevice(RequestDetails requestDetails, AuditEventDto dto) {
-    dto.setDevice(buildDevice(requestDetails));
+  protected void setAgent(RequestDetails requestDetails, AuditEventDto dto) {
+    dto.setAgent(new Reference(buildDevice(requestDetails)));
   }
 
   protected void setInteraction(ServletRequestDetails requestDetails, AuditEventDto dto) {
@@ -112,7 +112,7 @@ public abstract class AbstractAuditEventInterceptor {
         AuditEventDto dto = new AuditEventDto();
         if (setRequestType(requestDetails, dto)) {
           setInteraction(requestDetails, dto);
-          setDevice(requestDetails, dto);
+          setAgent(requestDetails, dto);
           addResources(dto, resource);
           if (resource instanceof Bundle) {
             Bundle bundle = (Bundle) resource;

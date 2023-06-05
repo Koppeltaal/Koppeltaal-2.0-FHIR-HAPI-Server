@@ -18,10 +18,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM;
@@ -41,7 +38,6 @@ public class AuditEventBuilder {
 	public static final Coding CODING_INTERACTION_CREATE = new Coding("http://hl7.org/fhir/restful-interaction", "create", "create");
 	public static final Coding CODING_INTERACTION_SEARCH = new Coding("http://hl7.org/fhir/restful-interaction", "search", "search");
 	public static final Coding CODING_INTERACTION_CAPABILITIES = new Coding("http://hl7.org/fhir/restful-interaction", "capabilities", "capabilities");
-	public static final Coding CODING_INTERACTION_SEND_NOTIFICATION = new Coding("http://terminology.hl7.org/CodeSystem/iso-21089-lifecycle", "transmit", "Transmit Record Lifecycle Event");
 	public static final Coding CODING_APPLICATION = new Coding("http://dicom.nema.org/resources/ontology/DCM", "110150", "Application");
 	public static final Coding CODING_APPLICATION_LAUNCHER = new Coding("http://dicom.nema.org/resources/ontology/DCM", "110151", "Application Launcher");
 	public static final Coding CODING_DESTINATION_ROLE_ID = new Coding("http://dicom.nema.org/resources/ontology/DCM", "110152", "Destination Role ID");
@@ -68,19 +64,19 @@ public class AuditEventBuilder {
 	}
 
 	AuditEvent build(AuditEventDto dto) {
-		AuditEvent auditEvent = new AuditEvent();
+    AuditEvent auditEvent = new AuditEvent();
     AuditEventDto.EventType eventType = dto.getEventType();
-		buildEventType(auditEvent, eventType);
-		List<Resource> resources = dto.getResources();
-		for (Resource resource : resources) {
+    buildEventType(auditEvent, eventType);
+    List<Reference> resources = dto.getResources();
+    for (Reference resource : resources) {
       AuditEvent.AuditEventEntityComponent entity = buildAuditEventEntityComponent(resource, dto);
-      if(dto.getEventType() == AuditEventDto.EventType.Delete) {
+      if (dto.getEventType() == AuditEventDto.EventType.Delete) {
         entity.setWhat(null); //remove as it's not allowed to reference to deleted objects
       }
       auditEvent.addEntity(entity);
-		}
-		auditEvent.setSource(buildEventSource());
-		auditEvent.setRecorded(dto.getDateTime());
+    }
+    auditEvent.setSource(buildEventSource());
+    auditEvent.setRecorded(dto.getDateTime());
 
     getResourceOriginExtension(dto)
       .ifPresent(auditEvent::addExtension);
@@ -90,7 +86,7 @@ public class AuditEventBuilder {
 		auditEvent.addExtension("http://koppeltaal.nl/fhir/StructureDefinition/correlation-id", new IdType(dto.getCorrelationId()));
 
     if(dto.getOperationOutcome() != null) {
-      AuditEvent.AuditEventEntityComponent entity = buildAuditEventEntityComponent(dto.getOperationOutcome(), dto);
+      AuditEvent.AuditEventEntityComponent entity = buildAuditEventEntityComponent(newReference(dto.getOperationOutcome()), dto);
       entity.setWhat(null); //remove ad OperationOutcomes aren't persisted and can't be referenced to
       auditEvent.addEntity(entity);
       auditEvent.setOutcomeDesc(
@@ -102,27 +98,33 @@ public class AuditEventBuilder {
     }
 
     if (StringUtils.isNotEmpty(dto.getOutcome())) {
-			auditEvent.setOutcome(AuditEvent.AuditEventOutcome.fromCode(dto.getOutcome()));
-		}
+      auditEvent.setOutcome(AuditEvent.AuditEventOutcome.fromCode(dto.getOutcome()));
+    }
 
-		Device device = dto.getDevice();
-		if (device != null) {
-			auditEvent.setAgent(singletonList(buildAgent(device)));
-		} else {
-			auditEvent.setAgent(singletonList(buildAgent(self)));
-		}
+    buildAgent(auditEvent, dto);
     setMetaWithProfileUrl(auditEvent);
     return auditEvent;
-	}
+  }
+
+  private void buildAgent(AuditEvent auditEvent, AuditEventDto dto) {
+    Reference agent = Objects.requireNonNullElseGet(dto.getAgent(), () -> newReference(self));
+    if (auditEvent.getType().equalsShallow(CODING_TRANSMIT)) {
+      // This is a Subscription Notification
+      auditEvent.addAgent(buildAgent(agent, true, CODING_SOURCE_ROLE_ID));
+    } else if (auditEvent.getType().equalsShallow(CODING_REST)) {
+      // This event is a REST operation
+      auditEvent.addAgent(buildAgent(agent, true, CODING_APPLICATION));
+    }
+  }
 
   @NotNull
   private Optional<Extension> getResourceOriginExtension(AuditEventDto dto) {
 
-    if(dto.getDevice() == null) return Optional.empty();
+    if (dto.getAgent() == null) return Optional.empty();
 
     final Extension resourceOriginExtension = new Extension();
     resourceOriginExtension.setUrl(RESOURCE_ORIGIN_SYSTEM);
-    final Reference deviceReference = new Reference(dto.getDevice());
+    final Reference deviceReference = dto.getAgent();
     deviceReference.setType(ResourceType.Device.name());
     resourceOriginExtension.setValue(deviceReference);
     return Optional.of(resourceOriginExtension);
@@ -134,27 +136,25 @@ public class AuditEventBuilder {
     auditEvent.setMeta(profileMeta);
   }
 
-  private AuditEvent.AuditEventAgentComponent buildAgent(Device device) {
-		AuditEvent.AuditEventAgentComponent rv = new AuditEvent.AuditEventAgentComponent();
-		rv.setWho(newReference(device));
-		rv.setType(new CodeableConcept(CODING_APPLICATION));
-		rv.setRequestor(true);
-		return rv;
-	}
+  private AuditEvent.AuditEventAgentComponent buildAgent(Reference device, boolean requestor, Coding role) {
+    AuditEvent.AuditEventAgentComponent rv = new AuditEvent.AuditEventAgentComponent();
+    rv.setWho(device);
+    rv.setType(new CodeableConcept(role));
+    rv.setRequestor(requestor);
+    return rv;
+  }
 
-	private AuditEvent.AuditEventEntityComponent buildAuditEventEntityComponent(Resource entity, AuditEventDto auditEvent) {
-		AuditEvent.AuditEventEntityComponent component = new AuditEvent.AuditEventEntityComponent();
-		component.setWhatTarget(entity);
-		Reference reference = newReference(entity);
-		component.setWhat(reference);
-		component.setType(new Coding("http://hl7.org/fhir/resource-types", reference.getType(), reference.getDisplay()));
+  private AuditEvent.AuditEventEntityComponent buildAuditEventEntityComponent(Reference reference, AuditEventDto auditEvent) {
+    AuditEvent.AuditEventEntityComponent component = new AuditEvent.AuditEventEntityComponent();
+    component.setWhat(reference);
+    component.setType(new Coding("http://hl7.org/fhir/resource-types", reference.getType(), reference.getDisplay()));
     String query = auditEvent.getQuery();
-		if (StringUtils.isNotEmpty(query)) {
-			component.setQuery(query.getBytes(StandardCharsets.UTF_8));
-		} else {
-		  component.setName(reference.getType()); //it's not allowed to both set the name and query http://hl7.org/fhir/R4B/auditevent-definitions.html#AuditEvent.entity.name
+    if (StringUtils.isNotEmpty(query)) {
+      component.setQuery(query.getBytes(StandardCharsets.UTF_8));
+    } else {
+      component.setName(reference.getType()); //it's not allowed to both set the name and query http://hl7.org/fhir/R4B/auditevent-definitions.html#AuditEvent.entity.name
     }
-		return component;
+    return component;
 	}
 
 	private AuditEvent.AuditEventSourceComponent buildEventSource() {
@@ -165,8 +165,10 @@ public class AuditEventBuilder {
 
 	private void buildEventType(AuditEvent auditEvent, AuditEventDto.EventType eventType) {
 		if (eventType == AuditEventDto.EventType.SendNotification) {
-			auditEvent.setType(CODING_TRANSMIT);
-		} else {
+      auditEvent.setType(CODING_TRANSMIT);
+      auditEvent.setSubtype(Collections.emptyList());
+      auditEvent.setAction(AuditEvent.AuditEventAction.E);
+    } else {
 			auditEvent.setType(CODING_REST);
 			switch (eventType) {
 				case Create:

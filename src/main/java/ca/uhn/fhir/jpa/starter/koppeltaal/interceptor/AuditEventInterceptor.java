@@ -11,7 +11,6 @@ import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.BaseServerResponseException;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
-import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.jetbrains.annotations.NotNull;
@@ -19,9 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import javax.servlet.http.HttpServletRequest;
 import java.util.Collections;
-import java.util.UUID;
 
 /**
  *
@@ -65,7 +62,7 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
         AuditEventDto dto = new AuditEventDto();
         if (setRequestType(servletRequestDetails, dto)) {
           setInteraction(servletRequestDetails, dto);
-          setDevice(servletRequestDetails, dto);
+          setAgent(servletRequestDetails, dto);
           dto.setOutcome(isSeriousFailure ? "8" : "4");
 
           OperationOutcome operationOutcome = (OperationOutcome) serverResponseException.getOperationOutcome();
@@ -81,7 +78,7 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
         AuditEventDto dto = new AuditEventDto();
         if (setRequestType(servletRequestDetails, dto)) {
           setInteraction(servletRequestDetails, dto);
-          setDevice(servletRequestDetails, dto);
+          setAgent(servletRequestDetails, dto);
           OperationOutcome operationOutcome = generateOperationOutcome(throwable.getMessage());
           dto.setOperationOutcome(operationOutcome);
           dto.setOutcome("8");
