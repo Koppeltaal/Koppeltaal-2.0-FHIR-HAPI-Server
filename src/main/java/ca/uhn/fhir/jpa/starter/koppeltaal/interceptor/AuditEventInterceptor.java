@@ -5,6 +5,7 @@ import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuditEventDto;
+import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventBuilder;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.RequestIdHolder;
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
@@ -62,7 +63,7 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
         AuditEventDto dto = new AuditEventDto();
         if (setRequestType(servletRequestDetails, dto)) {
           setInteraction(servletRequestDetails, dto);
-          setAgent(servletRequestDetails, dto);
+          setAgent(servletRequestDetails, dto, AuditEventBuilder.CODING_SOURCE_ROLE_ID);
           dto.setOutcome(isSeriousFailure ? "8" : "4");
 
           OperationOutcome operationOutcome = (OperationOutcome) serverResponseException.getOperationOutcome();
@@ -78,7 +79,7 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
         AuditEventDto dto = new AuditEventDto();
         if (setRequestType(servletRequestDetails, dto)) {
           setInteraction(servletRequestDetails, dto);
-          setAgent(servletRequestDetails, dto);
+          setAgent(servletRequestDetails, dto, AuditEventBuilder.CODING_SOURCE_ROLE_ID);
           OperationOutcome operationOutcome = generateOperationOutcome(throwable.getMessage());
           dto.setOperationOutcome(operationOutcome);
           dto.setOutcome("8");

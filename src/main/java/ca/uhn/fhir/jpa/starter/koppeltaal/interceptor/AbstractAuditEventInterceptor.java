@@ -3,6 +3,7 @@ package ca.uhn.fhir.jpa.starter.koppeltaal.interceptor;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuditEventDto;
+import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventBuilder;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
@@ -48,8 +49,8 @@ public abstract class AbstractAuditEventInterceptor {
     return StringUtils.removeStart(completeUrl, requestDetails.getFhirServerBase());
   }
 
-  protected void setAgent(RequestDetails requestDetails, AuditEventDto dto) {
-    dto.setAgent(new Reference(buildDevice(requestDetails)));
+  protected void setAgent(RequestDetails requestDetails, AuditEventDto dto, Coding type) {
+    dto.addAgent(new Reference(buildDevice(requestDetails)), type);
   }
 
   protected void setInteraction(ServletRequestDetails requestDetails, AuditEventDto dto) {
@@ -112,7 +113,7 @@ public abstract class AbstractAuditEventInterceptor {
         AuditEventDto dto = new AuditEventDto();
         if (setRequestType(requestDetails, dto)) {
           setInteraction(requestDetails, dto);
-          setAgent(requestDetails, dto);
+          setAgent(requestDetails, dto, AuditEventBuilder.CODING_SOURCE_ROLE_ID);
           addResources(dto, resource);
           if (resource instanceof Bundle) {
             Bundle bundle = (Bundle) resource;

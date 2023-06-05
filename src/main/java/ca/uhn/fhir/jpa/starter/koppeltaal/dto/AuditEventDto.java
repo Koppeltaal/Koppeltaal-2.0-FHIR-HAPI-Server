@@ -1,5 +1,7 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.dto;
 
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.hl7.fhir.r4.model.Reference;
 
@@ -42,7 +44,7 @@ public class AuditEventDto {
    * If the incoming call does not have a request ID, it should NOT be filled.
 	 */
 	String correlationId;
-	Reference agent;
+  List<AgentAndTypeDto> agents = new ArrayList<>();
 	String query;
 	List<Reference> resources = new ArrayList<>();
 
@@ -58,12 +60,15 @@ public class AuditEventDto {
 		this.dateTime = dateTime;
 	}
 
-	public Reference getAgent() {
-		return agent;
+	public List<AgentAndTypeDto> getAgents() {
+		return agents;
 	}
 
-	public void setAgent(Reference agent) {
-		this.agent = agent;
+	public void addAgent(Reference agent, Coding type, boolean requestor) {
+		this.agents.add(new AgentAndTypeDto(agent, type, requestor));
+	}
+	public void addAgent(Reference agent, Coding type) {
+		this.agents.add(new AgentAndTypeDto(agent, type));
 	}
 
 	public EventType getEventType() {
@@ -136,7 +141,7 @@ public class AuditEventDto {
       ", traceId='" + traceId + '\'' +
       ", requestId='" + requestId + '\'' +
       ", correlationId='" + correlationId + '\'' +
-      ", device=" + agent +
+      ", agents=" + agents +
       ", query='" + query + '\'' +
       ", resources=" + resources +
       '}';
@@ -155,4 +160,43 @@ public class AuditEventDto {
 		ReceiveNotification,
 		StatusChange
 	}
+
+  public static class AgentAndTypeDto {
+    final Reference agent;
+    final Coding type;
+    final boolean requester;
+
+    public AgentAndTypeDto(Reference agent, Coding type) {
+      this.agent = agent;
+      this.type = type;
+      this.requester = true;
+    }
+
+    public AgentAndTypeDto(Reference agent, Coding type, boolean requester) {
+      this.agent = agent;
+      this.type = type;
+      this.requester = requester;
+    }
+
+    public boolean isRequester() {
+      return requester;
+    }
+
+    public Reference getAgent() {
+      return agent;
+    }
+
+    public Coding getType() {
+      return type;
+    }
+
+    @Override
+    public String toString() {
+      return new ToStringBuilder(this)
+        .append("agent", agent)
+        .append("type", type)
+        .append("requester", requester)
+        .toString();
+    }
+  }
 }

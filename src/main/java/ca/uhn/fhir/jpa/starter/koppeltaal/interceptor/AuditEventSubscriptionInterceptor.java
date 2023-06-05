@@ -4,18 +4,19 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.interceptor.api.Hook;
 import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
+import ca.uhn.fhir.interceptor.model.RequestPartitionId;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
+import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
+import ca.uhn.fhir.jpa.partition.SystemRequestDetails;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuditEventDto;
+import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventBuilder;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.RequestIdHolder;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.jpa.subscription.model.CanonicalSubscription;
 import ca.uhn.fhir.jpa.subscription.model.ResourceDeliveryMessage;
 import org.hl7.fhir.instance.model.api.IIdType;
-import org.hl7.fhir.r4.model.AuditEvent;
-import org.hl7.fhir.r4.model.Reference;
-import org.hl7.fhir.r4.model.Resource;
-import org.hl7.fhir.r4.model.StringType;
+import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -38,12 +39,14 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
   private static final Logger LOG = LoggerFactory.getLogger(AuditEventSubscriptionInterceptor.class);
   protected final FhirContext fhirContext;
   private final RequestIdHolder requestIdHolder;
+  private final IFhirResourceDao<Subscription> subscriptionDao;
 
 
-  public AuditEventSubscriptionInterceptor(DaoRegistry daoRegistry, AuditEventService auditEventService, FhirContext fhirContext, RequestIdHolder requestIdHolder) {
+  public AuditEventSubscriptionInterceptor(DaoRegistry daoRegistry, AuditEventService auditEventService, FhirContext fhirContext, RequestIdHolder requestIdHolder, IFhirResourceDao<Subscription> subscriptionDao) {
     super(auditEventService, daoRegistry);
     this.fhirContext = fhirContext;
     this.requestIdHolder = requestIdHolder;
+    this.subscriptionDao = subscriptionDao;
   }
 
   @Hook(value = Pointcut.SUBSCRIPTION_BEFORE_DELIVERY, order = Integer.MAX_VALUE)
@@ -70,12 +73,19 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
         .ifPresent(dto::setCorrelationId);
       dto.setOutcome("0");
       dto.addResource(new Reference(resource));
-      dto.addResource(new Reference(canonicalSubscription.getIdElement(fhirContext)));
+      IIdType subscriptionId = canonicalSubscription.getIdElement(fhirContext);
+      dto.addResource(new Reference(subscriptionId));
       dto.setQuery(canonicalSubscription.getCriteriaString());
       dto.setDateTime(new Date());
 
       Optional<IIdType> resourceOriginDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(resource);
-      resourceOriginDeviceId.ifPresent(iIdType -> dto.setAgent(new Reference(iIdType)));
+      resourceOriginDeviceId.ifPresent(id -> dto.addAgent(new Reference(id), AuditEventBuilder.CODING_SOURCE_ROLE_ID, true));
+
+      Subscription subscription = subscriptionDao.read(subscriptionId, newSystemRequestDetails(), true);
+      if (subscription != null) {
+        Optional<IIdType> subscriptionDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(subscription);
+        subscriptionDeviceId.ifPresent(id -> dto.addAgent(new Reference(id), AuditEventBuilder.CODING_DESTINATION_ROLE_ID, false));
+      }
 
       LOG.info("Creating: {}", dto);
 
@@ -84,6 +94,12 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
       LOG.debug("Not creating AuditEvent as the resource is an instance of AuditEvent");
     }
 
+  }
+
+  private SystemRequestDetails newSystemRequestDetails() {
+    return
+      new SystemRequestDetails()
+        .setRequestPartitionId(RequestPartitionId.defaultPartition());
   }
 
   private void setTraceAndRequestIdHeaders(CanonicalSubscription canonicalSubscription, String transactionId, String requestId, Optional<String> correlationIdOptional) {

@@ -18,7 +18,10 @@ import org.springframework.stereotype.Component;
 import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM;
@@ -101,33 +104,32 @@ public class AuditEventBuilder {
       auditEvent.setOutcome(AuditEvent.AuditEventOutcome.fromCode(dto.getOutcome()));
     }
 
-    buildAgent(auditEvent, dto);
+    buildAgents(auditEvent, dto);
     setMetaWithProfileUrl(auditEvent);
     return auditEvent;
   }
 
-  private void buildAgent(AuditEvent auditEvent, AuditEventDto dto) {
-    Reference agent = Objects.requireNonNullElseGet(dto.getAgent(), () -> newReference(self));
-    if (auditEvent.getType().equalsShallow(CODING_TRANSMIT)) {
-      // This is a Subscription Notification
-      auditEvent.addAgent(buildAgent(agent, true, CODING_SOURCE_ROLE_ID));
-    } else if (auditEvent.getType().equalsShallow(CODING_REST)) {
-      // This event is a REST operation
-      auditEvent.addAgent(buildAgent(agent, true, CODING_APPLICATION));
+  private void buildAgents(AuditEvent auditEvent, AuditEventDto dto) {
+    for (AuditEventDto.AgentAndTypeDto agentDto : dto.getAgents()) {
+      if (auditEvent.getType().equalsShallow(CODING_TRANSMIT)) {
+        // This is a Subscription Notification
+        auditEvent.addAgent(buildAgents(agentDto.getAgent(), agentDto.getType(), agentDto.isRequester()));
+      } else if (auditEvent.getType().equalsShallow(CODING_REST)) {
+        // This event is a REST operation
+        auditEvent.addAgent(buildAgents(agentDto.getAgent(), agentDto.getType(), agentDto.isRequester()));
+      }
     }
   }
 
   @NotNull
   private Optional<Extension> getResourceOriginExtension(AuditEventDto dto) {
-
-    if (dto.getAgent() == null) return Optional.empty();
-
-    final Extension resourceOriginExtension = new Extension();
-    resourceOriginExtension.setUrl(RESOURCE_ORIGIN_SYSTEM);
-    final Reference deviceReference = dto.getAgent();
-    deviceReference.setType(ResourceType.Device.name());
-    resourceOriginExtension.setValue(deviceReference);
-    return Optional.of(resourceOriginExtension);
+    for (AuditEventDto.AgentAndTypeDto agent : dto.getAgents()) {
+      final Extension resourceOriginExtension = new Extension();
+      resourceOriginExtension.setUrl(RESOURCE_ORIGIN_SYSTEM);
+      resourceOriginExtension.setValue(agent.getAgent());
+      return Optional.of(resourceOriginExtension);
+    }
+    return Optional.empty();
   }
 
   private void setMetaWithProfileUrl(AuditEvent auditEvent) {
@@ -136,7 +138,7 @@ public class AuditEventBuilder {
     auditEvent.setMeta(profileMeta);
   }
 
-  private AuditEvent.AuditEventAgentComponent buildAgent(Reference device, boolean requestor, Coding role) {
+  private AuditEvent.AuditEventAgentComponent buildAgents(Reference device, Coding role, boolean requestor) {
     AuditEvent.AuditEventAgentComponent rv = new AuditEvent.AuditEventAgentComponent();
     rv.setWho(device);
     rv.setType(new CodeableConcept(role));
