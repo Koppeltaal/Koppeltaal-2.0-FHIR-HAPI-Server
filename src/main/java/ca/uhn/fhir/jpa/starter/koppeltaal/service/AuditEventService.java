@@ -1,9 +1,8 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.service;
 
-import ca.uhn.fhir.interceptor.model.RequestPartitionId;
+import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.api.model.DaoMethodOutcome;
-import ca.uhn.fhir.jpa.partition.SystemRequestDetails;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuditEventDto;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import org.hl7.fhir.r4.model.AuditEvent;
@@ -21,25 +20,30 @@ import java.util.concurrent.Executors;
  */
 @Component
 public class AuditEventService {
-	private static final Logger LOG = LoggerFactory.getLogger(AuditEventService.class);
-	private final IFhirResourceDao<AuditEvent> auditEventDao;
-	private final AuditEventBuilder auditEventBuilder;
-	private ExecutorService executorService;
+  protected long sleepTime = 2000;
+  private static final Logger LOG = LoggerFactory.getLogger(AuditEventService.class);
+  private final IFhirResourceDao<AuditEvent> auditEventDao;
+  private final AuditEventBuilder auditEventBuilder;
+  protected ExecutorService executorService;
 
-	public AuditEventService(IFhirResourceDao<AuditEvent> auditEventDao, AuditEventBuilder auditEventBuilder) {
-		this.auditEventDao = auditEventDao;
-		this.auditEventBuilder = auditEventBuilder;
-	}
+  public AuditEventService(DaoRegistry daoRegistry, AuditEventBuilder auditEventBuilder) {
+    this.auditEventDao = daoRegistry.getResourceDao(AuditEvent.class);
+    this.auditEventBuilder = auditEventBuilder;
+  }
 
-	@PostConstruct
-	public void init() {
-		executorService = Executors.newCachedThreadPool();
-	}
+  protected void setExecutorService(ExecutorService executorService) {
+    this.executorService = executorService;
+  }
 
-	@PreDestroy
-	public void shutdown() {
-		if (executorService != null) {
-			executorService.shutdown();
+  @PostConstruct
+  public void init() {
+    executorService = Executors.newCachedThreadPool();
+  }
+
+  @PreDestroy
+  public void shutdown() {
+    if (executorService != null) {
+      executorService.shutdown();
 		}
 	}
 
@@ -47,13 +51,8 @@ public class AuditEventService {
 		final AuditEvent auditEvent = auditEventBuilder.build(dto);
 		executorService.submit(() -> {
       try {
-
-        Thread.sleep(2000); //introduce a delay as this runs async and can cause a concurrency issue where the referenced entity doesn't exist yet, causing referential integrity issues
-
-        SystemRequestDetails systemRequestDetails = new SystemRequestDetails();
-        systemRequestDetails.setRequestPartitionId(RequestPartitionId.defaultPartition()); //FIXME: Solution isn't multi-tenant
-
-        DaoMethodOutcome outcome = auditEventDao.create(auditEvent, systemRequestDetails);
+        Thread.sleep(sleepTime); //introduce a delay as this runs async and can cause a concurrency issue where the referenced entity doesn't exist yet, causing referential integrity issues
+        DaoMethodOutcome outcome = auditEventDao.create(auditEvent, requestDetails);
         if (!outcome.getCreated()) {
           LOG.warn("Unexpected outcome");
         }

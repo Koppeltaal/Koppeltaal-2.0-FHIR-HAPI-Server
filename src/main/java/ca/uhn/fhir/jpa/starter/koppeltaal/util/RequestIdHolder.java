@@ -7,8 +7,8 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 
 /**
- * This holder contains the request id for incoming requests mapped to the trace-id.
- * This is needed as HAPI doesn't provide access to the request-id in the SUBSCRIPTION_BEFORE_DELIVERY Pointcut.
+ * This holder contains the request state for incoming requests mapped to the trace-id.
+ * This is needed as HAPI doesn't provide access to the state in the SUBSCRIPTION_BEFORE_DELIVERY Pointcut.
  *
  * This is a very hacky and error-prone in-memory solution to be able and set the X-Correlation-Id on outgoing subscription
  * calls. This is error-prone as new requests have the risk of overwriting the requestId before the interceptor
@@ -20,10 +20,12 @@ public class RequestIdHolder {
   private static final Logger LOG = LoggerFactory.getLogger(RequestIdHolder.class);
 
   private final Map<String, String> traceIdToRequestIdMap = new HashMap<>();
+  private final Map<String, String> traceIdToTenantIdMap = new HashMap<>();
 
-  public void addMapping(String traceId, String requestId) {
-    LOG.info("Mapping trace id [{}] to request id [{}]", traceId, requestId);
+  public void addMapping(String traceId, String requestId, String tenantId) {
+    LOG.info("Mapping trace id [{}] to request id [{}] and tenant id [{}]", traceId, requestId, tenantId);
     traceIdToRequestIdMap.put(traceId, requestId);
+    traceIdToTenantIdMap.put(traceId, tenantId);
 
     autoCleanup(traceId);
   }
@@ -42,9 +44,24 @@ public class RequestIdHolder {
     return Optional.empty();
   }
 
-  public void clearRequestId(String traceId) {
-    LOG.info("Clearing request id mapped to trace id [{}]", traceId);
+  public Optional<String> getTenantId(String traceId) {
+
+    boolean hasTenantId = traceIdToTenantIdMap.containsKey(traceId);
+
+    if(hasTenantId) {
+      String requestId = traceIdToTenantIdMap.get(traceId);
+      LOG.info("Found request id [{}] found based on tenant id [{}]", requestId, traceId);
+      return Optional.of(requestId);
+    }
+
+    LOG.info("Did not find tenant id based on trace id [{}]", traceId);
+    return Optional.empty();
+  }
+
+  public void clearIds(String traceId) {
+    LOG.info("Clearing request and tenant id mapped to trace id [{}]", traceId);
     traceIdToRequestIdMap.remove(traceId);
+    traceIdToTenantIdMap.remove(traceId);
   }
 
   private void autoCleanup(String traceId) {
@@ -54,8 +71,8 @@ public class RequestIdHolder {
     new Timer().schedule(new TimerTask() {
       @Override
       public void run() {
-        clearRequestId(traceId);
+        clearIds(traceId);
       }
-    }, 20 * 1000L); //cleanup after 20 seconds
+    }, 20 * 60 * 1000L); //cleanup after 20 minutes
   }
 }

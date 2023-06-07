@@ -42,11 +42,11 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
   private final IFhirResourceDao<Subscription> subscriptionDao;
 
 
-  public AuditEventSubscriptionInterceptor(DaoRegistry daoRegistry, AuditEventService auditEventService, FhirContext fhirContext, RequestIdHolder requestIdHolder, IFhirResourceDao<Subscription> subscriptionDao) {
+  public AuditEventSubscriptionInterceptor(DaoRegistry daoRegistry, AuditEventService auditEventService, FhirContext fhirContext, RequestIdHolder requestIdHolder) {
     super(auditEventService, daoRegistry);
     this.fhirContext = fhirContext;
     this.requestIdHolder = requestIdHolder;
-    this.subscriptionDao = subscriptionDao;
+    this.subscriptionDao = daoRegistry.getSubscriptionDao();
   }
 
   @Hook(value = Pointcut.SUBSCRIPTION_BEFORE_DELIVERY, order = Integer.MAX_VALUE)
@@ -73,33 +73,44 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
         .ifPresent(dto::setCorrelationId);
       dto.setOutcome("0");
       dto.addResource(new Reference(resource));
-      IIdType subscriptionId = canonicalSubscription.getIdElement(fhirContext);
-      dto.addResource(new Reference(subscriptionId));
       dto.setQuery(canonicalSubscription.getCriteriaString());
       dto.setDateTime(new Date());
 
       Optional<IIdType> resourceOriginDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(resource);
       resourceOriginDeviceId.ifPresent(id -> dto.addAgent(new Reference(id), AuditEventBuilder.CODING_SOURCE_ROLE_ID, true));
 
-      Subscription subscription = subscriptionDao.read(subscriptionId, newSystemRequestDetails(), true);
+      SystemRequestDetails requestDetails = newSystemRequestDetails(traceId);
+
+      IIdType subscriptionId = canonicalSubscription.getIdElement(fhirContext);
+      Subscription subscription = subscriptionDao.read(subscriptionId, requestDetails, true);
       if (subscription != null) {
         Optional<IIdType> subscriptionDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(subscription);
         subscriptionDeviceId.ifPresent(id -> dto.addAgent(new Reference(id), AuditEventBuilder.CODING_DESTINATION_ROLE_ID, false));
+        dto.addResource(new Reference(subscription));
       }
 
       LOG.info("Creating: {}", dto);
 
-      auditEventService.submitAuditEvent(dto, null);
+      auditEventService.submitAuditEvent(dto, requestDetails);
     } else {
       LOG.debug("Not creating AuditEvent as the resource is an instance of AuditEvent");
     }
 
   }
 
-  private SystemRequestDetails newSystemRequestDetails() {
-    return
-      new SystemRequestDetails()
-        .setRequestPartitionId(RequestPartitionId.defaultPartition());
+  private SystemRequestDetails newSystemRequestDetails(String traceId) {
+    Optional<String> tenantId = requestIdHolder.getTenantId(traceId);
+    SystemRequestDetails details = new SystemRequestDetails();
+    if (tenantId.isPresent()) {
+      String id = tenantId.get();
+      details.setTenantId(id);
+      RequestPartitionId partitionId = RequestPartitionId.fromPartitionName(id);
+      details.setRequestPartitionId(partitionId);
+    } else {
+      RequestPartitionId partitionId = RequestPartitionId.defaultPartition();
+      details.setRequestPartitionId(partitionId);
+    }
+    return details;
   }
 
   private void setTraceAndRequestIdHeaders(CanonicalSubscription canonicalSubscription, String transactionId, String requestId, Optional<String> correlationIdOptional) {

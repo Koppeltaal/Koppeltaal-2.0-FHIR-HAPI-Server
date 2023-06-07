@@ -1,6 +1,7 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.service;
 
 import ca.uhn.fhir.interceptor.model.RequestPartitionId;
+import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.api.model.DaoMethodOutcome;
 import ca.uhn.fhir.jpa.partition.SystemRequestDetails;
@@ -11,8 +12,11 @@ import ca.uhn.fhir.model.dstu2.composite.IdentifierDt;
 import ca.uhn.fhir.rest.api.server.IBundleProvider;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import org.apache.commons.lang3.StringUtils;
+import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.*;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -53,8 +57,8 @@ public class AuditEventBuilder {
 
 	private  Device self;
 
-	public AuditEventBuilder(IFhirResourceDao<Device> deviceDao, FhirServerAuditLogConfiguration fhirServerAuditLogConfiguration) {
-		this.deviceDao = deviceDao;
+	public AuditEventBuilder(DaoRegistry daoRegistry, FhirServerAuditLogConfiguration fhirServerAuditLogConfiguration) {
+		this.deviceDao = daoRegistry.getResourceDao(Device.class);
 		this.fhirServerAuditLogConfiguration = fhirServerAuditLogConfiguration;
 	}
 
@@ -149,17 +153,38 @@ public class AuditEventBuilder {
   private AuditEvent.AuditEventEntityComponent buildAuditEventEntityComponent(Reference reference, AuditEventDto auditEvent) {
     AuditEvent.AuditEventEntityComponent component = new AuditEvent.AuditEventEntityComponent();
     component.setWhat(reference);
-    component.setType(new Coding("http://hl7.org/fhir/resource-types", reference.getType(), reference.getDisplay()));
+    String type = getTypeFromReference(reference);
+    component.setType(new Coding("http://hl7.org/fhir/resource-types", type, reference.getDisplay()));
     String query = auditEvent.getQuery();
     if (StringUtils.isNotEmpty(query)) {
       component.setQuery(query.getBytes(StandardCharsets.UTF_8));
     } else {
-      component.setName(reference.getType()); //it's not allowed to both set the name and query http://hl7.org/fhir/R4B/auditevent-definitions.html#AuditEvent.entity.name
+      component.setName(type); //it's not allowed to both set the name and query http://hl7.org/fhir/R4B/auditevent-definitions.html#AuditEvent.entity.name
     }
     return component;
 	}
 
-	private AuditEvent.AuditEventSourceComponent buildEventSource() {
+  @Nullable
+  private static String getTypeFromReference(Reference reference) {
+    String type = reference.getType();
+    if (StringUtils.isEmpty(type)) {
+      IIdType referenceElement = reference.getReferenceElement();
+      if (!referenceElement.isEmpty()) {
+        type = referenceElement.getResourceType();
+      } else {
+        IBaseResource resource = reference.getResource();
+        if (resource != null) {
+          IIdType idElement = resource.getIdElement();
+          if (!idElement.isEmpty()) {
+            type = idElement.getResourceType();
+          }
+        }
+      }
+    }
+    return type;
+  }
+
+  private AuditEvent.AuditEventSourceComponent buildEventSource() {
 		return new AuditEvent.AuditEventSourceComponent()
 			.setSite(fhirServerAuditLogConfiguration.getSite())
 			.setObserver(newReference(self));
@@ -236,7 +261,7 @@ public class AuditEventBuilder {
 	}
 
 	@NotNull
-	private Reference newReference(Resource entity) {
+	private Reference newReference(@NotNull Resource entity) {
 		Reference reference = new Reference();
 		String id = entity.getId();
 		String type = entity.fhirType();

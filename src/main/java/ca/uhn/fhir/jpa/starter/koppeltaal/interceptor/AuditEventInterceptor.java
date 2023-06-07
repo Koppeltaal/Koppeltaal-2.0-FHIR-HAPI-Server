@@ -123,7 +123,7 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
     // The requestId is always set @ ca.uhn.fhir.jpa.starter.koppeltaal.KoppeltaalRestfulServer.getOrCreateRequestId()
     String requestId = requestDetails.getRequestId();
 
-    requestIdHolder.addMapping(requestDetails.getTransactionGuid(), requestId);
+    requestIdHolder.addMapping(requestDetails.getTransactionGuid(), requestId, requestDetails.getTenantId());
 
     LOG.info(String.format("Incoming request, traceId='%s', requestId='%s', correlationId='%s'", requestDetails.getTransactionGuid(), requestId, requestDetails.getUserData().get("correlationId")));
   }
