@@ -2,7 +2,7 @@ package ca.uhn.fhir.jpa.starter.koppeltaal;
 
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.interceptor.api.IInterceptorService;
-import ca.uhn.fhir.jpa.api.config.DaoConfig;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.interceptor.OverridePathBasedReferentialIntegrityForDeletesInterceptor;
@@ -64,7 +64,7 @@ public class KoppeltaalRestfulServer extends RestfulServer {
   @Autowired
   private DaoRegistry daoRegistry;
   @Autowired
-  private DaoConfig daoConfig;
+  private JpaStorageSettings jpaStorageSettings;
 
   @Autowired
   private OverridePathBasedReferentialIntegrityForDeletesInterceptor referentialIntegrityDeleteInterceptor;
@@ -85,7 +85,7 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 		// Add your own customization here
     registerInterceptor(mimeTypeInterceptor);
 
-			IFhirResourceDao<Device> deviceDao = daoRegistry.getResourceDao(Device.class);
+    IFhirResourceDao<Device> deviceDao = daoRegistry.getResourceDao(Device.class);
 		if (fhirServerSecurityConfiguration.isEnabled()) {
 			registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
 
@@ -136,7 +136,7 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 
     registerInterceptor(new DefaultDescendingSortInterceptor());
 
-    daoConfig.setResourceServerIdStrategy(DaoConfig.IdStrategyEnum.UUID);
+    jpaStorageSettings.setResourceServerIdStrategy(JpaStorageSettings.IdStrategyEnum.UUID);
 	}
 
   @Override

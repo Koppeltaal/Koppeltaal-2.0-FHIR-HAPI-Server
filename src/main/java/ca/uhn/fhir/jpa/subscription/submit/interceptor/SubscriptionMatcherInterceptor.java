@@ -6,7 +6,7 @@ import ca.uhn.fhir.interceptor.api.HookParams;
 import ca.uhn.fhir.interceptor.api.IInterceptorBroadcaster;
 import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
-import ca.uhn.fhir.jpa.api.config.DaoConfig;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
 import ca.uhn.fhir.jpa.subscription.channel.impl.LinkedBlockingChannel;
 import ca.uhn.fhir.jpa.subscription.channel.subscription.SubscriptionChannelFactory;
 import ca.uhn.fhir.jpa.subscription.match.matcher.matching.IResourceModifiedConsumer;
@@ -59,7 +59,7 @@ public class SubscriptionMatcherInterceptor implements IResourceModifiedConsumer
 	@Autowired
 	private SubscriptionChannelFactory mySubscriptionChannelFactory;
 	@Autowired
-	private DaoConfig myDaoConfig;
+	private JpaStorageSettings jpaStorageSettings;
 
 	private volatile MessageChannel myMatchingChannel;
 
@@ -92,7 +92,7 @@ public class SubscriptionMatcherInterceptor implements IResourceModifiedConsumer
 	@Hook(Pointcut.STORAGE_PRECOMMIT_RESOURCE_UPDATED)
 	public void resourceUpdated(IBaseResource theOldResource, IBaseResource theNewResource, RequestDetails theRequest) {
 		startIfNeeded();
-		if (!myDaoConfig.isTriggerSubscriptionsForNonVersioningChanges()) {
+		if (!jpaStorageSettings.isTriggerSubscriptionsForNonVersioningChanges()) {
 			if (theOldResource != null && theNewResource != null) {
 				String oldVersion = theOldResource.getIdElement().getVersionIdPart();
 				String newVersion = theNewResource.getIdElement().getVersionIdPart();
