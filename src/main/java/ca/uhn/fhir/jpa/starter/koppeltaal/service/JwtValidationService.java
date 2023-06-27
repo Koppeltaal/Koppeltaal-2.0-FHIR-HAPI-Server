@@ -19,15 +19,23 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
 /**
  *
  */
-@Component
+@Service
 public class JwtValidationService {
-	/**
+
+  private final String authServerIssuer;
+
+  public JwtValidationService(@Value("${fhir.server.security.issuer:http://127.0.0.1:8083}") String authServerIssuer) {
+    this.authServerIssuer = authServerIssuer;
+  }
+
+  /**
 	 * Unfortunately, this implementation of JWT has no helper method for selecting the right
 	 * algorithm from the header. The public key must match the algorithm type (RSA or EC), but
 	 * the size of the hash algorithm can vary.
@@ -63,20 +71,17 @@ public class JwtValidationService {
 		// Get the algorithm name from the JWT.
 		DecodedJWT decode = JWT.decode(token);
 		String algorithmName = decode.getAlgorithm();
-		// Lookup the issuer.
-    // TODO: KOP-559 Now the issuer is just fetched as JWKS URL, need to whitelist.
-		String issuer = decode.getIssuer();
-
-		JwkProvider provider = new UrlJwkProvider(issuer);
+		// Verify the issuer is the auth server
+		JwkProvider provider = new UrlJwkProvider(authServerIssuer);
 		Jwk jwk = provider.get(decode.getKeyId());
-		Assert.isTrue(jwk != null, String.format("Unable to locate public key for issuer %s", issuer));
+		Assert.isTrue(jwk != null, String.format("Unable to locate public key for issuer %s", authServerIssuer));
 
 		// Get the algorithm from the public key and algorithm name.
 		Algorithm algorithm = getValidationAlgorithm(jwk.getPublicKey(), algorithmName);
 
 		// Decode and verify the token.
 		return JWT.require(algorithm)
-				.withIssuer(issuer) // Make sure to require yourself to be the audience.
+				.withIssuer(authServerIssuer)
 				.withAudience(audience) // Make sure to require yourself to be the audience.
 				.acceptExpiresAt(leeway)
 				.build()

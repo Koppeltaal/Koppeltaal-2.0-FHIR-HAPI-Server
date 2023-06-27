@@ -239,12 +239,12 @@ fhir:
       enabled: false
     security:
       enabled: false
-      issuer: "koppeltaal"
-      audience: "fhir-server"
-      introspectEndpoint: "http://127.0.0.1:8083/oauth2/introspect"
-      authorizationEndpoint: "http://127.0.0.1:8083/oauth2/authorize"
-      tokenEndpoint: "http://127.0.0.1:8083/oauth2/token"
-      jwksEndpoint: "http://127.0.0.1:8083/.well-known/jwks.json"
+      issuer: http://127.0.0.1:8083
+      audience: fhir-server
+      introspectEndpoint: ${fhir.server.security.issuer}/oauth2/introspect
+      authorizationEndpoint: ${fhir.server.security.issuer}/oauth2/authorize
+      tokenEndpoint: ${fhir.server.security.issuer}/oauth2/token
+      jwksEndpoint: ${fhir.server.security.issuer}/.well-known/jwks.json
     auditlog:
       enabled: true
       site: "Koppeltaal domein VZVZ"
