@@ -45,19 +45,19 @@ COPY certificates/ximulator12.test.aorta-zorg.nl.cer /tmp/ximulator12.test.aorta
 
 # tmp swap to root user to install a certificate
 #USER 0
-#RUN [\
-# "/usr/lib/jvm/java-17-openjdk-amd64/bin/keytool",\
-# "-import",\
-# "-trustcacerts",\
-# "-cacerts",\
-# "-noprompt",\
-# "-storepass",\
-# "changeit",\
-# "-alias",\
-# "ximulator12.test.aorta-zorg.nl",\
-# "-file",\
-# "/tmp/ximulator12.test.aorta-zorg.nl.cer"\
-#]
+RUN [\
+ "/usr/lib/jvm/java-17-openjdk-amd64/bin/keytool",\
+ "-import",\
+ "-trustcacerts",\
+ "-cacerts",\
+ "-noprompt",\
+ "-storepass",\
+ "changeit",\
+ "-alias",\
+ "ximulator12.test.aorta-zorg.nl",\
+ "-file",\
+ "/tmp/ximulator12.test.aorta-zorg.nl.cer"\
+]
 
 # 65532 is the nonroot user's uid
 # used here instead of the name to allow Kubernetes to easily detect that the container
