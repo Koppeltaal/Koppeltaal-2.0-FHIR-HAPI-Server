@@ -3,14 +3,17 @@ service:
   externalPort: 8080
 
 livenessProbe:
-  probeType: "tcpSocket"
-  initialDelaySeconds: 80
-#  failureThreshold: 50
+  path: /fhir/DEFAULT/.well-known/smart-configuration
 
 readinessProbe:
-  probeType: "tcpSocket"
-  initialDelaySeconds: 80
-#  failureThreshold: 50
+  path: /fhir/DEFAULT/.well-known/smart-configuration
+
+startupProbe:
+  path: /fhir/DEFAULT/.well-known/smart-configuration
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 50
+
 
 # AD PV & PVC creation to mount Lucene db
 persistence:
