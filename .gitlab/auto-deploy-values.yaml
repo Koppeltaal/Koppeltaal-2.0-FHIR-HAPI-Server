@@ -9,6 +9,7 @@ readinessProbe:
   path: /fhir/DEFAULT/.well-known/smart-configuration
 
 startupProbe:
+  enabled: true
   path: /fhir/DEFAULT/.well-known/smart-configuration
   initialDelaySeconds: 30
   periodSeconds: 10
