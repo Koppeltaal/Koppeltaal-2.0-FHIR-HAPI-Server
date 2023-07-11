@@ -186,7 +186,7 @@ public class PackageInstallerWithExclusionSvcImpl implements IPackageInstallerSv
 				if (exists) {
           /* Custom addition, skip if installed */
 						ourLog.info("Package {}#{} is already installed", theInstallationSpec.getName(), theInstallationSpec.getVersion());
-            return retVal;
+//            return retVal;
 				}
 
 				NpmPackage npmPackage = myPackageCacheManager.installPackage(theInstallationSpec);
@@ -468,14 +468,18 @@ public class PackageInstallerWithExclusionSvcImpl implements IPackageInstallerSv
 		// Resource has a null status field
 		if (statusTypes.get(0).getValue() == null) return false;
 		// Resource has a status, and we need to check based on type
-		switch (theResource.fhirType()) {
+    String statusString = statusTypes.get(0).getValueAsString();
+    switch (theResource.fhirType()) {
 			case "Subscription":
-				return (statusTypes.get(0).getValueAsString().equals("requested"));
+				return (statusString.equals("requested"));
 			case "DocumentReference":
 			case "Communication":
-				return (!statusTypes.get(0).getValueAsString().equals("?"));
+				return (!statusString.equals("?"));
 			default:
-				return (statusTypes.get(0).getValueAsString().equals("active"));
+        /* CUSTOMIZATION START */
+        /* Also allow draft, the ZIBs and nl-core are in draft */
+				return statusString.equals("active") || statusString.equalsIgnoreCase("draft");
+        /* CUSTOMIZATION END */
 		}
 	}
 
