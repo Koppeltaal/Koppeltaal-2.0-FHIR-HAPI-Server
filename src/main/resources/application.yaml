@@ -255,13 +255,13 @@ fhir:
 
 smart:
   configuration:
-    issuer: http://localhost:8083
-    jwks_uri: http://localhost:8083/.well-known/jwks.json
-    authorization_endpoint: http://localhost:8083/oauth2/authorize
+    issuer: ${fhir.server.security.issuer}
+    jwks_uri: ${fhir.server.security.issuer}/.well-known/jwks.json
+    authorization_endpoint: ${fhir.server.security.issuer}/oauth2/authorize
     grant_types_supported:
       - authorization_code
       - client_credentials
-    token_endpoint: http://localhost:8083/oauth2/token
+    token_endpoint: ${fhir.server.security.issuer}/oauth2/token
     token_endpoint_auth_methods_supported:
       - private_key_jwt
     scopes_supported:
@@ -272,7 +272,7 @@ smart:
       - system/*.cruds?resource-origin=
     response_types_supported:
       - code
-    introspection_endpoint: http://localhost:8083/oauth2/introspect
+    introspection_endpoint: ${fhir.server.security.issuer}/oauth2/introspect
     capabilities:
       - launch-ehr
       - authorize-post

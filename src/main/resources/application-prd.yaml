@@ -4,11 +4,11 @@ spring:
       hibernate.search.backend.directory.root: /pvc-mount/prd/lucene/
       hibernate.search.automatic_indexing.synchronization.strategy: read-sync
 
+fhir:
+  server:
+    security:
+      issuer: https://auth-service.koppeltaal.headease.nl
+
 smart:
   configuration:
-    issuer: https://auth-service.koppeltaal.headease.nl
-    jwks_uri: https://auth-service.koppeltaal.headease.nl/.well-known/jwks.json
-    authorization_endpoint: https://auth-service.koppeltaal.headease.nl/oauth2/authorize
-    token_endpoint: https://auth-service.koppeltaal.headease.nl/oauth2/token
-    introspection_endpoint: https://auth-service.koppeltaal.headease.nl/oauth2/introspect
     management_endpoint: https://domain-admin.koppeltaal.headease.nl
