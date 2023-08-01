@@ -8,33 +8,32 @@
 
 package ca.uhn.fhir.jpa.starter.koppeltaal.service;
 
-import com.auth0.jwk.*;
+import com.auth0.jwk.Jwk;
+import com.auth0.jwk.JwkException;
+import com.auth0.jwk.JwkProvider;
+import com.auth0.jwk.UrlJwkProvider;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.interfaces.DecodedJWT;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Component;
+import org.springframework.util.Assert;
+
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.util.Assert;
 
 /**
  *
  */
-@Service
+@Component
 public class JwtValidationService {
-
-  private final String authServerIssuer;
-
-  public JwtValidationService(@Value("${fhir.server.security.issuer:http://127.0.0.1:8083}") String authServerIssuer) {
-    this.authServerIssuer = authServerIssuer;
-  }
-
   /**
 	 * Unfortunately, this implementation of JWT has no helper method for selecting the right
 	 * algorithm from the header. The public key must match the algorithm type (RSA or EC), but
@@ -67,21 +66,23 @@ public class JwtValidationService {
 		throw new IllegalArgumentException(String.format("Unsupported algorithm %s", algorithmName));
 	}
 
-	public DecodedJWT validate(String token, String audience, long leeway) throws JwkException, JWTVerificationException {
+  public DecodedJWT validate(String token, String jwksEndpoint, String audience, long leeway) throws JwkException, JWTVerificationException, URISyntaxException, IOException {
 		// Get the algorithm name from the JWT.
 		DecodedJWT decode = JWT.decode(token);
 		String algorithmName = decode.getAlgorithm();
-		// Verify the issuer is the auth server
-		JwkProvider provider = new UrlJwkProvider(authServerIssuer);
+    // Lookup the issuer.
+    String issuer = decode.getIssuer();
+    URI uri = new URI(jwksEndpoint).normalize();
+    JwkProvider provider = new UrlJwkProvider(uri.toURL());
 		Jwk jwk = provider.get(decode.getKeyId());
-		Assert.isTrue(jwk != null, String.format("Unable to locate public key for issuer %s", authServerIssuer));
+    Assert.isTrue(jwk != null, String.format("Unable to locate public key for issuer %s", issuer));
 
 		// Get the algorithm from the public key and algorithm name.
 		Algorithm algorithm = getValidationAlgorithm(jwk.getPublicKey(), algorithmName);
 
 		// Decode and verify the token.
 		return JWT.require(algorithm)
-				.withIssuer(authServerIssuer)
+      .withIssuer(issuer) // Make sure to require yourself to be the audience.
 				.withAudience(audience) // Make sure to require yourself to be the audience.
 				.acceptExpiresAt(leeway)
 				.build()

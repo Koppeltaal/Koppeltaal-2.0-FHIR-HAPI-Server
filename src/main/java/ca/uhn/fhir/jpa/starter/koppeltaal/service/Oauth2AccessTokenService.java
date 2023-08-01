@@ -15,6 +15,9 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.net.URISyntaxException;
+
 /**
  *
  */
@@ -33,9 +36,9 @@ public class Oauth2AccessTokenService {
 
 	public boolean validateToken(String token) {
 		try {
-			jwtValidationService.validate(token, fhirServerSecurityConfiguration.getAudience(), fhirServerSecurityConfiguration.getTokenValidationLeeway());
+			jwtValidationService.validate(token, fhirServerSecurityConfiguration.getAudience(), fhirServerSecurityConfiguration.getJwksEndpoint(), fhirServerSecurityConfiguration.getTokenValidationLeeway());
 			return true;
-		} catch (JWTVerificationException | JwkException e) {
+		} catch (JWTVerificationException | IOException | JwkException | URISyntaxException e) {
 			LOG.info("validateToken failed with message:" + e.getMessage(), e);
 			return false;
 		}
