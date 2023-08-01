@@ -64,8 +64,9 @@ public class Oauth2UrisStatementInterceptorForR4 {
 				}
 
 				setSecurityUrlExtension(extension, "jwks", fhirServerSecurityConfiguration.getJwksEndpoint());
-				setSecurityUrlExtension(extension, "token", fhirServerSecurityConfiguration.getTokenEndpoint());
-				setSecurityUrlExtension(extension, "authorize", fhirServerSecurityConfiguration.getAuthorizationEndpoint());
+        setSecurityUrlExtension(extension, "token", fhirServerSecurityConfiguration.getTokenEndpoint());
+        setSecurityUrlExtension(extension, "issuer", fhirServerSecurityConfiguration.getIssuer());
+        setSecurityUrlExtension(extension, "authorize", fhirServerSecurityConfiguration.getAuthorizationEndpoint());
 				setSecurityUrlExtension(extension, "introspect", fhirServerSecurityConfiguration.getIntrospectEndpoint());
 
 			}
