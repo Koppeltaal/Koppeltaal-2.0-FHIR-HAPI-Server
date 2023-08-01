@@ -23,8 +23,17 @@ public class FhirServerSecurityConfiguration {
 	String tokenEndpoint;
   String jwksEndpoint;
 	String audience;
+  String issuer;
 	boolean enabled = true;
 	long tokenValidationLeeway = 60;
+
+  public String getIssuer() {
+    return issuer;
+  }
+
+  public void setIssuer(String issuer) {
+    this.issuer = issuer;
+  }
 
 	public String getAudience() {
 		return audience;

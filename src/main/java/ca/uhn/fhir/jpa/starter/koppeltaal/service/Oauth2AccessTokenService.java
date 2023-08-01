@@ -36,7 +36,11 @@ public class Oauth2AccessTokenService {
 
 	public boolean validateToken(String token) {
 		try {
-			jwtValidationService.validate(token, fhirServerSecurityConfiguration.getAudience(), fhirServerSecurityConfiguration.getJwksEndpoint(), fhirServerSecurityConfiguration.getTokenValidationLeeway());
+			jwtValidationService.validate(token,
+        fhirServerSecurityConfiguration.getAudience(),
+        fhirServerSecurityConfiguration.getIssuer(),
+        fhirServerSecurityConfiguration.getJwksEndpoint(),
+        fhirServerSecurityConfiguration.getTokenValidationLeeway());
 			return true;
 		} catch (JWTVerificationException | IOException | JwkException | URISyntaxException e) {
 			LOG.info("validateToken failed with message:" + e.getMessage(), e);

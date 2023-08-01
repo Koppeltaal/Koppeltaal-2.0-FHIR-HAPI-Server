@@ -66,12 +66,11 @@ public class JwtValidationService {
 		throw new IllegalArgumentException(String.format("Unsupported algorithm %s", algorithmName));
 	}
 
-  public DecodedJWT validate(String token, String jwksEndpoint, String audience, long leeway) throws JwkException, JWTVerificationException, URISyntaxException, IOException {
+  public DecodedJWT validate(String token, String audience, String issuer, String jwksEndpoint, long leeway) throws JwkException, JWTVerificationException, URISyntaxException, IOException {
 		// Get the algorithm name from the JWT.
 		DecodedJWT decode = JWT.decode(token);
 		String algorithmName = decode.getAlgorithm();
     // Lookup the issuer.
-    String issuer = decode.getIssuer();
     URI uri = new URI(jwksEndpoint).normalize();
     JwkProvider provider = new UrlJwkProvider(uri.toURL());
 		Jwk jwk = provider.get(decode.getKeyId());
