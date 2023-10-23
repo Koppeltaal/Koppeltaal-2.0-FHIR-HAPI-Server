@@ -12,6 +12,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.OpenApiConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.*;
+import ca.uhn.fhir.jpa.starter.koppeltaal.provider.CustomTaskProvider;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.Oauth2AccessTokenService;
 import ca.uhn.fhir.rest.openapi.OpenApiInterceptor;
 import ca.uhn.fhir.rest.server.RestfulServer;
@@ -25,7 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServletRequest;
-import java.util.UUID;
+import java.util.*;
 
 import static ca.uhn.fhir.rest.server.ServletRequestTracing.ATTRIBUTE_REQUEST_ID;
 
@@ -74,6 +75,9 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 
   @Autowired
   private IInterceptorService myInterceptorRegistry;
+
+  @Autowired
+  private CustomTaskProvider customTaskProvider;
 
 	public KoppeltaalRestfulServer(FhirContext context) {
 		super(context);
@@ -137,6 +141,8 @@ public class KoppeltaalRestfulServer extends RestfulServer {
     registerInterceptor(new DefaultDescendingSortInterceptor());
 
     jpaStorageSettings.setResourceServerIdStrategy(JpaStorageSettings.IdStrategyEnum.UUID);
+
+    registerProvider(customTaskProvider);
 	}
 
   @Override
