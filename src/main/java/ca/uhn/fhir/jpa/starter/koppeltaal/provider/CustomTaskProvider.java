@@ -2,9 +2,7 @@ package ca.uhn.fhir.jpa.starter.koppeltaal.provider;
 
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
-import ca.uhn.fhir.rest.annotation.Operation;
-import ca.uhn.fhir.rest.annotation.OperationParam;
-import ca.uhn.fhir.rest.annotation.ResourceParam;
+import ca.uhn.fhir.rest.annotation.*;
 import ca.uhn.fhir.rest.api.server.IBundleProvider;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.param.ReferenceOrListParam;
@@ -23,6 +21,14 @@ public class CustomTaskProvider {
   public CustomTaskProvider(IFhirResourceDao<Task> taskDao, IFhirResourceDao<ActivityDefinition> activityDefinitionDao) {
     this.taskDao = taskDao;
     this.activityDefinitionDao = activityDefinitionDao;
+  }
+
+  @Search(queryName = "get-tasks-by-activityDefinitionPublisherId", type = Task.class)
+  public IBundleProvider searchTasksByActivityDefinitionPublisherId(
+    @RequiredParam(name = "publisherId") String publisherId,
+    @ResourceParam RequestDetails requestDetails
+  ) {
+    return getTasksByActivityDefinitionPublisherId(publisherId, requestDetails);
   }
 
   @Operation(name = "get-tasks-by-activityDefinitionPublisherId", idempotent = true, type = Task.class)
