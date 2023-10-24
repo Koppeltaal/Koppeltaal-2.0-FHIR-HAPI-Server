@@ -107,6 +107,7 @@ hapi:
       - StructureDefinition
       - Task
       - ValueSet
+      - OperationDefinition
     ##################################################
     # Allowed Bundle Types for persistence (defaults are: COLLECTION,DOCUMENT,MESSAGE)
     ##################################################
