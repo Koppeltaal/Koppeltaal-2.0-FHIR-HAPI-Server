@@ -79,6 +79,9 @@ public class KoppeltaalRestfulServer extends RestfulServer {
   @Autowired
   private CustomTaskProvider customTaskProvider;
 
+  @Autowired
+  private TaskSubscriptionPublisherIdInterceptor taskSubscriptionPublisherIdInterceptor;
+
 	public KoppeltaalRestfulServer(FhirContext context) {
 		super(context);
 	}
@@ -107,6 +110,8 @@ public class KoppeltaalRestfulServer extends RestfulServer {
       SubscriptionNarrowingInterceptor subscriptionNarrowingInterceptor = new SubscriptionNarrowingInterceptor(daoRegistry);
       myInterceptorRegistry.registerInterceptor(subscriptionNarrowingInterceptor);
       registerInterceptor(subscriptionNarrowingInterceptor);
+      myInterceptorRegistry.registerInterceptor(taskSubscriptionPublisherIdInterceptor);
+      registerInterceptor(taskSubscriptionPublisherIdInterceptor);
 
 		if (fhirServerAuditLogConfiguration.isEnabled()) {
 			registerInterceptor(auditEventInterceptor);
