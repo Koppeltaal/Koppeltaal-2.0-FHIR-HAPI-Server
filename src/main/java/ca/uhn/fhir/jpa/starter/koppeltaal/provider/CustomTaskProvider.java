@@ -5,9 +5,7 @@ import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
 import ca.uhn.fhir.rest.annotation.*;
 import ca.uhn.fhir.rest.api.server.IBundleProvider;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
-import ca.uhn.fhir.rest.param.ReferenceOrListParam;
-import ca.uhn.fhir.rest.param.ReferenceParam;
-import ca.uhn.fhir.rest.param.TokenParam;
+import ca.uhn.fhir.rest.param.*;
 import org.hl7.fhir.r4.model.ActivityDefinition;
 import org.hl7.fhir.r4.model.Task;
 import org.springframework.stereotype.Component;
@@ -26,14 +24,16 @@ public class CustomTaskProvider {
   @Search(queryName = "get-tasks-by-activityDefinitionPublisherId", type = Task.class)
   public IBundleProvider searchTasksByActivityDefinitionPublisherId(
     @RequiredParam(name = "publisherId") String publisherId,
+    @OptionalParam(name = "_lastUpdated") DateParam lastUpdated,
     @ResourceParam RequestDetails requestDetails
   ) {
-    return getTasksByActivityDefinitionPublisherId(publisherId, requestDetails);
+    return getTasksByActivityDefinitionPublisherId(publisherId, lastUpdated, requestDetails);
   }
 
   @Operation(name = "get-tasks-by-activityDefinitionPublisherId", idempotent = true, type = Task.class)
   public IBundleProvider getTasksByActivityDefinitionPublisherId(
     @OperationParam(name = "publisherId") String publisherId,
+    @OperationParam(name = "_lastUpdated") DateParam lastUpdated,
     @ResourceParam RequestDetails requestDetails
   ) {
 
@@ -50,6 +50,10 @@ public class CustomTaskProvider {
     // Use the OR query in the search parameter map
     SearchParameterMap paramMap = new SearchParameterMap();
     paramMap.add("instantiates-canonical", orList);
+
+    if (lastUpdated != null) {
+      paramMap.setLastUpdated(new DateRangeParam(lastUpdated, null));
+    }
 
     // Search for matching tasks
     return taskDao.search(paramMap, requestDetails);
