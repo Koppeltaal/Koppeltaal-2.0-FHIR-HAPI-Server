@@ -12,7 +12,6 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.OpenApiConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.*;
-import ca.uhn.fhir.jpa.starter.koppeltaal.provider.CustomTaskProvider;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.Oauth2AccessTokenService;
 import ca.uhn.fhir.rest.openapi.OpenApiInterceptor;
 import ca.uhn.fhir.rest.server.RestfulServer;
@@ -76,12 +75,6 @@ public class KoppeltaalRestfulServer extends RestfulServer {
   @Autowired
   private IInterceptorService myInterceptorRegistry;
 
-  @Autowired
-  private CustomTaskProvider customTaskProvider;
-
-  @Autowired
-  private TaskSubscriptionPublisherIdInterceptor taskSubscriptionPublisherIdInterceptor;
-
 	public KoppeltaalRestfulServer(FhirContext context) {
 		super(context);
 	}
@@ -110,8 +103,6 @@ public class KoppeltaalRestfulServer extends RestfulServer {
       SubscriptionNarrowingInterceptor subscriptionNarrowingInterceptor = new SubscriptionNarrowingInterceptor(daoRegistry);
       myInterceptorRegistry.registerInterceptor(subscriptionNarrowingInterceptor);
       registerInterceptor(subscriptionNarrowingInterceptor);
-      myInterceptorRegistry.registerInterceptor(taskSubscriptionPublisherIdInterceptor);
-      registerInterceptor(taskSubscriptionPublisherIdInterceptor);
 
 		if (fhirServerAuditLogConfiguration.isEnabled()) {
 			registerInterceptor(auditEventInterceptor);
@@ -146,8 +137,6 @@ public class KoppeltaalRestfulServer extends RestfulServer {
     registerInterceptor(new DefaultDescendingSortInterceptor());
 
     jpaStorageSettings.setResourceServerIdStrategy(JpaStorageSettings.IdStrategyEnum.UUID);
-
-    registerProvider(customTaskProvider);
 	}
 
   @Override
