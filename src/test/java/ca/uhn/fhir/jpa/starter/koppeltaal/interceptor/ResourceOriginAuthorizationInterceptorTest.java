@@ -206,4 +206,30 @@ class ResourceOriginAuthorizationInterceptorTest extends BaseResourceOriginTest 
     );
   }
 
+  @Test
+  public void shouldBeAbleToModifySearchParameterWithoutResourceOrigin() {
+    final IdType resourceId = new IdType(ResourceType.SearchParameter.name(), 14L);
+
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.PUT, ResourceType.SearchParameter, resourceId, "cruds");
+
+    resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(any(IBaseResource.class)))
+      .thenReturn(Optional.empty());
+
+    interceptor.authorizeRequest(requestDetails);
+  }
+
+  @Test
+  public void shouldNotBeAbleToModifyActivityDefinitionWithoutResourceOrigin() {
+    final IdType resourceId = new IdType(ResourceType.ActivityDefinition.name(), 14L);
+
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.PUT, ResourceType.ActivityDefinition, resourceId, "cruds");
+
+    resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(any(IBaseResource.class)))
+      .thenReturn(Optional.empty());
+
+    assertThrows(ForbiddenOperationException.class, () ->
+      interceptor.authorizeRequest(requestDetails)
+    );
+  }
+
 }
