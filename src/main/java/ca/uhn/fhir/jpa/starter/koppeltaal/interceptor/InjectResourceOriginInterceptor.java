@@ -20,11 +20,8 @@ import ca.uhn.fhir.rest.param.UriParam;
 import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
 import ca.uhn.fhir.rest.server.exceptions.InternalErrorException;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Optional;
+
+import java.util.*;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -125,14 +122,14 @@ public class InjectResourceOriginInterceptor {
 		final IFhirResourceDao<?> resourceDao = daoRegistry.getResourceDao(requestDetails.getResourceName());
 		final IBaseResource existingResource = resourceDao.read(requestDetails.getId(), requestDetails);
 
-		final List<Extension> extensionsByUrl = ((DomainResource) existingResource).getExtensionsByUrl(RESOURCE_ORIGIN_SYSTEM);
+		List<Extension> extensionsByUrl = ((DomainResource) existingResource).getExtensionsByUrl(RESOURCE_ORIGIN_SYSTEM);
 
 		if(extensionsByUrl.size() != 1 && !(resource instanceof Device)) {
 
 			throw new InternalErrorException(String.format(
 				"Cannot set the resource-origin extension in the Update as the resource-extension isn't "
 					+ "found on the persisted version [%s]", resource.getIdElement()));
-		} else {
+		} else if(!extensionsByUrl.isEmpty()) {
 			resource.addExtension(extensionsByUrl.get(0));
 		}
 	}
