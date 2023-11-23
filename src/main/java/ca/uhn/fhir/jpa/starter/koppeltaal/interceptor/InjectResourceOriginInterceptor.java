@@ -127,7 +127,7 @@ public class InjectResourceOriginInterceptor {
 
 		final List<Extension> extensionsByUrl = ((DomainResource) existingResource).getExtensionsByUrl(RESOURCE_ORIGIN_SYSTEM);
 
-		if(extensionsByUrl.size() != 1) {
+		if(extensionsByUrl.size() != 1 && !(resource instanceof Device)) {
 
 			throw new InternalErrorException(String.format(
 				"Cannot set the resource-origin extension in the Update as the resource-extension isn't "
