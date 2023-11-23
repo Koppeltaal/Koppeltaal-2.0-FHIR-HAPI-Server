@@ -117,9 +117,10 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     if (resourceOriginOptional.isEmpty()) {
       LOG.warn("Found resource ({}) without resource-origin", requestDetailsResource.getIdElement());
 
-      if(requestDetailsResource instanceof SearchParameter) {
+      if(requestDetailsResource instanceof SearchParameter || requestDetailsResource instanceof Device) {
         // SearchParameters are created via simplifier releases on server start and do not contain a resource-origin.
         // It is important that we can update these if the user has permission.
+        // Devices are currently created without resource-origin by domain admin, will be resolved in the future.
         return "no-resource-origin-on-search-parameter";
       }
 
