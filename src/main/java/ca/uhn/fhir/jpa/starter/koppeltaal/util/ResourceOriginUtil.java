@@ -12,11 +12,7 @@ import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
-import org.hl7.fhir.r4.model.Device;
-import org.hl7.fhir.r4.model.DomainResource;
-import org.hl7.fhir.r4.model.Extension;
-import org.hl7.fhir.r4.model.Reference;
-import org.hl7.fhir.r4.model.StructureDefinition;
+import org.hl7.fhir.r4.model.*;
 
 public class ResourceOriginUtil {
 
@@ -51,22 +47,14 @@ public class ResourceOriginUtil {
 	public static Optional<Device> getDevice(RequestDetails requestDetails, IFhirResourceDao<Device> deviceDao) {
 
 		final Optional<String> clientIdOptional = getRequesterClientId(requestDetails);
-		if(!clientIdOptional.isPresent()) return Optional.empty();
+		if(clientIdOptional.isEmpty()) return Optional.empty();
 
 		return getDevice(clientIdOptional.get(), deviceDao, requestDetails);
 	}
 
 	private static Optional<Device> getDevice(String clientId, IFhirResourceDao<Device> deviceDao, RequestDetails requestDetails) {
-		final SearchParameterMap searchParameterMap = new SearchParameterMap();
-    //FIXME: KOP-535 - should include system
-		searchParameterMap.add(StructureDefinition.SP_IDENTIFIER, new TokenParam(clientId));
-
-		final IBundleProvider searchResults = deviceDao.search(searchParameterMap, requestDetails);
-
-		if(searchResults != null && !searchResults.isEmpty()) {
-			return Optional.of((Device) searchResults.getAllResources().get(0));
-		}
-
-		return Optional.empty();
+    return Optional.of(
+      deviceDao.read(new IdType(clientId), requestDetails)
+    );
 	}
 }
