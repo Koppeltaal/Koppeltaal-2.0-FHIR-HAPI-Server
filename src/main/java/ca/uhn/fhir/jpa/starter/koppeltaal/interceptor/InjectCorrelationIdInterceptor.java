@@ -45,13 +45,13 @@ public class InjectCorrelationIdInterceptor {
 
     final String serverRequestId = requestDetails.getRequestId();
     if (StringUtils.isNoneBlank(serverRequestId)) {
-      response.addHeader(Constants.HEADER_REQUEST_ID, serverRequestId);
+      response.setHeader(Constants.HEADER_REQUEST_ID, serverRequestId);
     }
 
     final String clientRequestId = servletRequestDetails.getHeader(Constants.HEADER_REQUEST_ID);
     final boolean serverChangedRequestId = !StringUtils.equals(clientRequestId, serverRequestId);
     if (StringUtils.isNotBlank(clientRequestId) && serverChangedRequestId) {
-      response.addHeader(CORRELATION_HEADER_KEY, clientRequestId);
+      response.setHeader(CORRELATION_HEADER_KEY, clientRequestId);
     }
   }
 }
