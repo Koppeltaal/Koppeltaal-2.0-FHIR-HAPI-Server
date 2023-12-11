@@ -230,9 +230,11 @@ public class StarterJpaConfig {
 		config.addAllowedHeader(HttpHeaders.CONTENT_TYPE);
 		config.addAllowedHeader(HttpHeaders.AUTHORIZATION);
 		config.addAllowedHeader(HttpHeaders.CACHE_CONTROL);
+		config.addAllowedHeader(HttpHeaders.IF_MATCH); //custom addition, required for updates
 		config.addAllowedHeader("x-fhir-starter");
 		config.addAllowedHeader("X-Requested-With");
 		config.addAllowedHeader("Prefer");
+
 
 		List<String> allAllowedCORSOrigins = appProperties.getCors().getAllowed_origin();
 		allAllowedCORSOrigins.forEach(config::addAllowedOriginPattern);
