@@ -39,7 +39,7 @@ public class EnforceHttpsSubscriptionEndpointInterceptor {
 			String endpoint = channel.getEndpoint();
 
 			if (!StringUtils.startsWith(endpoint, "https://")) {
-				throw new PreconditionFailedException("Subscription.endpoint must start with `https://`");
+				throw new PreconditionFailedException("Subscription.channel.endpoint must start with `https://`");
 			}
 		}
 	}
