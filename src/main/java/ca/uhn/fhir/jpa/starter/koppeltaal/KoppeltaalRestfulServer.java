@@ -75,6 +75,9 @@ public class KoppeltaalRestfulServer extends RestfulServer {
   @Autowired
   private IInterceptorService myInterceptorRegistry;
 
+	@Autowired
+	private EnforceHttpsSubscriptionEndpointInterceptor enforceHttpsSubscriptionEndpointInterceptor;
+
 	public KoppeltaalRestfulServer(FhirContext context) {
 		super(context);
 	}
@@ -135,6 +138,8 @@ public class KoppeltaalRestfulServer extends RestfulServer {
     registerInterceptor(referentialIntegrityDeleteInterceptor);
 
     registerInterceptor(new DefaultDescendingSortInterceptor());
+
+	registerInterceptor(enforceHttpsSubscriptionEndpointInterceptor);
 
     jpaStorageSettings.setResourceServerIdStrategy(JpaStorageSettings.IdStrategyEnum.UUID);
 	}
