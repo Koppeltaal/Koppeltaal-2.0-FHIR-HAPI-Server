@@ -4,6 +4,7 @@ import ca.uhn.fhir.interceptor.api.Hook;
 import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.rest.server.exceptions.PreconditionFailedException;
+import ca.uhn.fhir.rest.server.exceptions.UnprocessableEntityException;
 
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -39,7 +40,7 @@ public class EnforceHttpsSubscriptionEndpointInterceptor {
 			String endpoint = channel.getEndpoint();
 
 			if (!StringUtils.startsWith(endpoint, "https://")) {
-				throw new PreconditionFailedException("Subscription.channel.endpoint must start with `https://`");
+				throw new UnprocessableEntityException("Subscription.channel.endpoint must start with `https://`");
 			}
 		}
 	}
