@@ -11,10 +11,12 @@ import static org.mockito.Mockito.when;
 
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
+import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
+import ca.uhn.fhir.rest.server.SimpleBundleProvider;
 import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
@@ -44,7 +46,9 @@ class InjectResourceOriginInterceptorTest {
 	private static MockedStatic<ResourceOriginUtil> resourceOriginUtil;
 
 	private DaoRegistry daoRegistry;
+	private IFhirResourceDao<Device> deviceDao;
 	private InjectResourceOriginInterceptor interceptor;
+	private SmartBackendServiceConfiguration smartBackendServiceConfiguration;
 
 	@BeforeAll
 	public static void initAll() {
@@ -64,6 +68,8 @@ class InjectResourceOriginInterceptorTest {
 	) {
 
 		this.daoRegistry = daoRegistry;
+		this.deviceDao = deviceDao;
+		this.smartBackendServiceConfiguration = smartBackendServiceConfiguration;
 
 		interceptor = new InjectResourceOriginInterceptor(
 			daoRegistry,
@@ -210,6 +216,51 @@ class InjectResourceOriginInterceptorTest {
 		final Patient resourceFromClient = createPatientWithResourceOrigin(deviceId);
 
 		requestDetails.setResource(resourceFromClient);
+	}
+
+	@Test
+	public void shouldSetResourceOriginOnDevice() {
+		final ServletRequestDetails requestDetails = new ServletRequestDetails();
+		requestDetails.setRestOperationType(RestOperationTypeEnum.CREATE);
+		final Device resource = new Device();
+		requestDetails.setResource(resource);
+
+		when(smartBackendServiceConfiguration.getDomainAdminClientId())
+				.thenReturn("admin");
+
+		resourceOriginUtil.when(() -> ResourceOriginUtil.getRequesterClientId(any(RequestDetails.class)))
+				.thenReturn(Optional.of("admin"));
+
+		when(deviceDao.search(any(SearchParameterMap.class), any(RequestDetails.class)))
+				.thenReturn(new SimpleBundleProvider(1));
+
+		interceptor.incomingRequestPreHandled(requestDetails);
+
+		final List<Extension> resourceOriginExtension = resource.getExtensionsByUrl(RESOURCE_ORIGIN_SYSTEM);
+		assertEquals(1, resourceOriginExtension.size());
+	}
+
+	@Test
+	public void shouldNotSetResourceOriginOnDevice() {
+		final ServletRequestDetails requestDetails = new ServletRequestDetails();
+		requestDetails.setRestOperationType(RestOperationTypeEnum.CREATE);
+		final Device resource = new Device();
+		requestDetails.setResource(resource);
+
+		when(smartBackendServiceConfiguration.getDomainAdminClientId())
+				.thenReturn("admin");
+
+		resourceOriginUtil.when(() -> ResourceOriginUtil.getRequesterClientId(any(RequestDetails.class)))
+				.thenReturn(Optional.of("admin"));
+
+		when(deviceDao.search(any(SearchParameterMap.class), any(RequestDetails.class)))
+				.thenReturn(new SimpleBundleProvider(0));
+
+		interceptor.incomingRequestPreHandled(requestDetails);
+
+		final List<Extension> resourceOriginExtension = resource.getExtensionsByUrl(RESOURCE_ORIGIN_SYSTEM);
+
+		assertEquals(0, resourceOriginExtension.size());
 	}
 
 	@NotNull

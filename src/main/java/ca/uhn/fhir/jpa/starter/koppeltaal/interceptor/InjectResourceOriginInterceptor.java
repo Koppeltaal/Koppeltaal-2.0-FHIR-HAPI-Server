@@ -70,8 +70,6 @@ public class InjectResourceOriginInterceptor {
 
 		if(!isDomainResource) return;
 
-		//TODO: Verify PATCH request doesn't change the resource-origin
-
 		if(operation == UPDATE) {
 			ensureResourceOriginIsUnmodifiedOrEnsureResourceOrigin(requestDetails, (DomainResource) resource);
 		}
@@ -80,15 +78,25 @@ public class InjectResourceOriginInterceptor {
 
 		ensureResourceOriginNotSet(requestDetails);
 
-		if("Device".equals(requestDetails.getResourceName())) {
+		if (requestDetails.getResource() instanceof Device) {
 			// the domain admin should be able to create devices no matter what.
 			// devices are used for authorizations, but this makes it impossible
 			//  to create the initial device needed for the domain admin
 			final String requesterClientId = ResourceOriginUtil.getRequesterClientId(requestDetails)
 				.orElseThrow(() -> new IllegalStateException("client_id not present"));
 
-      //FIXME: KOP-533 - resource-origin is now never set from domain admin, this should only be done when the initial device is missing
-			if(StringUtils.equals(smartBackendServiceConfiguration.getDomainAdminClientId(), requesterClientId)) return;
+			if (StringUtils.equals(smartBackendServiceConfiguration.getDomainAdminClientId(), requesterClientId)) {
+				// Only the first <Device> ever will cause problems, as it cannot have a
+				// resource-origin of itself, as it doesn't exist yet.
+				// All other Deviced created should have a resource-origin
+				SearchParameterMap params = new SearchParameterMap();
+				params.setCount(0); // we don't need the resources, just the size being larger than 1
+				IBundleProvider resultBundle = deviceDao.search(params, requestDetails);
+
+				if (resultBundle != null && resultBundle.size() == 0) {
+					return;
+				}
+			}
 		}
 
 		DomainResource domainResource = (DomainResource) resource;
