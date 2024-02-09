@@ -25,7 +25,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Not using the {@link AuthorizationInterceptor} as custom {@link org.hl7.fhir.CompartmentDefinition} objects are not allowed.
+ * Not using the {@link AuthorizationInterceptor} as custom
+ * {@link org.hl7.fhir.CompartmentDefinition} objects are not allowed.
  */
 @Interceptor
 public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInterceptor {
@@ -34,8 +35,8 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
   private final SmartBackendServiceConfiguration smartBackendServiceConfiguration;
 
   public ResourceOriginAuthorizationInterceptor(DaoRegistry daoRegistry,
-                                                IFhirResourceDao<Device> deviceDao,
-                                                SmartBackendServiceConfiguration smartBackendServiceConfiguration) {
+      IFhirResourceDao<Device> deviceDao,
+      SmartBackendServiceConfiguration smartBackendServiceConfiguration) {
 
     super(daoRegistry, deviceDao);
     this.smartBackendServiceConfiguration = smartBackendServiceConfiguration;
@@ -46,16 +47,22 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 
     final String resourceName = requestDetails.getResourceName();
 
-    if (StringUtils.isBlank(resourceName)) return; //capabilities service
+    if (StringUtils.isBlank(resourceName))
+      return; // capabilities service
+
+    if ("ImplementationGuide".equals(resourceName) && requestDetails.getRequestType() == RequestTypeEnum.GET) {
+      return; // part of the `CapabilityStatement.implementationGuides`
+    }
 
     if ("Device".equals(resourceName)) {
       // the domain admin should be able to create devices no matter what.
       // devices are used for authorizations, but this makes it impossible
       // to create the initial device needed for the domain admin without whitelisting
       final String requesterClientId = ResourceOriginUtil.getRequesterClientId(requestDetails)
-        .orElseThrow(() -> new AuthenticationException("client_id not present"));
+          .orElseThrow(() -> new AuthenticationException("client_id not present"));
 
-      if (StringUtils.equals(smartBackendServiceConfiguration.getDomainAdminClientId(), requesterClientId)) return;
+      if (StringUtils.equals(smartBackendServiceConfiguration.getDomainAdminClientId(), requesterClientId))
+        return;
     }
 
     validate(requestDetails);
@@ -70,7 +77,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 
       if (relevantPermissions.isEmpty()) {
         LOG.warn("No permission found, user tried to [{}] a [{}], but the found scopes are [{}]",
-          requestType, requestDetails.getResourceName(), PermissionUtil.getFullScope(requestDetails));
+            requestType, requestDetails.getResourceName(), PermissionUtil.getFullScope(requestDetails));
         throw new ForbiddenOperationException("Unauthorized");
       }
       return;
@@ -81,21 +88,22 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 
     boolean hasPermission;
 
-    if(requestDetails.getRequestType() == RequestTypeEnum.GET && requestDetails.getResource() == null) { //read all
-       hasPermission = relevantPermissions.stream()
-        .map((permission) -> StringUtils.substringAfter(permission, "."))
-        .anyMatch((permission) -> permission.matches(crudsRegex + ".*"));
+    if (requestDetails.getRequestType() == RequestTypeEnum.GET && requestDetails.getResource() == null) { // read all
+      hasPermission = relevantPermissions.stream()
+          .map((permission) -> StringUtils.substringAfter(permission, "."))
+          .anyMatch((permission) -> permission.matches(crudsRegex + ".*"));
     } else {
       String existingEntityResourceOrigin = getEntityResourceOrigin(requestDetails);
 
       hasPermission = relevantPermissions.stream()
-        .map((permission) -> StringUtils.substringAfter(permission, "."))
-        .anyMatch((permission) -> permission.matches(crudsRegex + "(?:\\?resource-origin=.*" + existingEntityResourceOrigin + "(,.*|$))?"));
+          .map((permission) -> StringUtils.substringAfter(permission, "."))
+          .anyMatch((permission) -> permission
+              .matches(crudsRegex + "(?:\\?resource-origin=.*" + existingEntityResourceOrigin + "(,.*|$))?"));
     }
 
     if (!hasPermission) {
       LOG.warn("No permission found, user tried to [{}] a [{}], but the found scopes are [{}]",
-        requestType, requestDetails.getResourceName(), PermissionUtil.getFullScope(requestDetails));
+          requestType, requestDetails.getResourceName(), PermissionUtil.getFullScope(requestDetails));
       throw new ForbiddenOperationException("Unauthorized");
     }
   }
@@ -108,7 +116,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
       return getResourceOriginDeviceReference(existingResource, requestDetails);
     }
 
-    return null; //no entity id - read all - will be managed by search narrowing
+    return null; // no entity id - read all - will be managed by search narrowing
   }
 
   String getResourceOriginDeviceReference(IBaseResource requestDetailsResource, RequestDetails requestDetails) {
@@ -117,10 +125,12 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     if (resourceOriginOptional.isEmpty()) {
       LOG.warn("Found resource ({}) without resource-origin", requestDetailsResource.getIdElement());
 
-      if(requestDetailsResource instanceof SearchParameter || requestDetailsResource instanceof Device) {
-        // SearchParameters are created via simplifier releases on server start and do not contain a resource-origin.
+      if (requestDetailsResource instanceof SearchParameter || requestDetailsResource instanceof Device) {
+        // SearchParameters are created via simplifier releases on server start and do
+        // not contain a resource-origin.
         // It is important that we can update these if the user has permission.
-        // Devices are currently created without resource-origin by domain admin, will be resolved in the future.
+        // Devices are currently created without resource-origin by domain admin, will
+        // be resolved in the future.
         return "no-resource-origin-on-search-parameter";
       }
 
