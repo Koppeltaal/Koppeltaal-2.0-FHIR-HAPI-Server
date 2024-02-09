@@ -3,6 +3,8 @@ package ca.uhn.fhir.jpa.starter.koppeltaal.interceptor;
 import ca.uhn.fhir.interceptor.api.Hook;
 import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
+import ca.uhn.fhir.jpa.starter.AppProperties;
+
 import org.hl7.fhir.instance.model.api.IBaseConformance;
 import org.hl7.fhir.r4.model.CapabilityStatement;
 import org.hl7.fhir.r4.model.CodeType;
@@ -51,6 +53,12 @@ public class CapabilityStatementInterceptor {
 
   private static final Logger LOG = LoggerFactory.getLogger(CapabilityStatementInterceptor.class);
 
+  private final AppProperties appProperties;
+
+  public CapabilityStatementInterceptor(AppProperties appProperties) {
+    this.appProperties = appProperties;
+  }
+
   @Hook(Pointcut.SERVER_CAPABILITY_STATEMENT_GENERATED)
   public void customize(IBaseConformance theCapabilityStatement) {
 
@@ -74,6 +82,13 @@ public class CapabilityStatementInterceptor {
         resource.setSearchRevInclude(Collections.emptyList());
       }
     }
+
+    appProperties.getImplementationGuides().values().forEach(implementationGuide -> {
+      String urlReference = String.format("http://koppeltaal.nl/fhir/ImplementationGuide/%s-%s",
+          implementationGuide.getName(), implementationGuide.getVersion());
+
+      capabilityStatement.addImplementationGuide(urlReference);
+    });
 
     LOG.debug("Applied Koppeltaal-specific changes to the CapabilityStatement");
   }

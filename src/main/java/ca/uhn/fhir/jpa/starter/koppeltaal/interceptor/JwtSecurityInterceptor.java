@@ -8,7 +8,6 @@
 
 package ca.uhn.fhir.jpa.starter.koppeltaal.interceptor;
 
-
 import ca.uhn.fhir.interceptor.api.Hook;
 import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
@@ -38,7 +37,7 @@ public class JwtSecurityInterceptor {
 	public void incomingRequestPreProcessed(HttpServletRequest request) {
 
 		final String requestURI = request.getRequestURI();
-		if (requiresBearerToken(requestURI)) {
+		if (requiresBearerToken(request)) {
 			try {
 				String authorization = request.getHeader("Authorization");
 				String token = StringUtils.trim(StringUtils.removeStartIgnoreCase(authorization, "Bearer"));
@@ -57,10 +56,17 @@ public class JwtSecurityInterceptor {
 		}
 	}
 
-	private boolean requiresBearerToken(String servletPath) {
+	private boolean requiresBearerToken(HttpServletRequest request) {
+		final String requestURI = request.getRequestURI();
 
-    return StringUtils.startsWith(servletPath, "/fhir")
-			&& !servletPath.matches("^/fhir/[a-zA-Z0-9_-]+/metadata.*") //allow multi-tenant /metadata requests
-      && !servletPath.matches("^/fhir//?(?:swagger-ui|api-docs).*"); // allow swagger/openapi endpoints - the interface sometimes adds two slashes
+		if (!("GET".equals(request.getMethod()))) {
+			return true;
+		}
+
+		return StringUtils.startsWith(requestURI, "/fhir")
+				&& !requestURI.matches("^/fhir/[a-zA-Z0-9_-]+/metadata.*") // allow multi-tenant /metadata requests
+				&& !requestURI.matches("^/fhir/[a-zA-Z0-9_-]+/ImplementationGuide.*") // allow ImplementationGuides
+				&& !requestURI.matches("^/fhir//?(?:swagger-ui|api-docs).*"); // allow swagger/openapi endpoints - the
+																				// interface sometimes adds two slashes
 	}
 }
