@@ -18,14 +18,15 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Not extending the {@link SearchNarrowingInterceptor} as it only works with default {@link
+ * Not extending the {@link SearchNarrowingInterceptor} as it only works with
+ * default {@link
  * org.hl7.fhir.CompartmentDefinition} objects.
  */
 @Interceptor
 public class ResourceOriginSearchNarrowingInterceptor extends BaseAuthorizationInterceptor {
 
 	public ResourceOriginSearchNarrowingInterceptor(DaoRegistry daoRegistry,
-		IFhirResourceDao<Device> deviceDao) {
+			IFhirResourceDao<Device> deviceDao) {
 
 		super(daoRegistry, deviceDao);
 	}
@@ -35,21 +36,28 @@ public class ResourceOriginSearchNarrowingInterceptor extends BaseAuthorizationI
 
 		final String resourceName = requestDetails.getResourceName();
 
-		if(requestDetails.getRequestType() != RequestTypeEnum.GET || StringUtils.isBlank(resourceName)) return;
+		if (requestDetails.getRequestType() != RequestTypeEnum.GET || StringUtils.isBlank(resourceName))
+			return;
+		else if (requestDetails.getRequestType() == RequestTypeEnum.GET
+				&& "ImplementationGuide".equals(requestDetails.getResourceName()))
+			return;
 
-    List<String> relevantScopes = PermissionUtil.getScopesForRequest(requestDetails);
+		List<String> relevantScopes = PermissionUtil.getScopesForRequest(requestDetails);
 
-    if(relevantScopes.isEmpty()) return; //no permission, not handled by this interceptor
+		if (relevantScopes.isEmpty())
+			return; // no permission, not handled by this interceptor
 
-    Set<String> resourceOrigins = PermissionUtil.getResourceOrigins(relevantScopes);
+		Set<String> resourceOrigins = PermissionUtil.getResourceOrigins(relevantScopes);
 
-    if(resourceOrigins.isEmpty()) return; //ALL permission, query already valid
+		if (resourceOrigins.isEmpty())
+			return; // ALL permission, query already valid
 
-    final Map<String, String[]> originalParameters = requestDetails.getParameters();
+		final Map<String, String[]> originalParameters = requestDetails.getParameters();
 		final HashMap<String, String[]> narrowedSearchParameters = new HashMap<>(originalParameters);
 
-    //If resource-origins are found, this means the permission is either OWN or GRANTED
-    narrowedSearchParameters.put("resource-origin", new String[]{String.join(",", resourceOrigins)});
+		// If resource-origins are found, this means the permission is either OWN or
+		// GRANTED
+		narrowedSearchParameters.put("resource-origin", new String[] { String.join(",", resourceOrigins) });
 
 		requestDetails.setParameters(narrowedSearchParameters);
 	}
