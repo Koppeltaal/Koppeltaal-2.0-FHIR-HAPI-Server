@@ -15,6 +15,9 @@ import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.http.HttpServletRequest;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.List;
 
 /**
@@ -126,6 +129,7 @@ public abstract class AbstractAuditEventInterceptor {
             }
           }
           dto.setQuery(getResourceQuery(requestDetails));
+          dto.setSite(getSite(requestDetails));
           dto.setOutcome("0");
           auditEventService.submitAuditEvent(dto, requestDetails);
         }
@@ -133,11 +137,28 @@ public abstract class AbstractAuditEventInterceptor {
     } catch (Exception e) {
       // this is a best-effort to create an audit event, but we do not want it to impact the original error response.
       // for example, if the Device is not found, it will override the original error code with a 404
-      if(resource != null) {
+      if (resource != null) {
         LOG.error(String.format("Failed to store AuditEvent for resource [%s]", resource.getIdElement().getValue()), e);
       } else {
         LOG.error("Failed to store AuditEvent for resource [null]", e);
       }
+    }
+  }
+
+  private String getSite(ServletRequestDetails requestDetails) {
+    HttpServletRequest servletRequest = requestDetails.getServletRequest();
+    String forwardHost = servletRequest.getHeader("X-Forwarded-Host");
+    String forwardProto = servletRequest.getHeader("X-Forwarded-Proto");
+    if (StringUtils.isNotEmpty(forwardHost)) {
+        return StringUtils.defaultString(forwardProto, "https") + "://" + forwardHost;
+    }
+    String requestUrl = servletRequest.getRequestURL().toString();
+    try {
+      URL url = new URL(requestUrl);
+      return url.getProtocol() + "://" + url.getHost();
+    } catch (MalformedURLException e) {
+      LOG.error("Failed to parse request URL: " + requestUrl, e);
+      return "http://localhost";
     }
   }
 

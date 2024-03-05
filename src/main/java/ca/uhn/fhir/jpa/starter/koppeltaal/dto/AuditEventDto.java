@@ -47,8 +47,9 @@ public class AuditEventDto {
   List<AgentAndTypeDto> agents = new ArrayList<>();
 	String query;
 	List<Reference> resources = new ArrayList<>();
+  private String site;
 
-	public void addResource(Reference r) {
+  public void addResource(Reference r) {
 		this.resources.add(r);
 	}
 
@@ -145,6 +146,14 @@ public class AuditEventDto {
       ", query='" + query + '\'' +
       ", resources=" + resources +
       '}';
+  }
+
+  public void setSite(String site) {
+    this.site = site;
+  }
+
+  public String getSite() {
+    return site;
   }
 
   public enum EventType {

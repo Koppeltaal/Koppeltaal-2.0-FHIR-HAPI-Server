@@ -82,7 +82,7 @@ public class AuditEventBuilder {
       }
       auditEvent.addEntity(entity);
     }
-    auditEvent.setSource(buildEventSource());
+    auditEvent.setSource(buildEventSource(dto.getSite()));
     auditEvent.setRecorded(dto.getDateTime());
 
     getResourceOriginExtension(dto)
@@ -184,9 +184,9 @@ public class AuditEventBuilder {
     return type;
   }
 
-  private AuditEvent.AuditEventSourceComponent buildEventSource() {
+  private AuditEvent.AuditEventSourceComponent buildEventSource(String site) {
 		return new AuditEvent.AuditEventSourceComponent()
-			.setSite(fhirServerAuditLogConfiguration.getSite())
+			.setSite(site)
 			.setObserver(newReference(self));
 	}
 
