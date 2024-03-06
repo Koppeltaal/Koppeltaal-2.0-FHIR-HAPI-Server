@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "fhir.server.auditlog")
 public class FhirServerAuditLogConfiguration {
 	private boolean enabled;
+  @Deprecated
 	private String site;
 	private Observer observer = new Observer();
 
@@ -21,7 +22,8 @@ public class FhirServerAuditLogConfiguration {
 		this.observer = observer;
 	}
 
-	public String getSite() {
+	@Deprecated
+  public String getSite() {
 		return site;
 	}
 
