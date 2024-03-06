@@ -154,7 +154,7 @@ public class AuditEventBuilder {
     AuditEvent.AuditEventEntityComponent component = new AuditEvent.AuditEventEntityComponent();
     component.setWhat(reference);
     String type = getTypeFromReference(reference);
-    component.setType(new Coding("http://hl7.org/fhir/resource-types", type, reference.getDisplay()));
+    component.setType(new Coding("http://hl7.org/fhir/resource-types", type, type));
     String query = auditEvent.getQuery();
     if (StringUtils.isNotEmpty(query)) {
       component.setQuery(query.getBytes(StandardCharsets.UTF_8));
