@@ -8,6 +8,7 @@ import ca.uhn.fhir.rest.api.server.SystemRequestDetails;
 import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerAuditLogConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuditEventDto;
+import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuditEventDto.EventType;
 import ca.uhn.fhir.model.dstu2.composite.IdentifierDt;
 import ca.uhn.fhir.rest.api.server.IBundleProvider;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
@@ -160,6 +161,9 @@ public class AuditEventBuilder {
       component.setQuery(query.getBytes(StandardCharsets.UTF_8));
     } else {
       component.setName(type); //it's not allowed to both set the name and query http://hl7.org/fhir/R4B/auditevent-definitions.html#AuditEvent.entity.name
+    }
+    if (auditEvent.getEventType() == EventType.Search && "Bundle".equals(type)) {
+      component.setRole(new Coding("http://terminology.hl7.org/CodeSystem/object-role", "24", "Query"));
     }
     return component;
 	}
