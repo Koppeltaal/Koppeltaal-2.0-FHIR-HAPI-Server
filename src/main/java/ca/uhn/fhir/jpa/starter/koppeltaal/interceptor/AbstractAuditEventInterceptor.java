@@ -38,7 +38,17 @@ public abstract class AbstractAuditEventInterceptor {
   private void addResources(AuditEventDto dto, IBaseResource... resources) {
     for (IBaseResource resource : resources) {
       if (resource instanceof Resource) {
-        dto.addResource(new Reference((Resource) resource));
+
+        if (StringUtils.isBlank(resource.getIdElement().getResourceType())) { // for some reason the Bundle references
+                                                                              // have no resource type..
+          resource.getIdElement()
+              .setValue(String.format("%s/%s", resource.fhirType(), resource.getIdElement().getIdPart()));
+        }
+
+        Reference reference = new Reference((Resource) resource);
+        reference.setType(resource.fhirType());
+
+        dto.addResource(reference);
       }
     }
   }
@@ -114,10 +124,10 @@ public abstract class AbstractAuditEventInterceptor {
     try {
       if (!(resource instanceof AuditEvent)) {
         AuditEventDto dto = new AuditEventDto();
+        addResources(dto, resource);
         if (setRequestType(requestDetails, dto)) {
           setInteraction(requestDetails, dto);
           setAgent(requestDetails, dto, AuditEventBuilder.CODING_SOURCE_ROLE_ID);
-          addResources(dto, resource);
           if (resource instanceof Bundle) {
             Bundle bundle = (Bundle) resource;
             List<Bundle.BundleEntryComponent> entry = bundle.getEntry();
@@ -128,6 +138,7 @@ public abstract class AbstractAuditEventInterceptor {
 
             }
           }
+
           dto.setQuery(getResourceQuery(requestDetails));
           dto.setSite(getSite(requestDetails));
           dto.setOutcome("0");
@@ -135,8 +146,10 @@ public abstract class AbstractAuditEventInterceptor {
         }
       }
     } catch (Exception e) {
-      // this is a best-effort to create an audit event, but we do not want it to impact the original error response.
-      // for example, if the Device is not found, it will override the original error code with a 404
+      // this is a best-effort to create an audit event, but we do not want it to
+      // impact the original error response.
+      // for example, if the Device is not found, it will override the original error
+      // code with a 404
       if (resource != null) {
         LOG.error(String.format("Failed to store AuditEvent for resource [%s]", resource.getIdElement().getValue()), e);
       } else {
@@ -150,7 +163,7 @@ public abstract class AbstractAuditEventInterceptor {
     String forwardHost = servletRequest.getHeader("X-Forwarded-Host");
     String forwardProto = servletRequest.getHeader("X-Forwarded-Proto");
     if (StringUtils.isNotEmpty(forwardHost)) {
-        return StringUtils.defaultString(forwardProto, "https") + "://" + forwardHost;
+      return StringUtils.defaultString(forwardProto, "https") + "://" + forwardHost;
     }
     String requestUrl = servletRequest.getRequestURL().toString();
     try {
