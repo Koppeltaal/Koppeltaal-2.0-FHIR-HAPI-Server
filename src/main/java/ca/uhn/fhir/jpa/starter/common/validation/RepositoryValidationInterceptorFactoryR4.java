@@ -27,10 +27,12 @@ import java.util.stream.Collectors;
 import static ca.uhn.fhir.jpa.starter.common.validation.IRepositoryValidationInterceptorFactory.ENABLE_REPOSITORY_VALIDATING_INTERCEPTOR;
 
 /**
- * This class can be customized to enable the {@link ca.uhn.fhir.jpa.interceptor.validation.RepositoryValidatingInterceptor}
+ * This class can be customized to enable the
+ * {@link ca.uhn.fhir.jpa.interceptor.validation.RepositoryValidatingInterceptor}
  * on this server.
  * <p>
- * The <code>enable_repository_validating_interceptor</code> property must be enabled in <code>application.yaml</code>
+ * The <code>enable_repository_validating_interceptor</code> property must be
+ * enabled in <code>application.yaml</code>
  * in order to use this class.
  */
 @ConditionalOnProperty(prefix = "hapi.fhir", name = ENABLE_REPOSITORY_VALIDATING_INTERCEPTOR, havingValue = "true")
@@ -42,28 +44,30 @@ public class RepositoryValidationInterceptorFactoryR4 implements IRepositoryVali
   private final RepositoryValidatingRuleBuilder repositoryValidatingRuleBuilder;
   private final IFhirResourceDao structureDefinitionResourceProvider;
 
-  public RepositoryValidationInterceptorFactoryR4(RepositoryValidatingRuleBuilder repositoryValidatingRuleBuilder, DaoRegistry daoRegistry) {
+  public RepositoryValidationInterceptorFactoryR4(
+      RepositoryValidatingRuleBuilder repositoryValidatingRuleBuilder, DaoRegistry daoRegistry) {
     this.repositoryValidatingRuleBuilder = repositoryValidatingRuleBuilder;
     this.fhirContext = daoRegistry.getSystemDao().getContext();
     structureDefinitionResourceProvider = daoRegistry.getResourceDao("StructureDefinition");
-
   }
 
   @Override
   public RepositoryValidatingInterceptor buildUsingStoredStructureDefinitions() {
 
-    IBundleProvider results = structureDefinitionResourceProvider.search(new SearchParameterMap().add(StructureDefinition.SP_KIND, new TokenParam("resource")));
-    if(results.size() != null && !results.isEmpty()) {
-      Map<String, List<StructureDefinition>> structureDefintions = results.getResources(0, results.size())
-        .stream()
+    IBundleProvider results = structureDefinitionResourceProvider.search(
+        new SearchParameterMap().setLoadSynchronous(true).add(StructureDefinition.SP_KIND, new TokenParam("resource")));
+    Map<String, List<StructureDefinition>> structureDefintions = results.getResources(0, results.size()).stream()
         .map(StructureDefinition.class::cast)
         .collect(Collectors.groupingBy(StructureDefinition::getType));
 
-      structureDefintions.forEach((key, value) -> {
-        String[] urls = value.stream().map(StructureDefinition::getUrl).toArray(String[]::new);
-        repositoryValidatingRuleBuilder.forResourcesOfType(key).requireAtLeastOneProfileOf(urls).and().requireValidationToDeclaredProfiles();
-      });
-    }
+    structureDefintions.forEach((key, value) -> {
+      String[] urls = value.stream().map(StructureDefinition::getUrl).toArray(String[]::new);
+      repositoryValidatingRuleBuilder
+          .forResourcesOfType(key)
+          .requireAtLeastOneProfileOf(urls)
+          .and()
+          .requireValidationToDeclaredProfiles();
+    });
 
     addKoppeltaalProfileRequirements();
 
@@ -74,29 +78,29 @@ public class RepositoryValidationInterceptorFactoryR4 implements IRepositoryVali
   private void addKoppeltaalProfileRequirements() {
 
     this.repositoryValidatingRuleBuilder
-      .forResourcesOfType("ActivityDefinition")
+        .forResourcesOfType("ActivityDefinition")
         .requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2ActivityDefinition")
-      .forResourcesOfType("AuditEvent")
+        .forResourcesOfType("AuditEvent")
         .requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2AuditEvent")
-      .forResourcesOfType("CareTeam")
+        .forResourcesOfType("CareTeam")
         .requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2CareTeam")
-      .forResourcesOfType("Device")
+        .forResourcesOfType("Device")
         .requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2Device")
-      .forResourcesOfType("Endpoint")
+        .forResourcesOfType("Endpoint")
         .requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2Endpoint")
-      .forResourcesOfType("Organization")
+        .forResourcesOfType("Organization")
         .requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2Organization")
-      .forResourcesOfType("Patient")
+        .forResourcesOfType("Patient")
         .requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2Patient")
-      .forResourcesOfType("Practitioner")
+        .forResourcesOfType("Practitioner")
         .requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2Practitioner")
-      .forResourcesOfType("RelatedPerson")
+        .forResourcesOfType("RelatedPerson")
         .requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2RelatedPerson")
-      .forResourcesOfType("Subscription")
+        .forResourcesOfType("Subscription")
         .requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2Subscription")
-      .forResourcesOfType("Task")
+        .forResourcesOfType("Task")
         .requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2Task")
-      .and()
+        .and()
         .requireValidationToDeclaredProfiles();
   }
 
@@ -105,12 +109,12 @@ public class RepositoryValidationInterceptorFactoryR4 implements IRepositoryVali
 
     /* !This seems bugged, does not enter here! */
 
-    // Customize the ruleBuilder here to have the rules you want! We will give a simple example
+    // Customize the ruleBuilder here to have the rules you want! We will give a
+    // simple example
     // of enabling validation for all Patient resources
 
     // Do not customize below this line
     List<IRepositoryValidatingRule> rules = repositoryValidatingRuleBuilder.build();
     return new RepositoryValidatingInterceptor(fhirContext, rules);
   }
-
 }

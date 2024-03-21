@@ -21,10 +21,15 @@ import org.springframework.context.annotation.Lazy;
 @Configuration
 public class ConditionalGraphQLConfiguration {
 
-  @Bean(name = JpaConfig.GRAPHQL_PROVIDER_NAME)
-  @Lazy
-  @ConditionalOnProperty(value = "hapi.fhir.graphql_enabled", matchIfMissing = true, havingValue = "false")
-  public GraphQLProvider graphQLProvider(FhirContext theFhirContext, IGraphQLStorageServices theGraphqlStorageServices, IValidationSupport theValidationSupport, ISearchParamRegistry theSearchParamRegistry, IDaoRegistry theDaoRegistry) {
-    return null;
-  }
+  //FIXME: Not using - but allow bean
+  // @Bean(name = JpaConfig.GRAPHQL_PROVIDER_NAME)
+  // @Lazy
+  // @ConditionalOnProperty(value = "hapi.fhir.graphql_enabled", matchIfMissing =
+  // true, havingValue = "false")
+  // public GraphQLProvider graphQLProvider(FhirContext theFhirContext,
+  // IGraphQLStorageServices theGraphqlStorageServices, IValidationSupport
+  // theValidationSupport, ISearchParamRegistry theSearchParamRegistry,
+  // IDaoRegistry theDaoRegistry) {
+  // return null;
+  // }
 }
