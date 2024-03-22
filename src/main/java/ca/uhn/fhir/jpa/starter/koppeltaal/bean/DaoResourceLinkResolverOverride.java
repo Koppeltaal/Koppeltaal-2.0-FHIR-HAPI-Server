@@ -26,6 +26,16 @@ public class DaoResourceLinkResolverOverride extends DaoResourceLinkResolver {
   @Override
   public IResourceLookup findTargetResource(@Nonnull RequestPartitionId theRequestPartitionId, String theSourceResourceName, PathAndRef thePathAndRef, RequestDetails theRequest, TransactionDetails theTransactionDetails) {
 
+
+    // Skip referential integrity check in `AuditEvent.entity.what` for the Bundle and the CapabilityStatement
+    if("AuditEvent.entity.what".equals(thePathAndRef.getPath()) && thePathAndRef.getRef().getResource() != null) {
+      var type = thePathAndRef.getRef().getResource().fhirType(); //required by the profile
+      if("CapabilityStatement".equals(type) || "Bundle".equals(type)) {
+        LOG.info("Skipping findTargetResource() as [{}] is excluded - custom KT2 addition!", type);
+        return null;
+      }
+    }
+
     if("Bundle".equals(theSourceResourceName) || "CapabilityStatement".equals(theSourceResourceName)) {
       LOG.info("Skipping findTargetResource() as [{}] is excluded - custom KT2 addition!", theSourceResourceName);
       return null;
