@@ -12,8 +12,8 @@ startupProbe:
   enabled: true
   path: /fhir/DEFAULT/.well-known/smart-configuration
   initialDelaySeconds: 30
-  periodSeconds: 10
-  failureThreshold: 80
+  periodSeconds: 12
+  failureThreshold: 150
 
 
 # AD PV & PVC creation to mount Lucene db
