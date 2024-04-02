@@ -68,6 +68,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -234,7 +235,13 @@ public class PackageInstallerWithExclusionSvcImpl implements IPackageInstallerSv
 		if (!theInstallationSpec.getInstallResourceTypes().isEmpty()) {
 			installTypes = theInstallationSpec.getInstallResourceTypes();
 		} else {
-			installTypes = DEFAULT_INSTALL_TYPES;
+			/** CUSTOM ADDITION START */
+			// installTypes = DEFAULT_INSTALL_TYPES;
+			List<String> defaultInstallTypes = Lists.newArrayList(DEFAULT_INSTALL_TYPES);
+			defaultInstallTypes.add("ImplementationGuide");
+			installTypes = Collections.unmodifiableList(defaultInstallTypes);
+			/** CUSTOM ADDITION END */
+
 		}
 
 		ourLog.info("Installing package: {}#{}", name, version);
