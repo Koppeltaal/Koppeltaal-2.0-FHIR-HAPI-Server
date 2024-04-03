@@ -17,6 +17,7 @@ import ca.uhn.fhir.rest.server.SimpleBundleProvider;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.util.SameThreadExecutorService;
 import org.hl7.fhir.r4.model.*;
+import org.hl7.fhir.r4.model.AuditEvent.AuditEventOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -101,7 +102,7 @@ public class AuditEventSubscriptionInterceptorTest {
   }
 
   @Test
-  void outgoingSubscription() {
+  void outgoingSubscriptionSuccess() {
     ResourceDeliveryMessage message = new ResourceDeliveryMessage();
     Patient patient = setBaseValues(new Patient());
     patient.addExtension(ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM, new Reference(sourceDevice));
@@ -109,7 +110,8 @@ public class AuditEventSubscriptionInterceptorTest {
     message.setTransactionId(currentTraceId);
     CanonicalSubscription subscription = new CanonicalSubscription();
     subscription.setIdElement(new IdType("Subscription", UUID.randomUUID().toString()));
-    interceptor.outgoingSubscription(subscription, message);
+    message.setSubscription(subscription);
+    interceptor.outgoingSubscriptionSucceeded(message);
 
     ArgumentCaptor<AuditEvent> argument = ArgumentCaptor.forClass(AuditEvent.class);
     verify(auditEventDao, atLeastOnce()).create(argument.capture(), any(RequestDetails.class));
@@ -117,6 +119,35 @@ public class AuditEventSubscriptionInterceptorTest {
     assert value.getAction() == AuditEvent.AuditEventAction.E;
     assert value.getType().equalsShallow(AuditEventBuilder.CODING_TRANSMIT);
     assert !value.getAgent().isEmpty();
+    assert "0".equals(value.getOutcome().toCode());
+    assert StringUtils.equals(value.getAgent().get(0).getWho().getReference(), sourceDevice.getIdElement().getValue());
+
+//    String text = fhirContext.newJsonParser().setPrettyPrint(true).encodeResourceToString(value);
+
+
+  }
+
+  @Test
+  void outgoingSubscriptionFailure() {
+    ResourceDeliveryMessage message = new ResourceDeliveryMessage();
+    Patient patient = setBaseValues(new Patient());
+    patient.addExtension(ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM, new Reference(sourceDevice));
+    message.setPayload(fhirContext, patient, EncodingEnum.JSON);
+    message.setTransactionId(currentTraceId);
+    CanonicalSubscription subscription = new CanonicalSubscription();
+    subscription.setIdElement(new IdType("Subscription", UUID.randomUUID().toString()));
+    message.setSubscription(subscription);
+    
+    interceptor.outgoingSubscriptionFailed(message, new Exception("My error message"));
+
+    ArgumentCaptor<AuditEvent> argument = ArgumentCaptor.forClass(AuditEvent.class);
+    verify(auditEventDao, atLeastOnce()).create(argument.capture(), any(RequestDetails.class));
+    AuditEvent value = argument.getValue();
+    assert value.getAction() == AuditEvent.AuditEventAction.E;
+    assert value.getType().equalsShallow(AuditEventBuilder.CODING_TRANSMIT);
+    assert !value.getAgent().isEmpty();
+    assert "4".equals(value.getOutcome().toCode());
+    assert StringUtils.isNotBlank(value.getOutcomeDesc());
     assert StringUtils.equals(value.getAgent().get(0).getWho().getReference(), sourceDevice.getIdElement().getValue());
 
 //    String text = fhirContext.newJsonParser().setPrettyPrint(true).encodeResourceToString(value);
