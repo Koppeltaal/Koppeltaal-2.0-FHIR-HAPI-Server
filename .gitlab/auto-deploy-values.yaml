@@ -1,3 +1,7 @@
+global:
+  hosts:
+    externalIP: ${STATIC_IP}
+
 service:
   internalPort: 8080
   externalPort: 8080
