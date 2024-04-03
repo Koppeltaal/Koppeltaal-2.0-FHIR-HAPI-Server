@@ -185,9 +185,9 @@ public class PackageInstallerWithExclusionSvcImpl implements IPackageInstallerSv
 					return existing.isPresent();
 				});
 				if (exists) {
-          /* Custom addition, skip if installed */
-						ourLog.info("Package {}#{} is already installed", theInstallationSpec.getName(), theInstallationSpec.getVersion());
-            // return retVal;
+          			/* Custom addition, skip if installed */
+					ourLog.info("Package {}#{} is already installed", theInstallationSpec.getName(), theInstallationSpec.getVersion());
+            		return retVal;
 				}
 
 				NpmPackage npmPackage = myPackageCacheManager.installPackage(theInstallationSpec);
