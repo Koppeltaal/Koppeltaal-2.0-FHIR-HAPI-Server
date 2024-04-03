@@ -103,6 +103,8 @@ public class AuditEventBuilder {
           .collect(Collectors.joining())
       );
       auditEvent.setOutcome(AuditEvent.AuditEventOutcome.fromCode(dto.getOutcome()));
+    } else if (StringUtils.isNotEmpty(dto.getOutcomeDesc())) {
+      auditEvent.setOutcomeDesc(dto.getOutcomeDesc());
     }
 
     if (StringUtils.isNotEmpty(dto.getOutcome())) {

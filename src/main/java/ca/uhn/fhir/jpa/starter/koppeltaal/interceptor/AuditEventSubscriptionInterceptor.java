@@ -49,10 +49,20 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
     this.subscriptionDao = daoRegistry.getSubscriptionDao();
   }
 
-  @Hook(value = Pointcut.SUBSCRIPTION_BEFORE_DELIVERY, order = Integer.MAX_VALUE)
-  public void outgoingSubscription(CanonicalSubscription canonicalSubscription, ResourceDeliveryMessage message) {
+  @Hook(value = Pointcut.SUBSCRIPTION_AFTER_DELIVERY, order = Integer.MAX_VALUE)
+  public void outgoingSubscriptionSucceeded(ResourceDeliveryMessage message) {
+    createSubscriptionAuditEvent(message, null);
+  }
 
+  @Hook(value = Pointcut.SUBSCRIPTION_AFTER_DELIVERY_FAILED, order = Integer.MAX_VALUE)
+  public void outgoingSubscriptionFailed(ResourceDeliveryMessage message, Exception exception) {
+    createSubscriptionAuditEvent(message, exception);
+  }
+
+  private void createSubscriptionAuditEvent(ResourceDeliveryMessage message, Exception exception) {
     String traceId = message.getTransactionId();
+
+    CanonicalSubscription canonicalSubscription = message.getSubscription();
 
     LOG.info("Starting AuditEvent creation for subscription with trade id [{}]", traceId);
 
@@ -71,7 +81,13 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
       dto.setRequestId(requestId);
       correlationIdOptional
         .ifPresent(dto::setCorrelationId);
-      dto.setOutcome("0");
+
+      if(exception != null) {
+        dto.setOutcome("4");
+        dto.setOutcomeDesc("Failed to deliver webhook notification. Error message: " + exception.getMessage());
+      } else {
+        dto.setOutcome("0");
+      }
       dto.addResource(new Reference(resource));
       dto.setQuery(canonicalSubscription.getCriteriaString());
       dto.setDateTime(new Date());
@@ -95,7 +111,6 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
     } else {
       LOG.debug("Not creating AuditEvent as the resource is an instance of AuditEvent");
     }
-
   }
 
   private SystemRequestDetails newSystemRequestDetails(String traceId) {

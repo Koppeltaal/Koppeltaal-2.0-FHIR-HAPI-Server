@@ -16,6 +16,7 @@ public class AuditEventDto {
 	EventType eventType;
 	Date dateTime = new Date();
 	String outcome = "";
+	String outcomeDesc = ""; //This field is only used when the operationOutcome is not provided, like in a failed Subscription delivery
   OperationOutcome operationOutcome;
 	/**
 	 * This ID should always remain the same over all systems involved in the event. An event
@@ -86,6 +87,14 @@ public class AuditEventDto {
 
 	public void setOutcome(String outcome) {
 		this.outcome = outcome;
+	}
+
+	public String getOutcomeDesc() {
+		return outcomeDesc;
+	}
+	
+	public void setOutcomeDesc(String outcomeDesc) {
+		this.outcomeDesc = outcomeDesc;
 	}
 
 	public String getCorrelationId() {
