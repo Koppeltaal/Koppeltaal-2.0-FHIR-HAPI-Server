@@ -31,7 +31,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
-
 @ExtendWith(MockitoExtension.class)
 public class AuditEventSubscriptionInterceptorTest {
   AuditEventSubscriptionInterceptor interceptor;
@@ -91,7 +90,7 @@ public class AuditEventSubscriptionInterceptorTest {
     auditEventService.init();
     RequestIdHolder requestIdHolder = new RequestIdHolder();
     currentTraceId = UUID.randomUUID().toString();
-    requestIdHolder.addMapping(currentTraceId, UUID.randomUUID().toString(), "tenant1");
+    requestIdHolder.addMapping(currentTraceId, UUID.randomUUID().toString(), "tenant1", "Device/123");
     fhirContext = FhirContext.forR4();
     interceptor = new AuditEventSubscriptionInterceptor(daoRegistry, auditEventService, fhirContext, requestIdHolder);
   }
@@ -120,10 +119,10 @@ public class AuditEventSubscriptionInterceptorTest {
     assert value.getType().equalsShallow(AuditEventBuilder.CODING_TRANSMIT);
     assert !value.getAgent().isEmpty();
     assert "0".equals(value.getOutcome().toCode());
-    assert StringUtils.equals(value.getAgent().get(0).getWho().getReference(), sourceDevice.getIdElement().getValue());
+    assert "Device/123".equals(value.getAgent().get(0).getWho().getReference());
 
-//    String text = fhirContext.newJsonParser().setPrettyPrint(true).encodeResourceToString(value);
-
+    // String text =
+    // fhirContext.newJsonParser().setPrettyPrint(true).encodeResourceToString(value);
 
   }
 
@@ -137,7 +136,7 @@ public class AuditEventSubscriptionInterceptorTest {
     CanonicalSubscription subscription = new CanonicalSubscription();
     subscription.setIdElement(new IdType("Subscription", UUID.randomUUID().toString()));
     message.setSubscription(subscription);
-    
+
     interceptor.outgoingSubscriptionFailed(message, new Exception("My error message"));
 
     ArgumentCaptor<AuditEvent> argument = ArgumentCaptor.forClass(AuditEvent.class);
@@ -148,10 +147,10 @@ public class AuditEventSubscriptionInterceptorTest {
     assert !value.getAgent().isEmpty();
     assert "4".equals(value.getOutcome().toCode());
     assert StringUtils.isNotBlank(value.getOutcomeDesc());
-    assert StringUtils.equals(value.getAgent().get(0).getWho().getReference(), sourceDevice.getIdElement().getValue());
+    assert "Device/123".equals(value.getAgent().get(0).getWho().getReference());
 
-//    String text = fhirContext.newJsonParser().setPrettyPrint(true).encodeResourceToString(value);
-
+    // String text =
+    // fhirContext.newJsonParser().setPrettyPrint(true).encodeResourceToString(value);
 
   }
 }

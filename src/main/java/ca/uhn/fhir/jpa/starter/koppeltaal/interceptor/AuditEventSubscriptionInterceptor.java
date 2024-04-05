@@ -41,8 +41,8 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
   private final RequestIdHolder requestIdHolder;
   private final IFhirResourceDao<Subscription> subscriptionDao;
 
-
-  public AuditEventSubscriptionInterceptor(DaoRegistry daoRegistry, AuditEventService auditEventService, FhirContext fhirContext, RequestIdHolder requestIdHolder) {
+  public AuditEventSubscriptionInterceptor(DaoRegistry daoRegistry, AuditEventService auditEventService,
+      FhirContext fhirContext, RequestIdHolder requestIdHolder) {
     super(auditEventService, daoRegistry);
     this.fhirContext = fhirContext;
     this.requestIdHolder = requestIdHolder;
@@ -66,11 +66,11 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
 
     LOG.info("Starting AuditEvent creation for subscription with trade id [{}]", traceId);
 
-    String requestId = UUID.randomUUID().toString(); //async, so always generate a new requestId
+    String requestId = UUID.randomUUID().toString(); // async, so always generate a new requestId
 
     Optional<String> correlationIdOptional = requestIdHolder.getRequestId(traceId);
 
-    Resource resource = (Resource)message.getPayload(fhirContext);
+    Resource resource = (Resource) message.getPayload(fhirContext);
 
     setTraceAndRequestIdHeaders(canonicalSubscription, traceId, requestId, correlationIdOptional);
 
@@ -80,9 +80,9 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
       dto.setTraceId(traceId);
       dto.setRequestId(requestId);
       correlationIdOptional
-        .ifPresent(dto::setCorrelationId);
+          .ifPresent(dto::setCorrelationId);
 
-      if(exception != null) {
+      if (exception != null) {
         dto.setOutcome("4");
         dto.setOutcomeDesc("Failed to deliver webhook notification. Error message: " + exception.getMessage());
       } else {
@@ -92,8 +92,12 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
       dto.setQuery(canonicalSubscription.getCriteriaString());
       dto.setDateTime(new Date());
 
-      Optional<IIdType> resourceOriginDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(resource);
-      resourceOriginDeviceId.ifPresent(id -> dto.addAgent(new Reference(id), AuditEventBuilder.CODING_SOURCE_ROLE_ID, true));
+      Optional<String> resourceOriginDeviceId = correlationIdOptional.isPresent()
+          ? Optional.of(requestIdHolder.getResourceOriginDeviceRef(correlationIdOptional.get()))
+          : Optional.empty();
+
+      resourceOriginDeviceId
+          .ifPresent(id -> dto.addAgent(new Reference(id), AuditEventBuilder.CODING_SOURCE_ROLE_ID, true));
 
       SystemRequestDetails requestDetails = newSystemRequestDetails(traceId);
 
@@ -101,7 +105,8 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
       Subscription subscription = subscriptionDao.read(subscriptionId, requestDetails, true);
       if (subscription != null) {
         Optional<IIdType> subscriptionDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(subscription);
-        subscriptionDeviceId.ifPresent(id -> dto.addAgent(new Reference(id), AuditEventBuilder.CODING_DESTINATION_ROLE_ID, false));
+        subscriptionDeviceId
+            .ifPresent(id -> dto.addAgent(new Reference(id), AuditEventBuilder.CODING_DESTINATION_ROLE_ID, false));
         dto.addResource(new Reference(subscription));
       }
 
@@ -128,22 +133,21 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
     return details;
   }
 
-  private void setTraceAndRequestIdHeaders(CanonicalSubscription canonicalSubscription, String transactionId, String requestId, Optional<String> correlationIdOptional) {
-    //There is no access to the response headers on the HttpServletResponse for subscriptions. Adding them in-memory to the subscription headers.
-    //Cleaning up to make sure the previous in-memory results aren't sent as well
+  private void setTraceAndRequestIdHeaders(CanonicalSubscription canonicalSubscription, String transactionId,
+      String requestId, Optional<String> correlationIdOptional) {
+    // There is no access to the response headers on the HttpServletResponse for
+    // subscriptions. Adding them in-memory to the subscription headers.
+    // Cleaning up to make sure the previous in-memory results aren't sent as well
     canonicalSubscription.setHeaders(
-      canonicalSubscription.getHeaders().stream()
-        .filter(header -> !header.startsWith(TRACE_ID_HEADER_KEY) && !header.startsWith(HEADER_REQUEST_ID))
-        .map(StringType::new)
-        .collect(Collectors.toList())
-    );
+        canonicalSubscription.getHeaders().stream()
+            .filter(header -> !header.startsWith(TRACE_ID_HEADER_KEY) && !header.startsWith(HEADER_REQUEST_ID))
+            .map(StringType::new)
+            .collect(Collectors.toList()));
 
     canonicalSubscription.addHeader(TRACE_ID_HEADER_KEY + ": " + transactionId);
     canonicalSubscription.addHeader(HEADER_REQUEST_ID + ": " + requestId);
-    correlationIdOptional.ifPresent(correlationId ->
-      canonicalSubscription.addHeader(CORRELATION_HEADER_KEY + ": " + correlationId)
-    );
+    correlationIdOptional
+        .ifPresent(correlationId -> canonicalSubscription.addHeader(CORRELATION_HEADER_KEY + ": " + correlationId));
   }
-
 
 }

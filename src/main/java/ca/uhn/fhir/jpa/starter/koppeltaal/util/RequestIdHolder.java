@@ -21,13 +21,15 @@ public class RequestIdHolder {
 
   private final Map<String, String> traceIdToRequestIdMap = new HashMap<>();
   private final Map<String, String> traceIdToTenantIdMap = new HashMap<>();
+  private final Map<String, String> requestIdToResourceOriginDeviceRefMap = new HashMap<>();
 
-  public void addMapping(String traceId, String requestId, String tenantId) {
-    LOG.info("Mapping trace id [{}] to request id [{}] and tenant id [{}]", traceId, requestId, tenantId);
+  public void addMapping(String traceId, String requestId, String tenantId, String resourceOriginDeviceRef) {
+    LOG.info("Mapping trace id [{}] to request id [{}] and tenant id [{}] initiated by resource-origin device ref [{}]", traceId, requestId, tenantId, resourceOriginDeviceRef);
     traceIdToRequestIdMap.put(traceId, requestId);
     traceIdToTenantIdMap.put(traceId, tenantId);
+    requestIdToResourceOriginDeviceRefMap.put(requestId, resourceOriginDeviceRef);
 
-    autoCleanup(traceId);
+    autoCleanup(traceId, requestId);
   }
 
   public Optional<String> getRequestId(String traceId) {
@@ -58,21 +60,26 @@ public class RequestIdHolder {
     return Optional.empty();
   }
 
-  public void clearIds(String traceId) {
-    LOG.info("Clearing request and tenant id mapped to trace id [{}]", traceId);
-    traceIdToRequestIdMap.remove(traceId);
-    traceIdToTenantIdMap.remove(traceId);
+  public String getResourceOriginDeviceRef(String requestId) {
+    return requestIdToResourceOriginDeviceRefMap.getOrDefault(requestId, "request-id-not-found");
   }
 
-  private void autoCleanup(String traceId) {
+  public void clearIds(String traceId, String requestId) {
+    LOG.info("Clearing request and tenant id mapped to trace id [{}] and resource-origins mapped to request-id [{}]", traceId, requestId);
+    traceIdToRequestIdMap.remove(traceId);
+    traceIdToTenantIdMap.remove(traceId);
+    requestIdToResourceOriginDeviceRefMap.remove(requestId);
+  }
 
-    LOG.info("Cleaning up trace id [{}] in 20 seconds", traceId);
+  private void autoCleanup(String traceId, String requestId) {
+
+    LOG.info("Cleaning up trace id [{}] and request id [{}] in 120 seconds", traceId, requestId);
 
     new Timer().schedule(new TimerTask() {
       @Override
       public void run() {
-        clearIds(traceId);
+        clearIds(traceId, requestId);
       }
-    }, 20 * 60 * 1000L); //cleanup after 20 minutes
+    }, 120 * 60 * 1000L); //cleanup after 120 seconds
   }
 }

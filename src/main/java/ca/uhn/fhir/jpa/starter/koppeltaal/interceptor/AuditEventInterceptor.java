@@ -8,11 +8,13 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuditEventDto;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventBuilder;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.RequestIdHolder;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.BaseServerResponseException;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.r4.model.Device;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -20,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
+import java.util.Optional;
 
 /**
  *
@@ -122,8 +125,10 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
 
     // The requestId is always set @ ca.uhn.fhir.jpa.starter.koppeltaal.KoppeltaalRestfulServer.getOrCreateRequestId()
     String requestId = requestDetails.getRequestId();
+    Optional<Device> requestingDevice = ResourceOriginUtil.getDevice(requestDetails, deviceDao);
+    String resourceOriginDeviceRef = requestingDevice.isPresent() ? "Device/" + requestingDevice.get().getId() : "no-resource-origin-found";
 
-    requestIdHolder.addMapping(requestDetails.getTransactionGuid(), requestId, requestDetails.getTenantId());
+    requestIdHolder.addMapping(requestDetails.getTransactionGuid(), requestId, requestDetails.getTenantId(), resourceOriginDeviceRef);
 
     LOG.info(String.format("Incoming request, traceId='%s', requestId='%s', correlationId='%s'", requestDetails.getTransactionGuid(), requestId, requestDetails.getUserData().get("correlationId")));
   }
