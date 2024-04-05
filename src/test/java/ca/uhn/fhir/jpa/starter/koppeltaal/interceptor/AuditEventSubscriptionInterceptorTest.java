@@ -17,7 +17,6 @@ import ca.uhn.fhir.rest.server.SimpleBundleProvider;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.util.SameThreadExecutorService;
 import org.hl7.fhir.r4.model.*;
-import org.hl7.fhir.r4.model.AuditEvent.AuditEventOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -90,7 +90,9 @@ public class AuditEventSubscriptionInterceptorTest {
     auditEventService.init();
     RequestIdHolder requestIdHolder = new RequestIdHolder();
     currentTraceId = UUID.randomUUID().toString();
-    requestIdHolder.addMapping(currentTraceId, UUID.randomUUID().toString(), "tenant1", "Device/123");
+    Device requestingDevice = new Device();
+    requestingDevice.setId("req-dev-id");
+    requestIdHolder.addMapping(currentTraceId, UUID.randomUUID().toString(), "tenant1", Optional.of(requestingDevice));
     fhirContext = FhirContext.forR4();
     interceptor = new AuditEventSubscriptionInterceptor(daoRegistry, auditEventService, fhirContext, requestIdHolder);
   }
@@ -119,7 +121,7 @@ public class AuditEventSubscriptionInterceptorTest {
     assert value.getType().equalsShallow(AuditEventBuilder.CODING_TRANSMIT);
     assert !value.getAgent().isEmpty();
     assert "0".equals(value.getOutcome().toCode());
-    assert "Device/123".equals(value.getAgent().get(0).getWho().getReference());
+    assert "req-dev-id".equals(value.getAgent().get(0).getWho().getReference());
 
     // String text =
     // fhirContext.newJsonParser().setPrettyPrint(true).encodeResourceToString(value);
@@ -147,7 +149,7 @@ public class AuditEventSubscriptionInterceptorTest {
     assert !value.getAgent().isEmpty();
     assert "4".equals(value.getOutcome().toCode());
     assert StringUtils.isNotBlank(value.getOutcomeDesc());
-    assert "Device/123".equals(value.getAgent().get(0).getWho().getReference());
+    assert "req-dev-id".equals(value.getAgent().get(0).getWho().getReference());
 
     // String text =
     // fhirContext.newJsonParser().setPrettyPrint(true).encodeResourceToString(value);

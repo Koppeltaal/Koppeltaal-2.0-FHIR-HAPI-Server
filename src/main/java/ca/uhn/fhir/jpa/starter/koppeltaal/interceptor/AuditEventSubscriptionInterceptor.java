@@ -92,8 +92,8 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
       dto.setQuery(canonicalSubscription.getCriteriaString());
       dto.setDateTime(new Date());
 
-      Optional<String> resourceOriginDeviceId = correlationIdOptional.isPresent()
-          ? Optional.of(requestIdHolder.getResourceOriginDeviceRef(correlationIdOptional.get()))
+      Optional<IdType> resourceOriginDeviceId = correlationIdOptional.isPresent()
+          ? requestIdHolder.getRequestingDeviceIdType(correlationIdOptional.get())
           : Optional.empty();
 
       resourceOriginDeviceId

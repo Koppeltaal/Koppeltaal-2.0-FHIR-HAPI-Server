@@ -126,11 +126,12 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
     // The requestId is always set @ ca.uhn.fhir.jpa.starter.koppeltaal.KoppeltaalRestfulServer.getOrCreateRequestId()
     String requestId = requestDetails.getRequestId();
     Optional<Device> requestingDevice = ResourceOriginUtil.getDevice(requestDetails, deviceDao);
-    String resourceOriginDeviceRef = requestingDevice.isPresent() ? "Device/" + requestingDevice.get().getId() : "no-resource-origin-found";
 
-    requestIdHolder.addMapping(requestDetails.getTransactionGuid(), requestId, requestDetails.getTenantId(), resourceOriginDeviceRef);
+    requestIdHolder.addMapping(requestDetails.getTransactionGuid(), requestId, requestDetails.getTenantId(),
+        requestingDevice);
 
-    LOG.info(String.format("Incoming request, traceId='%s', requestId='%s', correlationId='%s'", requestDetails.getTransactionGuid(), requestId, requestDetails.getUserData().get("correlationId")));
+    LOG.info(String.format("Incoming request, traceId='%s', requestId='%s', correlationId='%s'",
+        requestDetails.getTransactionGuid(), requestId, requestDetails.getUserData().get("correlationId")));
   }
 
   @Hook(Pointcut.STORAGE_PRECOMMIT_RESOURCE_UPDATED)
