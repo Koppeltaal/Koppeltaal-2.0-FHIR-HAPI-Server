@@ -83,12 +83,7 @@ public class CapabilityStatementInterceptor {
       }
     }
 
-    appProperties.getImplementationGuides().values().forEach(implementationGuide -> {
-      String urlReference = String.format("http://koppeltaal.nl/fhir/ImplementationGuide/%s-%s",
-          implementationGuide.getName(), implementationGuide.getVersion());
-
-      capabilityStatement.addImplementationGuide(urlReference);
-    });
+    capabilityStatement.addImplementationGuide("http://koppeltaal.nl/fhir/ImplementationGuide");
 
     LOG.debug("Applied Koppeltaal-specific changes to the CapabilityStatement");
   }
