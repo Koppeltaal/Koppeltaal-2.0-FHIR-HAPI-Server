@@ -185,9 +185,7 @@ public class PackageInstallerWithExclusionSvcImpl implements IPackageInstallerSv
 					return existing.isPresent();
 				});
 				if (exists) {
-          			/* Custom addition, skip if installed */
 					ourLog.info("Package {}#{} is already installed", theInstallationSpec.getName(), theInstallationSpec.getVersion());
-            		// return retVal;
 				}
 
 				NpmPackage npmPackage = myPackageCacheManager.installPackage(theInstallationSpec);
@@ -198,7 +196,11 @@ public class PackageInstallerWithExclusionSvcImpl implements IPackageInstallerSv
 				retVal.getMessage().addAll(JpaPackageCache.getProcessingMessages(npmPackage));
 
 				if (theInstallationSpec.isFetchDependencies()) {
-					fetchAndInstallDependencies(npmPackage, theInstallationSpec, retVal);
+					/* Custom addition start, skip if installed */
+					if(!exists) {
+						fetchAndInstallDependencies(npmPackage, theInstallationSpec, retVal);
+					}
+					/* Custom addition end, skip if installed */
 				}
 
 				if (theInstallationSpec.getInstallMode() == PackageInstallationSpec.InstallModeEnum.STORE_AND_INSTALL) {
