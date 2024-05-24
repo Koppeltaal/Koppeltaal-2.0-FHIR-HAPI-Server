@@ -4,6 +4,8 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartConfigurationProperties;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.SmartConfigurationDto;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -22,6 +24,7 @@ public class SmartConfigurationController {
     }
   }
 
+  @CrossOrigin(origins = "*")
   @GetMapping(value = "/smart-configuration", headers = "Accept=*/*", produces = "application/json")
   public String getSmartConfiguration() {
     return smartConfiguration;
