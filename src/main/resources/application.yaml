@@ -15,11 +15,8 @@ spring:
     fail-on-missing-locations: false
   datasource:
     url: jdbc:postgresql://127.0.0.1:5432/hapi_fhir_server_dev
-    username: jorisscharp
+    username: admin
     password: ""
-#    url: jdbc:postgresql://35.204.98.239:5432/hapi_fhir_server
-    #    username: hapi_fhir_server
-    #    password: 8lKfLlo5uemaalK2
     driverClassName: org.postgresql.Driver
     #    max-active: 15
 
@@ -86,7 +83,7 @@ hapi:
 ###    example from registry (packages.fhir.org)
       kt2:
         name: Koppeltaalv2.00
-        version: 0.13.0
+        version: 0.13.1-beta.1
 #      example not from registry
 #      ips_1_0_0:
 #        url: https://build.fhir.org/ig/HL7/fhir-ips/package.tgz
