@@ -103,6 +103,7 @@ hapi:
       - Organization
       - Patient
       - Practitioner
+      - RelatedPerson
       - Subscription
       - StructureDefinition
       - Task
