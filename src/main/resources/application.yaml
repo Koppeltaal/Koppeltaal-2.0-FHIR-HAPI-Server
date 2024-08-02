@@ -83,7 +83,7 @@ hapi:
 ###    example from registry (packages.fhir.org)
       kt2:
         name: Koppeltaalv2.00
-        version: 0.14.0-beta.1
+        version: 0.14.0-beta.3
 #      example not from registry
 #      ips_1_0_0:
 #        url: https://build.fhir.org/ig/HL7/fhir-ips/package.tgz
