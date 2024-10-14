@@ -2,7 +2,7 @@ package ca.uhn.fhir.jpa.starter.koppeltaal.interceptor;
 
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
-import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
+import ca.uhn.fhir.rest.server.exceptions.UnprocessableEntityException;
 
 import org.hl7.fhir.r4.model.Task;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +48,7 @@ class ValidSubTaskInterceptorTest {
         when(requestDetails.getResource()).thenReturn(task);
         when(requestDetails.getRestOperationType()).thenReturn(RestOperationTypeEnum.CREATE);
 
-        assertThrows(InvalidRequestException.class, () -> interceptor.incomingRequestPreHandled(requestDetails));
+        assertThrows(UnprocessableEntityException.class, () -> interceptor.incomingRequestPreHandled(requestDetails));
     }
 
     @Test
@@ -102,7 +102,7 @@ class ValidSubTaskInterceptorTest {
         when(requestDetails.getResource()).thenReturn(task);
         when(requestDetails.getRestOperationType()).thenReturn(RestOperationTypeEnum.UPDATE);
 
-        assertThrows(InvalidRequestException.class, () -> interceptor.incomingRequestPreHandled(requestDetails));
+        assertThrows(UnprocessableEntityException.class, () -> interceptor.incomingRequestPreHandled(requestDetails));
     }
 
     @Test
@@ -128,7 +128,7 @@ class ValidSubTaskInterceptorTest {
         when(requestDetails.getResource()).thenReturn(task);
         when(requestDetails.getRestOperationType()).thenReturn(RestOperationTypeEnum.CREATE);
 
-        InvalidRequestException exception = assertThrows(InvalidRequestException.class,
+        UnprocessableEntityException exception = assertThrows(UnprocessableEntityException.class,
                 () -> interceptor.incomingRequestPreHandled(requestDetails));
         assertEquals("Task with code 'view' should have a 'partOf' reference", exception.getMessage());
     }

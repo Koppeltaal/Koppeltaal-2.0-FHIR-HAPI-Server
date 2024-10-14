@@ -8,7 +8,7 @@ import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
-import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
+import ca.uhn.fhir.rest.server.exceptions.UnprocessableEntityException;
 
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Task;
@@ -45,7 +45,7 @@ public class ValidSubTaskInterceptor {
 				.filter(coding -> isSubtaskCode(coding.getCode()))
 				.findFirst()
 				.ifPresent(nullValue -> {
-					throw new InvalidRequestException(
+					throw new UnprocessableEntityException(
 							String.format("Task with code '%s' should have a 'partOf' reference",
 									task.getCode().getCoding().get(0).getCode()));
 				});
