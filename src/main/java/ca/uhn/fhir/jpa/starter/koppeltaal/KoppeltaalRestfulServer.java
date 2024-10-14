@@ -139,6 +139,8 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 
     registerInterceptor(new DefaultDescendingSortInterceptor());
 
+	registerInterceptor(new ValidSubTaskInterceptor());
+
 	registerInterceptor(enforceHttpsSubscriptionEndpointInterceptor);
 
     jpaStorageSettings.setResourceServerIdStrategy(JpaStorageSettings.IdStrategyEnum.UUID);
