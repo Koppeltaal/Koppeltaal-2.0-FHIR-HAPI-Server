@@ -101,7 +101,9 @@ public class PackageInstallerWithExclusionSvcImpl implements IPackageInstallerSv
     "StructureDefinition/nl-core-HearingFunction.HearingAid.Product",
     "StructureDefinition/nl-core-HearingFunction.HearingAid",
     "StructureDefinition/nl-core-VisualFunction.VisualAid.Product",
-    "StructureDefinition/nl-core-VisualFunction.VisualAid"
+    "StructureDefinition/nl-core-VisualFunction.VisualAid",
+	"StructureDefinition/zib-Wound.Drain.Product",
+	"StructureDefinition/zib-Wound.Drain"
   );
   /* CUSTOMIZATION END */
 
