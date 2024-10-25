@@ -103,7 +103,7 @@ public class PackageInstallerWithExclusionSvcImpl implements IPackageInstallerSv
     "StructureDefinition/nl-core-VisualFunction.VisualAid.Product",
     "StructureDefinition/nl-core-VisualFunction.VisualAid",
 	"StructureDefinition/zib-Wound.Drain.Product",
-	"StructureDefinition/zib-Wound.Drain"
+	"StructureDefinition/zib-Wound.Drain",
 	"StructureDefinition/nl-core-Wound.Drain.Product",
 	"StructureDefinition/nl-core-Wound.Drain"
   );
