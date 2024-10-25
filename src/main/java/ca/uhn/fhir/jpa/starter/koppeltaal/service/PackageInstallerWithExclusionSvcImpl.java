@@ -486,8 +486,8 @@ public class PackageInstallerWithExclusionSvcImpl implements IPackageInstallerSv
 				return (!statusString.equals("?"));
 			default:
         /* CUSTOMIZATION START */
-        /* Also allow draft, the ZIBs and nl-core are in draft */
-				return statusString.equals("active") || statusString.equalsIgnoreCase("draft");
+        /* Also allow draft, the ZIBs and nl-core are in draft or unknown */
+				return statusString.equals("active") || statusString.equalsIgnoreCase("draft") || statusString.equalsIgnoreCase("unknown");
         /* CUSTOMIZATION END */
 		}
 	}
