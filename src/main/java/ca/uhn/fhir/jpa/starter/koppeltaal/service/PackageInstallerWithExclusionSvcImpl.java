@@ -197,9 +197,9 @@ public class PackageInstallerWithExclusionSvcImpl implements IPackageInstallerSv
 
 				if (theInstallationSpec.isFetchDependencies()) {
 					/* Custom addition start, skip if installed */
-					if(!exists) {
+					// if(!exists) {
 						fetchAndInstallDependencies(npmPackage, theInstallationSpec, retVal);
-					}
+					// }
 					/* Custom addition end, skip if installed */
 				}
 
