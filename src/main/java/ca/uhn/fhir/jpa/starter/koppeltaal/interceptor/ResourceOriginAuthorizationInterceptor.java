@@ -16,6 +16,7 @@ import ca.uhn.fhir.rest.server.interceptor.auth.AuthorizationInterceptor;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
+import org.hl7.fhir.r4.model.CodeSystem;
 import org.hl7.fhir.r4.model.Device;
 import org.hl7.fhir.r4.model.SearchParameter;
 import org.slf4j.Logger;
@@ -125,8 +126,8 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     if (resourceOriginOptional.isEmpty()) {
       LOG.warn("Found resource ({}) without resource-origin", requestDetailsResource.getIdElement());
 
-      if (requestDetailsResource instanceof SearchParameter || requestDetailsResource instanceof Device) {
-        // SearchParameters are created via simplifier releases on server start and do
+      if (requestDetailsResource instanceof SearchParameter || requestDetailsResource instanceof Device || requestDetailsResource instanceof CodeSystem) {
+        // CodeSystems and SearchParameters are created via simplifier releases on server start and do
         // not contain a resource-origin.
         // It is important that we can update these if the user has permission.
         // Devices are currently created without resource-origin by domain admin, will
