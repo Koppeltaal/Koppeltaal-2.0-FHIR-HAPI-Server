@@ -27,6 +27,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.CodeType;
+import org.hl7.fhir.r4.model.CodeSystem;
 import org.hl7.fhir.r4.model.Device;
 import org.hl7.fhir.r4.model.DomainResource;
 import org.hl7.fhir.r4.model.Enumerations.PublicationStatus;
@@ -68,7 +69,7 @@ public class InjectResourceOriginInterceptor {
 
 		final boolean isDomainResource = resource instanceof DomainResource;
 
-		if(!isDomainResource) return;
+		if(!isDomainResource || resource instanceof CodeSystem) return;
 
 		if(operation == UPDATE) {
 			ensureResourceOriginIsUnmodifiedOrEnsureResourceOrigin(requestDetails, (DomainResource) resource);
