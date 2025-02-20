@@ -22,9 +22,9 @@ spec:
       labels:
         {{- include "hapi-fhir-jpaserver.selectorLabels" . | nindent 8 }}
     spec:
-      {{- with .Values.imagePullSecrets }}
+      {{- if .Values.imagePullSecrets.name}}
       imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
+        - name: {{.Values.imagePullSecrets.name}}
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}

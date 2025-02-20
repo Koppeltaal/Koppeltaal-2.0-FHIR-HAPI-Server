@@ -12,7 +12,7 @@ image:
   pullPolicy: IfNotPresent
 
 # -- image pull secrets to use when pulling the image
-imagePullSecrets: []
+imagePullSecrets: {}
 
 # -- override the chart name
 nameOverride: ""
