@@ -2,6 +2,10 @@ global:
   hosts:
     externalIP: ${STATIC_IP}
 
+ingress:
+  annotations:
+    nginx.ingress.kubernetes.io/limit-rps: "5"
+
 service:
   internalPort: 8080
   externalPort: 8080
