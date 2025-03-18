@@ -140,7 +140,11 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
     // Cleaning up to make sure the previous in-memory results aren't sent as well
     canonicalSubscription.setHeaders(
         canonicalSubscription.getHeaders().stream()
-            .filter(header -> !header.startsWith(TRACE_ID_HEADER_KEY) && !header.startsWith(HEADER_REQUEST_ID))
+          .filter(header ->
+            !header.startsWith(TRACE_ID_HEADER_KEY)
+            && !header.startsWith(HEADER_REQUEST_ID)
+            && !header.startsWith(CORRELATION_HEADER_KEY)
+          )
             .map(StringType::new)
             .collect(Collectors.toList()));
 
