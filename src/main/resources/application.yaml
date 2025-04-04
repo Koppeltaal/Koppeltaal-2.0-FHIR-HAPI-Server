@@ -169,6 +169,7 @@ hapi:
       kt2:
         name: Koppeltaalv2.00
         version: 0.14.0
+        fetchDependencies: true
     #      example not from registry
     #      ips_1_0_0:
     #        url: https://build.fhir.org/ig/HL7/fhir-ips/package.tgz
