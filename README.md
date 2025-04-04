@@ -4,6 +4,13 @@ This project is a complete starter project you can use to deploy a FHIR server u
 
 Note that this project is specifically intended for end users of the HAPI FHIR JPA server module (in other words, it helps you implement HAPI FHIR, it is not the source of the library itself). If you are looking for the main HAPI FHIR project, see here: https://github.com/hapifhir/hapi-fhir
 
+While this project shows how you can use many parts of the HAPI FHIR framework there are a set of features which you should be aware of are missing or something you need to supply yourself or get professional support ahead of using it directly in production:
+
+1) The service comes with no security implementation. See how it can be done [here](https://hapifhir.io/hapi-fhir/docs/security/introduction.html)
+2) The service comes with no enterprise logging. See how it can be done [here](https://hapifhir.io/hapi-fhir/docs/security/balp_interceptor.html)
+3) The internal topic cache used by subscriptions in HAPI FHIR are not shared across multiple instances as the [default supplied implementation is in-mem](https://github.com/hapifhir/hapi-fhir/blob/master/hapi-fhir-jpaserver-subscription/src/main/java/ca/uhn/fhir/jpa/topic/ActiveSubscriptionTopicCache.java)
+4) The internal message broker channel in HAPI FHIR is not shared across multiple instances as the [default supplied implementation is in-mem](https://github.com/hapifhir/hapi-fhir/blob/master/hapi-fhir-storage/src/main/java/ca/uhn/fhir/jpa/subscription/channel/api/IChannelFactory.java). This impacts the use of modules listed [here](https://smilecdr.com/docs/installation/message_broker.html#modules-dependent-on-message-brokers)
+
 Need Help? Please see: https://github.com/hapifhir/hapi-fhir/wiki/Getting-Help
 
 ## Prerequisites
@@ -13,7 +20,7 @@ In order to use this sample, you should have:
 - [This project](https://github.com/hapifhir/hapi-fhir-jpaserver-starter) checked out. You may wish to create a GitHub Fork of the project and check that out instead so that you can customize the project and save the results to GitHub.
 
 ### and either
- - Oracle Java (JDK) installed: Minimum JDK8 or newer.
+ - Oracle Java (JDK) installed: Minimum JDK17 or newer.
  - Apache Maven build tool (newest version)
 
 ### or
@@ -91,7 +98,7 @@ configs:
      file: ./hapi.application.yaml
 ```
 
-Provide the following content in ``./hapi.aplication.yaml``:
+Provide the following content in ``./hapi.application.yaml``:
 
 ```yaml
 spring:
@@ -102,7 +109,7 @@ spring:
     driverClassName: org.postgresql.Driver
   jpa:
     properties:
-      hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgres94Dialect
+      hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
       hibernate.search.enabled: false
 ```
 
@@ -144,7 +151,7 @@ configs:
      file: ./hapi-extra-classes
 ```
 
-Provide the following content in ``./hapi.aplication.yaml``:
+Provide the following content in ``./hapi.application.yaml``:
 
 ```yaml
 spring:
@@ -155,7 +162,7 @@ spring:
     driverClassName: org.postgresql.Driver
   jpa:
     properties:
-      hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgres94Dialect
+      hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
       hibernate.search.enabled: false
 hapi:
   fhir:
@@ -189,21 +196,32 @@ public class YourInterceptor
 
 ## Running locally
 
-The easiest way to run this server entirely depends on your environment requirements. At least, the following 4 ways are supported:
+The easiest way to run this server entirely depends on your environment requirements. The following ways are supported:
 
 ### Using jetty
 ```bash
-mvn jetty:run
+mvn -Pjetty spring-boot:run
 ```
 
+The Server will then be accessible at http://localhost:8080/fhir and the CapabilityStatement will be found at http://localhost:8080/fhir/metadata.
 
-If you need to run this server on a different port (using Maven), you can change the port in the run command as follows:
-
+### Using Spring Boot
 ```bash
-mvn -Djetty.port=8888 jetty:run
+mvn spring-boot:run
 ```
 
-Server will then be accessible at http://localhost:8888/ and eg. http://localhost:8888/fhir/metadata. Remember to adjust you overlay configuration in the application.yaml to eg.
+The Server will then be accessible at http://localhost:8080/fhir and the CapabilityStatement will be found at http://localhost:8080/fhir/metadata.
+
+If you want to run this server on a different port, you can change the port in the `src/main/resources/application.yaml` file as follows:
+
+```yaml
+server:
+#  servlet:
+#    context-path: /example/path
+  port: 8888
+```
+
+The Server will then be accessible at http://localhost:8888/fhir and the CapabilityStatement will be found at http://localhost:8888/fhir/metadata. Remember to adjust your overlay configuration in the `application.yaml` file to the following:
 
 ```yaml
     tester:
@@ -219,7 +237,7 @@ Server will then be accessible at http://localhost:8888/ and eg. http://localhos
 ```bash
 mvn clean spring-boot:run -Pboot
 ```
-Server will then be accessible at http://localhost:8080/ and eg. http://localhost:8080/fhir/metadata. Remember to adjust you overlay configuration in the application.yaml to eg.
+Server will then be accessible at http://localhost:8080/ and eg. http://localhost:8080/fhir/metadata. Remember to adjust you overlay configuration in the application.yaml to the following:
 
 ```yaml
     tester:
@@ -233,9 +251,9 @@ Server will then be accessible at http://localhost:8080/ and eg. http://localhos
 
 ### Using Spring Boot
 ```bash
-mvn clean package spring-boot:repackage -Pboot && java -jar target/ROOT.war
+mvn clean package spring-boot:repackage -DskipTests=true -Pboot && java -jar target/ROOT.war
 ```
-Server will then be accessible at http://localhost:8080/ and eg. http://localhost:8080/fhir/metadata. Remember to adjust you overlay configuration in the application.yaml to eg.
+Server will then be accessible at http://localhost:8080/ and eg. http://localhost:8080/fhir/metadata. Remember to adjust your overlay configuration in the application.yaml to the following:
 
 ```yaml
     tester:
@@ -250,7 +268,7 @@ Server will then be accessible at http://localhost:8080/ and eg. http://localhos
 ```bash
 mvn clean package com.google.cloud.tools:jib-maven-plugin:dockerBuild -Dimage=distroless-hapi && docker run -p 8080:8080 distroless-hapi
 ```
-Server will then be accessible at http://localhost:8080/ and eg. http://localhost:8080/fhir/metadata. Remember to adjust you overlay configuration in the application.yaml to eg.
+Server will then be accessible at http://localhost:8080/ and eg. http://localhost:8080/fhir/metadata. Remember to adjust your overlay configuration in the application.yaml to the following:
 
 ```yaml
     tester:
@@ -266,7 +284,7 @@ Server will then be accessible at http://localhost:8080/ and eg. http://localhos
 ```bash
 ./build-docker-image.sh && docker run -p 8080:8080 hapi-fhir/hapi-fhir-jpaserver-starter:latest
 ```
-Server will then be accessible at http://localhost:8080/ and eg. http://localhost:8080/fhir/metadata. Remember to adjust you overlay configuration in the application.yaml to eg.
+Server will then be accessible at http://localhost:8080/ and eg. http://localhost:8080/fhir/metadata. Remember to adjust your overlay configuration in the application.yaml to the following:
 
 ```yaml
     tester:
@@ -301,13 +319,13 @@ spring:
     driverClassName: org.postgresql.Driver
   jpa:
     properties:
-      hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgres94Dialect
+      hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
       hibernate.search.enabled: false
 
       # Then comment all hibernate.search.backend.*
 ```
 
-Because the integration tests within the project rely on the default H2 database configuration, it is important to either explicity skip the integration tests during the build process, i.e., `mvn install -DskipTests`, or delete the tests altogether. Failure to skip or delete the tests once you've configured PostgreSQL for the datasource.driver, datasource.url, and hibernate.dialect as outlined above will result in build errors and compilation failure.
+Because the integration tests within the project rely on the default H2 database configuration, it is important to either explicitly skip the integration tests during the build process, i.e., `mvn install -DskipTests`, or delete the tests altogether. Failure to skip or delete the tests once you've configured PostgreSQL for the datasource.driver, datasource.url, and hibernate.dialect as outlined above will result in build errors and compilation failure.
 
 ### Microsoft SQL Server configuration
 
@@ -322,26 +340,36 @@ spring:
     driverClassName: com.microsoft.sqlserver.jdbc.SQLServerDriver
 ```
 
-Also, make sure you are not setting the Hibernate dialect explicitly, in other words remove any lines similar to:
+Also, make sure you are not setting the Hibernate dialect explicitly, in other words, remove any lines similar to:
 
 ```
 hibernate.dialect: {some none Microsoft SQL dialect}
 ```
 
 
-Because the integration tests within the project rely on the default H2 database configuration, it is important to either explicity skip the integration tests during the build process, i.e., `mvn install -DskipTests`, or delete the tests altogether. Failure to skip or delete the tests once you've configured PostgreSQL for the datasource.driver, datasource.url, and hibernate.dialect as outlined above will result in build errors and compilation failure.
+Because the integration tests within the project rely on the default H2 database configuration, it is important to either explicitly skip the integration tests during the build process, i.e., `mvn install -DskipTests`, or delete the tests altogether. Failure to skip or delete the tests once you've configured PostgreSQL for the datasource.driver, datasource.url, and hibernate.dialect as outlined above will result in build errors and compilation failure.
 
 
 NOTE: MS SQL Server by default uses a case-insensitive codepage. This will cause errors with some operations - such as when expanding case-sensitive valuesets (UCUM) as there are unique indexes defined on the terminology tables for codes.
 It is recommended to deploy a case-sensitive database prior to running HAPI FHIR when using MS SQL Server to avoid these and potentially other issues.
 
 ## Adding custom interceptors
-Custom interceptors can be registered with the server by including the property `hapi.fhir.custom-interceptor-classes`. This will take a comma separated list of fully-qualified class names which will be registered with the server. 
-Interceptors will be discovered in one of two ways: 
+Custom interceptors can be registered with the server by including the property `hapi.fhir.custom-interceptor-classes`. This will take a comma separated list of fully-qualified class names which will be registered with the server.
+Interceptors will be discovered in one of two ways:
 
 1) discovered from the Spring application context as existing Beans (can be used in conjunction with `hapi.fhir.custom-bean-packages`) or registered with Spring via other methods
 
-or 
+or
+
+2) classes will be instantiated via reflection if no matching Bean is found
+
+## Adding custom operations(providers)
+Custom operations(providers) can be registered with the server by including the property `hapi.fhir.custom-provider-classes`. This will take a comma separated list of fully-qualified class names which will be registered with the server.
+Providers will be discovered in one of two ways:
+
+1) discovered from the Spring application context as existing Beans (can be used in conjunction with `hapi.fhir.custom-bean-packages`) or registered with Spring via other methods
+
+or
 
 2) classes will be instantiated via reflection if no matching Bean is found
 
@@ -373,7 +401,7 @@ Again, browse to the following link to use the server (note that the port 8080 m
 
 [http://localhost:8080/](http://localhost:8080/)
 
-You will then be able access the JPA server e.g. using http://localhost:8080/fhir/metadata.
+You will then be able to access the JPA server e.g. using http://localhost:8080/fhir/metadata.
 
 If you would like it to be hosted at eg. hapi-fhir-jpaserver, eg. http://localhost:8080/hapi-fhir-jpaserver/ or http://localhost:8080/hapi-fhir-jpaserver/fhir/metadata - then rename the WAR file to ```hapi-fhir-jpaserver.war``` and adjust the overlay configuration accordingly e.g.
 
@@ -390,7 +418,7 @@ If you would like it to be hosted at eg. hapi-fhir-jpaserver, eg. http://localho
 
 ## Deploy with docker compose
 
-Docker compose is a simple option to build and deploy container. To deploy with docker compose, you should build the project
+Docker compose is a simple option to build and deploy containers. To deploy with docker compose, you should build the project
 with `mvn clean install` and then bring up the containers with `docker-compose up -d --build`. The server can be
 reached at http://localhost:8080/.
 
@@ -409,7 +437,7 @@ spring:
     driverClassName: org.postgresql.Driver
 jpa:
   properties:
-    hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgres94Dialect
+    hibernate.dialect: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
     hibernate.search.enabled: false
 
     # Then comment all hibernate.search.backend.*
@@ -462,7 +490,11 @@ The server may be configured with subscription support by enabling properties in
 
 ## Enabling Clinical Reasoning
 
-Set `hapi.fhir.cr_enabled=true` in the [application.yaml](https://github.com/hapifhir/hapi-fhir-jpaserver-starter/blob/master/src/main/resources/application.yaml) file to enable [Clinical Quality Language](https://cql.hl7.org/) on this server.
+Set `hapi.fhir.cr.enabled=true` in the [application.yaml](https://github.com/hapifhir/hapi-fhir-jpaserver-starter/blob/master/src/main/resources/application.yaml) file to enable [Clinical Quality Language](https://cql.hl7.org/) on this server.  An alternate settings file, [cds.application.yaml](https://github.com/hapifhir/hapi-fhir-jpaserver-starter/blob/master/src/main/resources/cds.application.yaml), exists with the Clinical Reasoning module enabled and default settings that have been found to work with most CDS and dQM test cases.
+
+## Enabling CDS Hooks
+
+Set `hapi.fhir.cdshooks.enabled=true` in the [application.yaml](https://github.com/hapifhir/hapi-fhir-jpaserver-starter/blob/master/src/main/resources/application.yaml) file to enable [CDS Hooks](https://cds-hooks.org/) on this server.  The Clinical Reasoning module must also be enabled because this implementation of CDS Hooks includes [CDS on FHIR](https://build.fhir.org/clinicalreasoning-cds-on-fhir.html).  An example CDS Service using CDS on FHIR is available in the CdsHooksServletIT test class.
 
 ## Enabling MDM (EMPI)
 
@@ -514,6 +546,32 @@ see the `-distroless` suffix in the image tags.
 To add a custom operation, refer to the documentation in the core hapi-fhir libraries [here](https://hapifhir.io/hapi-fhir/docs/server_plain/rest_operations_operations.html).
 
 Within `hapi-fhir-jpaserver-starter`, create a generic class (that does not extend or implement any classes or interfaces), add the `@Operation` as a method within the generic class, and then register the class as a provider using `RestfulServer.registerProvider()`.
+
+## Runtime package install
+
+It's possible to install a FHIR Implementation Guide package (`package.tgz`) either from a published package or from a local package with the `$install` operation, without having to restart the server. This is available for R4 and R5.
+
+This feature must be enabled in the application.yaml (or docker command line):
+
+```yaml
+hapi:
+  fhir:
+    ig_runtime_upload_enabled: true
+```
+
+The `$install` operation is triggered with a POST to `[server]/ImplementationGuide/$install`, with the payload below:
+
+```json
+{
+  "resourceType": "Parameters",
+  "parameter": [
+    {
+      "name": "npmContent",
+      "valueBase64Binary": "[BASE64_ENCODED_NPM_PACKAGE_DATA]"
+    }
+  ]
+}
+```
 
 ## Enable OpenTelemetry auto-instrumentation
 
