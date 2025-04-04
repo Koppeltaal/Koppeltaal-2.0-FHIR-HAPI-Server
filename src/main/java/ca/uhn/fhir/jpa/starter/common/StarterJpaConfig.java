@@ -204,10 +204,10 @@ public class StarterJpaConfig {
 		return loggingInterceptor;
 	}
 
-  @Bean
-  public IPackageInstallerSvc packageInstallerSvc(PackageInstallerWithExclusionSvcImpl packageInstallerWithExclusionSvc) {
-    return packageInstallerWithExclusionSvc;
-  }
+//  @Bean
+//  public IPackageInstallerSvc packageInstallerSvc(PackageInstallerWithExclusionSvcImpl packageInstallerWithExclusionSvc) {
+//    return packageInstallerWithExclusionSvc;
+//  }
 
 	@Bean("packageInstaller")
 	@Primary

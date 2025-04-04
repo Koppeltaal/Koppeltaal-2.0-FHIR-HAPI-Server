@@ -217,12 +217,13 @@
         <dependency>
             <groupId>com.auth0</groupId>
             <artifactId>java-jwt</artifactId>
-            <version>3.16.0</version>
+            <version>4.5.0</version>
         </dependency>
+
         <dependency>
             <groupId>com.auth0</groupId>
             <artifactId>jwks-rsa</artifactId>
-            <version>0.18.0</version>
+            <version>0.22.1</version>
         </dependency>
 
         <!-- webjars -->
@@ -409,7 +410,6 @@
         </dependency>
 
     </dependencies>
-  </dependencyManagement>
 
     <build>
 

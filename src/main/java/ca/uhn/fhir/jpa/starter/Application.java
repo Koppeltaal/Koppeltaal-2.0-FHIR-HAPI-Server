@@ -74,7 +74,7 @@ public class Application extends SpringBootServletInitializer {
 		ServletRegistrationBean servletRegistrationBean = new ServletRegistrationBean();
 		beanFactory.autowireBean(restfulServer);
 		servletRegistrationBean.setServlet(restfulServer);
-		servletRegistrationBean.addUrlMappings("/fhir/*");
+		servletRegistrationBean.addUrlMappings("/fhir/DEFAULT/*"); //Partitioning got changed massively in newer versions - disable it and map the servlet to our default partition
 		servletRegistrationBean.setLoadOnStartup(1);
 
     return servletRegistrationBean;

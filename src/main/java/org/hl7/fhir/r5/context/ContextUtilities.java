@@ -174,6 +174,11 @@ public class ContextUtilities implements ProfileKnowledgeProvider {
     return null;
   }
 
+  @Override
+  public String getCanonicalForDefaultContext() {
+    return ""; //TODO: Check if implementation is needed
+  }
+
 
   protected String tail(String url) {
     if (Utilities.noString(url)) {

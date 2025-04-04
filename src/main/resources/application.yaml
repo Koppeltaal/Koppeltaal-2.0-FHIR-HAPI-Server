@@ -256,9 +256,9 @@ hapi:
       - https://unitsofmeasure.org/*
       - http://loinc.org/*
       - https://loinc.org/*
-    partitioning:
-      allow_references_across_partitions: false
-      partitioning_include_in_search_hashes: false
+      #    partitioning:
+      #      allow_references_across_partitions: false
+      #      partitioning_include_in_search_hashes: false
       #      conditional_create_duplicate_identifiers_enabled: false
     cors:
       allow_Credentials: true
@@ -420,9 +420,6 @@ smart:
       baseUrl: "http://127.0.0.1:8086"
       authorizationToken: "c1317ea3-de40-4a1e-be3f-3994fb79f759"
       domainAdminClientId: "5ad7cf6a-9556-4d23-91ca-250dafa1df09"
-
-server:
-  forward-headers-strategy: framework
 
 logging:
   level:

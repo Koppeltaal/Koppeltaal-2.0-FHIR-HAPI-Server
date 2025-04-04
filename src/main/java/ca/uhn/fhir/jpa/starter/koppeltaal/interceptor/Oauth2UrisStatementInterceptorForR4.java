@@ -13,7 +13,8 @@ import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration;
 import java.util.Collections;
 import java.util.List;
-import javax.validation.constraints.Null;
+
+import jakarta.validation.constraints.Null;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.CapabilityStatement;

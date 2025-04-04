@@ -48,6 +48,7 @@ import ca.uhn.fhir.util.FhirTerser;
 import ca.uhn.fhir.util.SearchParameterUtil;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
+import jakarta.annotation.PostConstruct;
 import org.apache.commons.lang3.Validate;
 import org.hl7.fhir.instance.model.api.IBase;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -65,7 +66,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.annotation.Nonnull;
-import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
@@ -89,7 +89,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
  * </ol>
  * @since 5.1.0
  */
-@Component
+//@Component
 public class PackageInstallerWithExclusionSvcImpl implements IPackageInstallerSvc {
 
   /* CUSTOMIZATION START */
