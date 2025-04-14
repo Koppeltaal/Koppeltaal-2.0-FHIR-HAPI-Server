@@ -160,7 +160,7 @@ hapi:
     server_address: http://localhost:8080/fhir/
     #    defer_indexing_for_codesystems_of_size: 101
     ### Flag is true by default. This flag filters resources during package installation, allowing only those resources with a valid status (e.g. active) to be installed.
-    #    validate_resource_status_for_package_upload: false
+    validate_resource_status_for_package_upload: false
     #    install_transitive_ig_dependencies: true
     ### tells the server whether to attempt to load IG resources that are already present
     reload_existing_implementationGuides : true

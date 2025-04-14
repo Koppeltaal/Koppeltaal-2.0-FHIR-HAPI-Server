@@ -20,10 +20,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
 import static ca.uhn.fhir.jpa.starter.common.validation.IRepositoryValidationInterceptorFactory.ENABLE_REPOSITORY_VALIDATING_INTERCEPTOR;
 
 /**
@@ -55,18 +51,22 @@ public class RepositoryValidationInterceptorFactoryR4 implements IRepositoryVali
 		IBundleProvider results = structureDefinitionResourceProvider.search(new SearchParameterMap()
 				.setLoadSynchronous(true)
 				.add(StructureDefinition.SP_KIND, new TokenParam("resource")));
-		Map<String, List<StructureDefinition>> structureDefintions = results.getResources(0, results.size()).stream()
-				.map(StructureDefinition.class::cast)
-				.collect(Collectors.groupingBy(StructureDefinition::getType));
 
-		structureDefintions.forEach((key, value) -> {
-			String[] urls = value.stream().map(StructureDefinition::getUrl).toArray(String[]::new);
-			repositoryValidatingRuleBuilder
-					.forResourcesOfType(key)
-					.requireAtLeastOneProfileOf(urls)
-					.and()
-					.requireValidationToDeclaredProfiles();
-		});
+    Integer resultCount = results.size();
+    if(resultCount != null) {
+      Map<String, List<StructureDefinition>> structureDefintions = results.getResources(0, resultCount).stream()
+          .map(StructureDefinition.class::cast)
+          .collect(Collectors.groupingBy(StructureDefinition::getType));
+
+      structureDefintions.forEach((key, value) -> {
+        String[] urls = value.stream().map(StructureDefinition::getUrl).toArray(String[]::new);
+        repositoryValidatingRuleBuilder
+            .forResourcesOfType(key)
+            .requireAtLeastOneProfileOf(urls)
+            .and()
+            .requireValidationToDeclaredProfiles();
+      });
+    }
 
     List<IRepositoryValidatingRule> rules = repositoryValidatingRuleBuilder.build();
     return new RepositoryValidatingInterceptor(fhirContext, rules);
