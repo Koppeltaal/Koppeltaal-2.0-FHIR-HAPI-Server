@@ -16,7 +16,6 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.service.Oauth2AccessTokenService;
 import ca.uhn.fhir.rest.openapi.OpenApiInterceptor;
 import ca.uhn.fhir.rest.server.RestfulServer;
 import ca.uhn.fhir.rest.server.interceptor.CaptureResourceSourceFromHeaderInterceptor;
-import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
@@ -25,39 +24,39 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.util.*;
+import java.util.UUID;
 
 import static ca.uhn.fhir.rest.server.ServletRequestTracing.ATTRIBUTE_REQUEST_ID;
 
-@WebServlet(urlPatterns = { "/fhir/*" }, displayName = "Koppeltaal Resource Service")
+@WebServlet(urlPatterns = {"/fhir/*"}, displayName = "Koppeltaal Resource Service")
 public class KoppeltaalRestfulServer extends RestfulServer {
   private static final Logger ourLog = LoggerFactory.getLogger(KoppeltaalRestfulServer.class);
-	private static final long serialVersionUID = 1L;
+  private static final long serialVersionUID = 1L;
 
   @Autowired
   AppProperties appProperties;
   @Autowired
   Oauth2AccessTokenService oauth2AccessTokenService;
-	@Autowired
-	FhirServerSecurityConfiguration fhirServerSecurityConfiguration;
-	@Autowired
-	FhirServerAuditLogConfiguration fhirServerAuditLogConfiguration;
-	@Autowired
-	private SmartBackendServiceConfiguration smartBackendServiceConfiguration;
-	@Autowired
-	private AuditEventInterceptor auditEventInterceptor;
+  @Autowired
+  FhirServerSecurityConfiguration fhirServerSecurityConfiguration;
+  @Autowired
+  FhirServerAuditLogConfiguration fhirServerAuditLogConfiguration;
+  @Autowired
+  private SmartBackendServiceConfiguration smartBackendServiceConfiguration;
+  @Autowired
+  private AuditEventInterceptor auditEventInterceptor;
   @Autowired
   private InjectCorrelationIdInterceptor injectCorrelationIdInterceptor;
-	@Autowired
+  @Autowired
   private InjectTraceIdInterceptor injectTraceIdInterceptor;
-	@Autowired
-	private AuditEventSubscriptionInterceptor auditEventSubscriptionInterceptor;
+  @Autowired
+  private AuditEventSubscriptionInterceptor auditEventSubscriptionInterceptor;
 
-	@Autowired
-	private AuditEventIntergityInterceptor auditEventIntergityInterceptor;
+  @Autowired
+  private AuditEventIntergityInterceptor auditEventIntergityInterceptor;
 
-	@Autowired
-	private OpenApiConfiguration openApiConfiguration;
+  @Autowired
+  private OpenApiConfiguration openApiConfiguration;
 
   @Autowired
   private CapabilityStatementInterceptor capabilityStatementInterceptor;
@@ -75,63 +74,64 @@ public class KoppeltaalRestfulServer extends RestfulServer {
   @Autowired
   private IInterceptorService myInterceptorRegistry;
 
-	@Autowired
-	private EnforceHttpsSubscriptionEndpointInterceptor enforceHttpsSubscriptionEndpointInterceptor;
+  @Autowired
+  private EnforceHttpsSubscriptionEndpointInterceptor enforceHttpsSubscriptionEndpointInterceptor;
 
-	public KoppeltaalRestfulServer(FhirContext context) {
-		super(context);
-	}
+  public KoppeltaalRestfulServer(FhirContext context) {
+    super(context);
+  }
 
-	@Override
-	protected void initialize() {
+  @Override
+  protected void initialize() {
 
-		// Add your own customization here
+    // Add your own customization here
     registerInterceptor(mimeTypeInterceptor);
 
     IFhirResourceDao<Device> deviceDao = daoRegistry.getResourceDao(Device.class);
-		if (fhirServerSecurityConfiguration.isEnabled()) {
-			registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
+    if (fhirServerSecurityConfiguration.isEnabled()) {
+      registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
 
-			registerInterceptor(new InjectResourceOriginInterceptor(daoRegistry, deviceDao, smartBackendServiceConfiguration)); // can only determine this from the Bearer token
-			registerInterceptor(new ResourceOriginAuthorizationInterceptor(daoRegistry, deviceDao, smartBackendServiceConfiguration));
-			registerInterceptor(new ResourceOriginSearchNarrowingInterceptor(daoRegistry, deviceDao));
+      registerInterceptor(new InjectResourceOriginInterceptor(daoRegistry, deviceDao, smartBackendServiceConfiguration)); // can only determine this from the Bearer token
+      registerInterceptor(new ResourceOriginAuthorizationInterceptor(daoRegistry, deviceDao, smartBackendServiceConfiguration));
+      registerInterceptor(new ResourceOriginSearchNarrowingInterceptor(daoRegistry, deviceDao));
 
-		}
-			//The SubscriptionInterceptor is somehow not properly registered with `registerInterceptor`, but does work via the `interceptorService`
-			// Figured it out, there a 2 InterceptorService(s). One in the constructor of {@RestfulServer}:
-			// {code}
-			// new InterceptorService("RestfulServer")
-			// {code}
-			// And one JPA version. They both do DIFFERENT things. The horror.
-      SubscriptionNarrowingInterceptor subscriptionNarrowingInterceptor = new SubscriptionNarrowingInterceptor(daoRegistry);
-      myInterceptorRegistry.registerInterceptor(subscriptionNarrowingInterceptor);
-      registerInterceptor(subscriptionNarrowingInterceptor);
+    }
+    //The SubscriptionInterceptor is somehow not properly registered with `registerInterceptor`, but does work via the `interceptorService`
+    // Figured it out, there a 2 InterceptorService(s). One in the constructor of {@RestfulServer}:
+    // {code}
+    // new InterceptorService("RestfulServer")
+    // {code}
+    // And one JPA version. They both do DIFFERENT things. The horror.
+    SubscriptionNarrowingInterceptor subscriptionNarrowingInterceptor = new SubscriptionNarrowingInterceptor(daoRegistry);
+    myInterceptorRegistry.registerInterceptor(subscriptionNarrowingInterceptor);
+    registerInterceptor(subscriptionNarrowingInterceptor);
 
-		if (fhirServerAuditLogConfiguration.isEnabled()) {
-			registerInterceptor(auditEventInterceptor);
+    if (fhirServerAuditLogConfiguration.isEnabled()) {
+      registerInterceptor(auditEventInterceptor);
       registerInterceptor(injectCorrelationIdInterceptor);
       registerInterceptor(injectTraceIdInterceptor);
-			// Yes, this is ANOTHER interceptor.
+      // Yes, this is ANOTHER interceptor.
+      myInterceptorRegistry.registerInterceptor(injectTraceIdInterceptor);
       myInterceptorRegistry.registerInterceptor(auditEventSubscriptionInterceptor);
-			registerInterceptor(auditEventSubscriptionInterceptor);
-			registerInterceptor(auditEventIntergityInterceptor);
-		}
+      registerInterceptor(auditEventSubscriptionInterceptor);
+      registerInterceptor(auditEventIntergityInterceptor);
+    }
 
     registerInterceptor(capabilityStatementInterceptor);
 
-		registerInterceptor(new EnforceIfMatchHeaderInterceptor());
-		registerInterceptor(new Oauth2UrisStatementInterceptorForR4(fhirServerSecurityConfiguration));
+    registerInterceptor(new EnforceIfMatchHeaderInterceptor());
+    registerInterceptor(new Oauth2UrisStatementInterceptorForR4(fhirServerSecurityConfiguration));
 
-		//  Allow users to set the meta.source with the "X-Request-Source" header
-		registerInterceptor(new CaptureResourceSourceFromHeaderInterceptor(getFhirContext()));
+    //  Allow users to set the meta.source with the "X-Request-Source" header
+    registerInterceptor(new CaptureResourceSourceFromHeaderInterceptor(getFhirContext()));
 
-		// Register our custom structured definitions
+    // Register our custom structured definitions
 //		registerInterceptor(factory.build());
 
-		// Register the OpenApi Interceptor
-		if (openApiConfiguration.isEnabled()) {
-			registerInterceptor(new OpenApiInterceptor());
-		}
+    // Register the OpenApi Interceptor
+    if (openApiConfiguration.isEnabled()) {
+      registerInterceptor(new OpenApiInterceptor());
+    }
 
     // Disable referential integrity for AuditEvent.entity.what
     referentialIntegrityDeleteInterceptor.addPath("AuditEvent.entity.what");
@@ -139,18 +139,18 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 
     registerInterceptor(new DefaultDescendingSortInterceptor());
 
-	registerInterceptor(new ValidSubTaskInterceptor());
+    registerInterceptor(new ValidSubTaskInterceptor());
 
-	registerInterceptor(enforceHttpsSubscriptionEndpointInterceptor);
+    registerInterceptor(enforceHttpsSubscriptionEndpointInterceptor);
 
     jpaStorageSettings.setResourceServerIdStrategy(JpaStorageSettings.IdStrategyEnum.UUID);
-	}
+  }
 
   @Override
   protected String getOrCreateRequestId(HttpServletRequest theRequest) {
     String requestId = (String) theRequest.getAttribute(ATTRIBUTE_REQUEST_ID);
 
-    if(StringUtils.isNotBlank(requestId)) return requestId;
+    if (StringUtils.isNotBlank(requestId)) return requestId;
 
     return UUID.randomUUID().toString();
   }

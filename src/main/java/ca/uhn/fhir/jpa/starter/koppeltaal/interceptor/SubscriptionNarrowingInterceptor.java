@@ -44,6 +44,7 @@ public class SubscriptionNarrowingInterceptor {
 
 		try {
 			final IBaseResource payload = message.getPayload(context);
+      String transId = message.getTransactionId();
 
 			final IIdType canonicalSubscriptionIdElement = canonicalSubscription.getIdElement(context);
       SystemRequestDetails theRequestDetails = new SystemRequestDetails();

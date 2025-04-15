@@ -15,6 +15,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.jpa.subscription.model.CanonicalSubscription;
 import ca.uhn.fhir.jpa.subscription.model.ResourceDeliveryMessage;
 import ca.uhn.fhir.rest.api.server.SystemRequestDetails;
+import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
@@ -22,9 +23,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 import static ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.InjectCorrelationIdInterceptor.CORRELATION_HEADER_KEY;
 import static ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.InjectTraceIdInterceptor.TRACE_ID_HEADER_KEY;
@@ -42,7 +42,7 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
   private final IFhirResourceDao<Subscription> subscriptionDao;
 
   public AuditEventSubscriptionInterceptor(DaoRegistry daoRegistry, AuditEventService auditEventService,
-      FhirContext fhirContext, RequestIdHolder requestIdHolder) {
+                                           FhirContext fhirContext, RequestIdHolder requestIdHolder) {
     super(auditEventService, daoRegistry);
     this.fhirContext = fhirContext;
     this.requestIdHolder = requestIdHolder;
@@ -60,19 +60,32 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
   }
 
   private void createSubscriptionAuditEvent(ResourceDeliveryMessage message, Exception exception) {
-    String traceId = message.getTransactionId();
 
     CanonicalSubscription canonicalSubscription = message.getSubscription();
+    // Firstly, retrieve the tracing headers from the actual delivered message, so we know for sure that they match what has been sent
+    List<String> headers = canonicalSubscription.getHeaders();
 
-    LOG.info("Starting AuditEvent creation for subscription with trade id [{}]", traceId);
+    String traceId = headers.stream()
+      .filter(head -> head.startsWith(TRACE_ID_HEADER_KEY))
+      .map(keyValue -> StringUtils.substringAfter(keyValue, TRACE_ID_HEADER_KEY + ": "))
+      .findFirst().orElseThrow(() -> new IllegalStateException("No trace-id found"));
 
-    String requestId = UUID.randomUUID().toString(); // async, so always generate a new requestId
+    String requestId = headers.stream()
+      .filter(head -> head.startsWith(HEADER_REQUEST_ID))
+      .map(keyValue -> StringUtils.substringAfter(keyValue, HEADER_REQUEST_ID + ": "))
+      .findFirst().orElseThrow(() -> new IllegalStateException("No request-id found"));
 
-    Optional<String> correlationIdOptional = requestIdHolder.getRequestId(traceId);
+    Optional<String> correlationIdOptional = headers.stream()
+      .filter(head -> head.startsWith(CORRELATION_HEADER_KEY))
+      .map(keyValue -> StringUtils.substringAfter(keyValue, CORRELATION_HEADER_KEY + ": "))
+      .findFirst();
+
+    LOG.info("Delivered subscription for traceId {}. Creating AuditEvent", traceId);
+
+
+    LOG.info("Starting AuditEvent creation for subscription with trace id [{}]", traceId);
 
     Resource resource = (Resource) message.getPayload(fhirContext);
-
-    setTraceAndRequestIdHeaders(canonicalSubscription, traceId, requestId, correlationIdOptional);
 
     if (!(resource instanceof AuditEvent)) {
       AuditEventDto dto = new AuditEventDto();
@@ -80,7 +93,7 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
       dto.setTraceId(traceId);
       dto.setRequestId(requestId);
       correlationIdOptional
-          .ifPresent(dto::setCorrelationId);
+        .ifPresent(dto::setCorrelationId);
 
       if (exception != null) {
         dto.setOutcome("4");
@@ -93,20 +106,20 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
       dto.setDateTime(new Date());
 
       Optional<IdType> resourceOriginDeviceId = correlationIdOptional.isPresent()
-          ? requestIdHolder.getRequestingDeviceIdType(correlationIdOptional.get())
-          : Optional.empty();
+        ? requestIdHolder.getRequestingDeviceIdType(correlationIdOptional.get())
+        : Optional.empty();
 
       resourceOriginDeviceId
-          .ifPresent(id -> dto.addAgent(new Reference(id), AuditEventBuilder.CODING_SOURCE_ROLE_ID, true));
+        .ifPresent(id -> dto.addAgent(new Reference(id), AuditEventBuilder.CODING_SOURCE_ROLE_ID, true));
 
-      SystemRequestDetails requestDetails = newSystemRequestDetails(traceId);
+      SystemRequestDetails requestDetails = newSystemRequestDetails();
 
       IIdType subscriptionId = canonicalSubscription.getIdElement(fhirContext);
       Subscription subscription = subscriptionDao.read(subscriptionId, requestDetails, true);
       if (subscription != null) {
         Optional<IIdType> subscriptionDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(subscription);
         subscriptionDeviceId
-            .ifPresent(id -> dto.addAgent(new Reference(id), AuditEventBuilder.CODING_DESTINATION_ROLE_ID, false));
+          .ifPresent(id -> dto.addAgent(new Reference(id), AuditEventBuilder.CODING_DESTINATION_ROLE_ID, false));
         dto.addResource(new Reference(subscription));
       }
 
@@ -118,40 +131,9 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
     }
   }
 
-  private SystemRequestDetails newSystemRequestDetails(String traceId) {
-    Optional<String> tenantId = requestIdHolder.getTenantId(traceId);
-    SystemRequestDetails details = new SystemRequestDetails();
-    if (tenantId.isPresent()) {
-      String id = tenantId.get();
-      details.setTenantId(id);
-      RequestPartitionId partitionId = RequestPartitionId.fromPartitionName(id);
-      details.setRequestPartitionId(partitionId);
-    } else {
-      RequestPartitionId partitionId = RequestPartitionId.defaultPartition();
-      details.setRequestPartitionId(partitionId);
-    }
-    return details;
+  private SystemRequestDetails newSystemRequestDetails() {
+    return
+      new SystemRequestDetails()
+        .setRequestPartitionId(RequestPartitionId.defaultPartition());
   }
-
-  private void setTraceAndRequestIdHeaders(CanonicalSubscription canonicalSubscription, String transactionId,
-      String requestId, Optional<String> correlationIdOptional) {
-    // There is no access to the response headers on the HttpServletResponse for
-    // subscriptions. Adding them in-memory to the subscription headers.
-    // Cleaning up to make sure the previous in-memory results aren't sent as well
-    canonicalSubscription.setHeaders(
-        canonicalSubscription.getHeaders().stream()
-          .filter(header ->
-            !header.startsWith(TRACE_ID_HEADER_KEY)
-            && !header.startsWith(HEADER_REQUEST_ID)
-            && !header.startsWith(CORRELATION_HEADER_KEY)
-          )
-            .map(StringType::new)
-            .collect(Collectors.toList()));
-
-    canonicalSubscription.addHeader(TRACE_ID_HEADER_KEY + ": " + transactionId);
-    canonicalSubscription.addHeader(HEADER_REQUEST_ID + ": " + requestId);
-    correlationIdOptional
-        .ifPresent(correlationId -> canonicalSubscription.addHeader(CORRELATION_HEADER_KEY + ": " + correlationId));
-  }
-
 }

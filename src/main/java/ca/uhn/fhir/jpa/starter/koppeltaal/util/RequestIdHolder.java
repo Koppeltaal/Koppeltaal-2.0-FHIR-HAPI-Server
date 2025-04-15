@@ -22,16 +22,14 @@ public class RequestIdHolder {
   private static final Logger LOG = LoggerFactory.getLogger(RequestIdHolder.class);
 
   private final Map<String, String> traceIdToRequestIdMap = new HashMap<>();
-  private final Map<String, String> traceIdToTenantIdMap = new HashMap<>();
   private final Map<String, IdType> requestIdToRequestingDeviceIdTypeMap = new HashMap<>();
 
-  public void addMapping(String traceId, String requestId, String tenantId, Optional<Device> requestingDevice) {
-    LOG.info("Mapping trace id [{}] to request id [{}] and tenant id [{}] initiated by resource-origin device ref [{}]",
-        traceId, requestId, tenantId,
+  public void addMapping(String traceId, String requestId, Optional<Device> requestingDevice) {
+    LOG.info("Mapping trace id [{}] to request id [{}] initiated by resource-origin device ref [{}]",
+        traceId, requestId,
         requestingDevice.isPresent() ? requestingDevice.get().getIdElement().getValue() : "no requesting device found");
 
     traceIdToRequestIdMap.put(traceId, requestId);
-    traceIdToTenantIdMap.put(traceId, tenantId);
 
     requestingDevice.ifPresent((device) -> requestIdToRequestingDeviceIdTypeMap.put(requestId, device.getIdElement()));
 
@@ -52,20 +50,6 @@ public class RequestIdHolder {
     return Optional.empty();
   }
 
-  public Optional<String> getTenantId(String traceId) {
-
-    boolean hasTenantId = traceIdToTenantIdMap.containsKey(traceId);
-
-    if(hasTenantId) {
-      String requestId = traceIdToTenantIdMap.get(traceId);
-      LOG.info("Found request id [{}] found based on tenant id [{}]", requestId, traceId);
-      return Optional.of(requestId);
-    }
-
-    LOG.info("Did not find tenant id based on trace id [{}]", traceId);
-    return Optional.empty();
-  }
-
   public Optional<IdType> getRequestingDeviceIdType(String requestId) {
     return Optional.ofNullable(requestIdToRequestingDeviceIdTypeMap.get(requestId));
   }
@@ -74,7 +58,6 @@ public class RequestIdHolder {
     LOG.info("Clearing request and tenant id mapped to trace id [{}] and resource-origins mapped to request-id [{}]",
         traceId, requestId);
     traceIdToRequestIdMap.remove(traceId);
-    traceIdToTenantIdMap.remove(traceId);
     requestIdToRequestingDeviceIdTypeMap.remove(requestId);
   }
 

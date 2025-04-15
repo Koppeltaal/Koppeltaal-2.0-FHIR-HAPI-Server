@@ -127,8 +127,7 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
     String requestId = requestDetails.getRequestId();
     Optional<Device> requestingDevice = ResourceOriginUtil.getDevice(requestDetails, deviceDao);
 
-    requestIdHolder.addMapping(requestDetails.getTransactionGuid(), requestId, requestDetails.getTenantId(),
-        requestingDevice);
+    requestIdHolder.addMapping(requestDetails.getTransactionGuid(), requestId, requestingDevice);
 
     LOG.info(String.format("Incoming request, traceId='%s', requestId='%s', correlationId='%s'",
         requestDetails.getTransactionGuid(), requestId, requestDetails.getUserData().get("correlationId")));
