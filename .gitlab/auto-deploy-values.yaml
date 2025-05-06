@@ -32,7 +32,3 @@ persistence:
     volumes[0].mount.path: /data/lucene
 
 strategyType: Recreate
-
-resources:
-  requests:
-    memory: 4G
