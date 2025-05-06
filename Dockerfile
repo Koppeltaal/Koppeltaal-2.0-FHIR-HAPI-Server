@@ -43,6 +43,7 @@ FROM gcr.io/distroless/java17-debian12:latest AS default
 COPY --from=build-distroless /app /app
 
 COPY certificates/ximulator12.test.aorta-zorg.nl.cer /tmp/ximulator12.test.aorta-zorg.nl.cer
+COPY certificates/notificaties.test.aorta-zorg.nl.cer /tmp/notificaties.test.aorta-zorg.nl.cer
 
 # tmp swap to root user to install a certificate
 #USER 0
@@ -58,6 +59,20 @@ RUN [\
  "ximulator12.test.aorta-zorg.nl",\
  "-file",\
  "/tmp/ximulator12.test.aorta-zorg.nl.cer"\
+]
+
+RUN [\
+ "/usr/lib/jvm/java-17-openjdk-amd64/bin/keytool",\
+ "-import",\
+ "-trustcacerts",\
+ "-cacerts",\
+ "-noprompt",\
+ "-storepass",\
+ "changeit",\
+ "-alias",\
+ "ximulator12.test.aorta-zorg.nl",\
+ "-file",\
+ "/tmp/notificaties.test.aorta-zorg.nl.cer"\
 ]
 
 # 65532 is the nonroot user's uid
