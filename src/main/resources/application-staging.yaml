@@ -5,9 +5,9 @@ spring:
       hibernate.search.backend.type: lucene
       hibernate.search.backend.analysis.configurer: ca.uhn.fhir.jpa.search.HapiHSearchAnalysisConfigurers$HapiLuceneAnalysisConfigurer
       hibernate.search.backend.directory.type: local-filesystem
-      hibernate.search.backend.directory.root: /pvc-mount/staging/lucene/
+      hibernate.search.backend.directory.root: /pvc-mount/staging/lucene.v8/
       hibernate.search.automatic_indexing.synchronization.strategy: read-sync
-      hibernate.search.backend.lucene_version: LUCENE_87
+      hibernate.search.backend.lucene_version: lucene_current
 
 fhir:
   server:
