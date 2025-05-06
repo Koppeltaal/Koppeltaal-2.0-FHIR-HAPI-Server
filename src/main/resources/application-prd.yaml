@@ -15,7 +15,7 @@ fhir:
       issuer: https://auth-service.koppeltaal.headease.nl
 hapi:
   fhir:
-    advanced-lucene-indexing: false
+    advanced-lucene-indexing: true
 
 smart:
   configuration:
