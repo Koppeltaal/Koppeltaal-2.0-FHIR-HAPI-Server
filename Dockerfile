@@ -70,7 +70,7 @@ RUN [\
  "-storepass",\
  "changeit",\
  "-alias",\
- "ximulator12.test.aorta-zorg.nl",\
+ "notificaties.test.aorta-zorg.nl",\
  "-file",\
  "/tmp/notificaties.test.aorta-zorg.nl.cer"\
 ]
