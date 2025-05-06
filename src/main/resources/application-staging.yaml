@@ -13,9 +13,6 @@ fhir:
   server:
     security:
       issuer: https://staging-auth-service.koppeltaal.headease.nl
-hapi:
-  fhir:
-    advanced-lucene-indexing: true
 
 smart:
   configuration:
