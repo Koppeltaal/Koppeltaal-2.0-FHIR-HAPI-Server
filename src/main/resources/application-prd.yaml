@@ -1,7 +1,7 @@
 spring:
   jpa:
     properties:
-      hibernate.search.enabled: true
+      hibernate.search.enabled: false
       hibernate.search.backend.type: lucene
       hibernate.search.backend.analysis.configurer: ca.uhn.fhir.jpa.search.HapiHSearchAnalysisConfigurers$HapiLuceneAnalysisConfigurer
       hibernate.search.backend.directory.type: local-filesystem
@@ -13,9 +13,6 @@ fhir:
   server:
     security:
       issuer: https://auth-service.koppeltaal.headease.nl
-hapi:
-  fhir:
-    advanced-lucene-indexing: true
 
 smart:
   configuration:
