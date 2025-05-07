@@ -68,6 +68,8 @@ public class RepositoryValidationInterceptorFactoryR4 implements IRepositoryVali
       });
     }
 
+    this.build();
+
     List<IRepositoryValidatingRule> rules = repositoryValidatingRuleBuilder.build();
     return new RepositoryValidatingInterceptor(fhirContext, rules);
   }
