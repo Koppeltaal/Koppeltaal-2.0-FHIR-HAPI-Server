@@ -22,20 +22,19 @@ import static ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.CapabilityStatement
 @Interceptor
 @Component
 public class MimeTypeInterceptor {
-	private static final Logger LOG = LoggerFactory.getLogger(MimeTypeInterceptor.class);
+  private static final Logger LOG = LoggerFactory.getLogger(MimeTypeInterceptor.class);
 
-
-	@Hook(Pointcut.SERVER_INCOMING_REQUEST_PRE_PROCESSED)
-	protected void ensureMimeTypeIsSupported(HttpServletRequest request, HttpServletResponse response) throws IOException {
-    validateMineTypeSupport(HttpHeaders.CONTENT_TYPE, request);
-    validateMineTypeSupport(HttpHeaders.ACCEPT, request);
+  @Hook(Pointcut.SERVER_INCOMING_REQUEST_PRE_PROCESSED)
+  protected void ensureMimeTypeIsSupported(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    validateMineTypeSupport(HttpHeaders.CONTENT_TYPE, request, 415);
+    validateMineTypeSupport(HttpHeaders.ACCEPT, request, 406);
   }
 
-  private static void validateMineTypeSupport(String header, HttpServletRequest request) {
+  private static void validateMineTypeSupport(String header, HttpServletRequest request, int errorStatusCode) {
 
     String rawHeaderValue = request.getHeader(header);
 
-    if(StringUtils.isBlank(rawHeaderValue)) return; //server defaults to application/fhir+json
+    if (StringUtils.isBlank(rawHeaderValue)) return; //server defaults to application/fhir+json
 
     String[] headerValues = rawHeaderValue.split(",");
 
@@ -44,10 +43,10 @@ public class MimeTypeInterceptor {
 
     for (String headerValue : headerValues) {
 
-      // the Accept header can contain additional information, seperated with a semicolon
+      // the Accept header can contain additional information, separated with a semicolon
       headerValue = StringUtils.substringBefore(headerValue, ";");
 
-      if(
+      if (
         ("PATCH".equals(request.getMethod()) && SUPPORTED_PATCH_MIME_TYPES.contains(headerValue)) ||
           (!"PATCH".equals(request.getMethod()) && SUPPORTED_MIME_TYPES.contains(headerValue))
       ) {
@@ -61,15 +60,15 @@ public class MimeTypeInterceptor {
       }
     }
 
-    if(foundSupported) return;
+    if (foundSupported) return;
 
-    if(foundUnsupported) {
+    if (foundUnsupported) {
       LOG.warn("Client sent known unsupported Accept header value: [{}]", rawHeaderValue);
-      throw new UnclassifiedServerFailureException(415, String.format("Unsupported Media Type [%s] provided in header [%s]. Supported media types are %s", rawHeaderValue, header, SUPPORTED_MIME_TYPES));
+      throw new UnclassifiedServerFailureException(errorStatusCode, String.format("Unsupported Media Type [%s] provided in header [%s]. Supported media types are %s", rawHeaderValue, header, SUPPORTED_MIME_TYPES));
     }
 
     //alternatively, we don't mark the mime type as unknown
-    throw new UnclassifiedServerFailureException(415, String.format("Unknown Media Type [%s] provided in header [%s]. Supported media types are %s", rawHeaderValue, header, SUPPORTED_MIME_TYPES));
+    throw new UnclassifiedServerFailureException(errorStatusCode, String.format("Unknown Media Type [%s] provided in header [%s]. Supported media types are %s", rawHeaderValue, header, SUPPORTED_MIME_TYPES));
   }
 
 }
