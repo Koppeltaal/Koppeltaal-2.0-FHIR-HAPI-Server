@@ -69,7 +69,7 @@ public class MimeTypeInterceptor {
     }
 
     //alternatively, we don't mark the mime type as unknown
-    throw new UnclassifiedServerFailureException(400, String.format("Unknown Media Type [%s] provided in header [%s]. Supported media types are %s", rawHeaderValue, header, SUPPORTED_MIME_TYPES));
-    }
+    throw new UnclassifiedServerFailureException(415, String.format("Unknown Media Type [%s] provided in header [%s]. Supported media types are %s", rawHeaderValue, header, SUPPORTED_MIME_TYPES));
+  }
 
 }
