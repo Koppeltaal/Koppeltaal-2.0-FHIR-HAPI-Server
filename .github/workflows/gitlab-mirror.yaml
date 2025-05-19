@@ -1,0 +1,42 @@
+# .github/workflows/gitlab-mirror.yml
+# Mirrors **every** ref (branches, tags, deleted refs, Git LFS, etc.)
+# from GitHub → GitLab keeping authors/committers intact.
+name: Mirror to GitLab
+
+on:
+  push:
+    branches: [ '**' ]   # any branch
+    tags:     [ '**' ]   # any tag
+  delete:                # so branch/tag deletions propagate
+    branches: [ '**' ]
+    tags:     [ '**' ]
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+
+    env:
+      GITLAB_REMOTE: git@gitlab.com:headease/koppeltaal/kt2-hapi-server.git
+
+    steps:
+      - name: Check out *all* history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0         # required for a full mirror
+
+      - name: Start SSH agent & load GitLab key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.GITLAB_SSH_PRIVATE_KEY }}
+
+      - name: Push a mirror to GitLab
+        run: |
+          # Add (or update) the mirror remote
+          if git remote | grep -q '^gitlab$'; then
+            git remote set-url gitlab "$GITLAB_REMOTE"
+          else
+            git remote add gitlab "$GITLAB_REMOTE"
+          fi
+
+          # --mirror copies ALL refs; --prune removes ones we deleted
+          git push --mirror --prune gitlab
