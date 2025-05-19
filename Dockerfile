@@ -42,7 +42,7 @@ ENV ALLOW_EMPTY_PASSWORD=yes
 FROM gcr.io/distroless/java17-debian12:latest AS default
 COPY --from=build-distroless /app /app
 
-COPY certificates/notificaties.lsp.orangeclicks.nl /tmp/notificaties.lsp.orangeclicks.nl
+COPY certificates/notificaties.lsp.orangeclicks.nl.cer /tmp/notificaties.lsp.orangeclicks.nl.cer
 
 # tmp swap to root user to install a certificate
 #USER 0
