@@ -34,12 +34,19 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H gitlab.com >> ~/.ssh/known_hosts
 
-      - name: Push branches & tags to GitLab
+      - name: Push branches & tags to GitLab (with lease)
         run: |
-          # create / update gitlab remote if needed
-          git remote remove gitlab 2>/dev/null || true
-          git remote add gitlab "$GITLAB_REMOTE"
+          # 1. ensure remote exists
+          if git remote | grep -q '^gitlab$'; then
+            git remote set-url gitlab "$GITLAB_REMOTE"
+          else
+            git remote add gitlab "$GITLAB_REMOTE"
+          fi
 
-          # mirror branches then tags (no hidden refs)
+          # 2. pull the current tips for the lease comparison 
+          git fetch gitlab --prune
+
+          # 3. mirror real refs, protecting against unexpected changes on GitLab
           git push --prune --force-with-lease --all  gitlab
           git push --prune --force-with-lease --tags gitlab
+
