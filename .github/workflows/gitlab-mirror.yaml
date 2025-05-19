@@ -29,6 +29,11 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.GITLAB_SSH_PRIVATE_KEY }}
 
+      - name: Add GitLab.com to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H gitlab.com >> ~/.ssh/known_hosts
+
       - name: Push a mirror to GitLab
         run: |
           # Add (or update) the mirror remote
