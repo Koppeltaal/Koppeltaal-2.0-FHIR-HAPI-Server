@@ -34,14 +34,12 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H gitlab.com >> ~/.ssh/known_hosts
 
-      - name: Push a mirror to GitLab
+      - name: Push branches & tags to GitLab
         run: |
-          # Add (or update) the mirror remote
-          if git remote | grep -q '^gitlab$'; then
-            git remote set-url gitlab "$GITLAB_REMOTE"
-          else
-            git remote add gitlab "$GITLAB_REMOTE"
-          fi
+          # create / update gitlab remote if needed
+          git remote remove gitlab 2>/dev/null || true
+          git remote add gitlab "$GITLAB_REMOTE"
 
-          # --mirror copies ALL refs; --prune removes ones we deleted
-          git push --mirror --prune gitlab
+          # mirror branches then tags (no hidden refs)
+          git push --prune --force-with-lease --all  gitlab
+          git push --prune --force-with-lease --tags gitlab
