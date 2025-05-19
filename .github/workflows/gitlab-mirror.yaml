@@ -1,6 +1,4 @@
 # .github/workflows/gitlab-mirror.yml
-# Mirrors **every** ref (branches, tags, deleted refs, Git LFS, etc.)
-# from GitHub → GitLab keeping authors/committers intact.
 name: Mirror to GitLab
 
 on:
@@ -14,7 +12,6 @@ on:
 jobs:
   mirror:
     runs-on: ubuntu-latest
-
     env:
       GITLAB_REMOTE: git@gitlab.com:headease/koppeltaal/kt2-hapi-server.git
 
@@ -34,7 +31,7 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H gitlab.com >> ~/.ssh/known_hosts
 
-      - name: Push branches & tags to GitLab (with lease)
+      - name: Push branches & tags (force mirror)
         run: |
           # 1. ensure remote exists
           if git remote | grep -q '^gitlab$'; then
@@ -43,10 +40,6 @@ jobs:
             git remote add gitlab "$GITLAB_REMOTE"
           fi
 
-          # 2. pull the current tips for the lease comparison 
-          git fetch gitlab --prune
-
-          # 3. mirror real refs, protecting against unexpected changes on GitLab
-          git push --prune --force-with-lease --all  gitlab
-          git push --prune --force-with-lease --tags gitlab
-
+          # mirror branches, then tags; overwrite anything that differs
+          git push --prune --force --all  gitlab
+          git push --prune --force --tags gitlab
