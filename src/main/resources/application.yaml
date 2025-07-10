@@ -161,18 +161,19 @@ hapi:
     #    defer_indexing_for_codesystems_of_size: 101
     ### Flag is true by default. This flag filters resources during package installation, allowing only those resources with a valid status (e.g. active) to be installed.
     validate_resource_status_for_package_upload: false
+    ### Disable validation during package installation to bypass snapshot generation issues
+    iginstaller_validationenabled: false
     #    install_transitive_ig_dependencies: true
-    ### tells the server whether to attempt to load IG resources that are already present
-    reload_existing_implementationGuides : true
     implementationguides:
-    ###    example from registry (packages.fhir.org)
       kt2:
-        name: Koppeltaalv2.00
-        version: 0.14.0
+        name: koppeltaalv2.00
+        version: 1.4.5-beta.002
+        packageUrl: https://github.com/GIDSOpenStandaarden/Koppeltaal-2.0-FHIR/releases/download/v1.4.5-beta.002-minimal-test-beta-release-81/koppeltaalv2-1.4.5-beta.002-minimal.tgz
         fetchDependencies: true
+        installMode: STORE_ONLY
     #      example not from registry
     #      ips_1_0_0:
-    #        url: https://build.fhir.org/ig/HL7/fhir-ips/package.tgz
+    #        packageUrl: https://build.fhir.org/ig/HL7/fhir-ips/package.tgz
     #        name: hl7.fhir.uv.ips
     #        version: 1.0.0
     supported_resource_types:
