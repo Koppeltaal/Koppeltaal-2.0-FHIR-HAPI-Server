@@ -12,16 +12,25 @@ service:
 
 livenessProbe:
   path: /fhir/DEFAULT/.well-known/smart-configuration
+  initialDelaySeconds: 120
+  timeoutSeconds: 30
+  periodSeconds: 30
+  failureThreshold: 5
 
 readinessProbe:
   path: /fhir/DEFAULT/.well-known/smart-configuration
+  initialDelaySeconds: 60
+  timeoutSeconds: 15
+  periodSeconds: 30
+  failureThreshold: 10
 
 startupProbe:
   enabled: true
   path: /fhir/DEFAULT/.well-known/smart-configuration
-  initialDelaySeconds: 30
-  periodSeconds: 10
-  failureThreshold: 90
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 15
+  failureThreshold: 180
 
 # AD PV & PVC creation to mount Lucene db
 persistence:
@@ -36,3 +45,5 @@ strategyType: Recreate
 resources:
   requests:
     memory: 6G
+  limits:
+    memory: 10G
