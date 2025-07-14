@@ -31,6 +31,7 @@ import ca.uhn.fhir.jpa.ips.provider.IpsOperationProvider;
 import ca.uhn.fhir.jpa.model.config.SubscriptionSettings;
 import ca.uhn.fhir.jpa.packages.IPackageInstallerSvc;
 import ca.uhn.fhir.jpa.packages.PackageInstallationSpec;
+import ca.uhn.fhir.jpa.starter.koppeltaal.service.PackageInstallerWithExclusionSvcImpl;
 import ca.uhn.fhir.jpa.provider.DaoRegistryResourceSupportedSvc;
 import ca.uhn.fhir.jpa.provider.IJpaSystemProvider;
 import ca.uhn.fhir.jpa.provider.JpaCapabilityStatementProvider;
@@ -201,17 +202,13 @@ public class StarterJpaConfig {
 		return loggingInterceptor;
 	}
 
-//  @Bean
-//  public IPackageInstallerSvc packageInstallerSvc(PackageInstallerWithExclusionSvcImpl packageInstallerWithExclusionSvc) {
-//    return packageInstallerWithExclusionSvc;
-//  }
 
 	@Bean("packageInstaller")
 	@Primary
 	@Conditional(OnImplementationGuidesPresent.class)
 	public IPackageInstallerSvc packageInstaller(
 			AppProperties appProperties,
-			IPackageInstallerSvc packageInstallerSvc,
+			PackageInstallerWithExclusionSvcImpl packageInstallerSvc,
 			Batch2JobRegisterer batch2JobRegisterer) {
 
 		batch2JobRegisterer.start();
@@ -228,6 +225,13 @@ public class StarterJpaConfig {
 							.addDependencyExclude("hl7.fhir.r4.core")
 							.addDependencyExclude("hl7.fhir.r5.core");
 				}
+				
+				// Filter out Binary resources to avoid varchar(4000) database errors
+				// Only install configuration and definition resources, skip example instances
+				packageInstallationSpec.addInstallResourceTypes(
+					"StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter",
+					"CapabilityStatement", "OperationDefinition", "ConceptMap", "NamingSystem"
+				);
 				packageInstallerSvc.install(packageInstallationSpec);
 			}
 		}
@@ -303,11 +307,17 @@ public class StarterJpaConfig {
 
 		List<String> supportedResourceTypes = appProperties.getSupported_resource_types();
 
+		// Debug logging to check what resource types are configured
+		ourLog.info("Configured supported resource types: {}", supportedResourceTypes);
+
 		if (!supportedResourceTypes.isEmpty()) {
 			if (!supportedResourceTypes.contains("SearchParameter")) {
 				supportedResourceTypes.add("SearchParameter");
 			}
+			ourLog.info("Setting supported resource types in DaoRegistry: {}", supportedResourceTypes);
 			daoRegistry.setSupportedResourceTypes(supportedResourceTypes);
+		} else {
+			ourLog.warn("No supported resource types configured - all resource types will be enabled");
 		}
 
 		if (appProperties.getNarrative_enabled()) {
