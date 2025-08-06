@@ -154,3 +154,13 @@ Create the JDBC URL from the host, port and database name.
 {{- define "imagePullSecret" }}
 {{- printf "{\"auths\": {\"%s\": {\"auth\": \"%s\"}}}" .Values.imagePullSecrets.registry (printf "%s:%s" .Values.imagePullSecrets.username .Values.imagePullSecrets.password | b64enc) | b64enc }}
 {{- end }}
+
+{{/*
+Get the container image for the wait-for-db init container
+*/}}
+{{- define "hapi-fhir-jpaserver.waitForDatabaseInitContainerImage" -}}
+{{- $registry := .Values.waitForDatabaseInitContainer.image.registry -}}
+{{- $repository := .Values.waitForDatabaseInitContainer.image.repository -}}
+{{- $tag := .Values.waitForDatabaseInitContainer.image.tag -}}
+{{ printf "%s/%s:%s" $registry $repository $tag}}
+{{- end -}}

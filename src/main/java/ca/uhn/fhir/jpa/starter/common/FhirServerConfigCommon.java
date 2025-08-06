@@ -97,9 +97,9 @@ public class FhirServerConfigCommon {
 		ourLog.info("Server configured for pre-expand value set default count of "
 				+ (appProperties.getPre_expand_value_sets_default_count().toString()));
 		ourLog.info("Server configured for pre-expand value set max count of "
-				+ (appProperties.getPre_expand_value_sets_default_count().toString()));
+				+ (appProperties.getPre_expand_value_sets_max_count().toString()));
 		ourLog.info("Server configured for maximum expansion size of "
-				+ (appProperties.getPre_expand_value_sets_default_count().toString()));
+				+ (appProperties.getMaximum_expansion_size().toString()));
 	}
 
 	@Bean
@@ -156,8 +156,8 @@ public class FhirServerConfigCommon {
 
 		jpaStorageSettings.setPreExpandValueSets(appProperties.getPre_expand_value_sets());
 		jpaStorageSettings.setEnableTaskPreExpandValueSets(appProperties.getEnable_task_pre_expand_value_sets());
-		jpaStorageSettings.setPreExpandValueSetsDefaultCount(appProperties.getPre_expand_value_sets_default_count());
 		jpaStorageSettings.setPreExpandValueSetsMaxCount(appProperties.getPre_expand_value_sets_max_count());
+		jpaStorageSettings.setPreExpandValueSetsDefaultCount(appProperties.getPre_expand_value_sets_default_count());
 		jpaStorageSettings.setMaximumExpansionSize(appProperties.getMaximum_expansion_size());
 
 		jpaStorageSettings.setIndexMissingFields(
@@ -201,6 +201,7 @@ public class FhirServerConfigCommon {
 
 		jpaStorageSettings.setFilterParameterEnabled(appProperties.getFilter_search_enabled());
 		jpaStorageSettings.setHibernateSearchIndexSearchParams(appProperties.getAdvanced_lucene_indexing());
+		// Keep our custom setting for full text indexing enabled
 		jpaStorageSettings.setHibernateSearchIndexFullText(true);
 		jpaStorageSettings.setTreatBaseUrlsAsLocal(new HashSet<>(appProperties.getLocal_base_urls()));
 		jpaStorageSettings.setTreatReferencesAsLogical(new HashSet<>(appProperties.getLogical_urls()));
@@ -253,6 +254,10 @@ public class FhirServerConfigCommon {
 		// Parallel Batch GET execution settings
 		jpaStorageSettings.setBundleBatchPoolSize(appProperties.getBundle_batch_pool_size());
 		jpaStorageSettings.setBundleBatchPoolSize(appProperties.getBundle_batch_pool_max_size());
+
+		// Set store meta source information
+		ourLog.debug("Server configured to Store Meta Source: {}", appProperties.getStore_meta_source_information());
+		jpaStorageSettings.setStoreMetaSourceInformation(appProperties.getStore_meta_source_information());
 
 		storageSettings(appProperties, jpaStorageSettings);
 		return jpaStorageSettings;

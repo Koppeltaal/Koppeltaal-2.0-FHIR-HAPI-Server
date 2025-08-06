@@ -33,6 +33,7 @@ import ca.uhn.fhir.jpa.packages.IPackageInstallerSvc;
 import ca.uhn.fhir.jpa.packages.PackageInstallationSpec;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.PackageInstallerWithExclusionSvcImpl;
 import ca.uhn.fhir.jpa.provider.DaoRegistryResourceSupportedSvc;
+import ca.uhn.fhir.jpa.provider.DiffProvider;
 import ca.uhn.fhir.jpa.provider.IJpaSystemProvider;
 import ca.uhn.fhir.jpa.provider.JpaCapabilityStatementProvider;
 import ca.uhn.fhir.jpa.provider.JpaConformanceProviderDstu2;
@@ -301,7 +302,8 @@ public class StarterJpaConfig {
 			ThreadSafeResourceDeleterSvc theThreadSafeResourceDeleterSvc,
 			ApplicationContext appContext,
 			Optional<IpsOperationProvider> theIpsOperationProvider,
-			Optional<IImplementationGuideOperationProvider> implementationGuideOperationProvider) {
+			Optional<IImplementationGuideOperationProvider> implementationGuideOperationProvider,
+			DiffProvider diffProvider) {
 //		RestfulServer fhirServer = new RestfulServer(fhirSystemDao.getContext());
     RestfulServer fhirServer = new KoppeltaalRestfulServer(fhirSystemDao.getContext());
 
@@ -477,6 +479,9 @@ public class StarterJpaConfig {
 
 		// Validation
 		repositoryValidatingInterceptor.ifPresent(fhirServer::registerInterceptor);
+
+		// Diff Provider
+		fhirServer.registerProvider(diffProvider);
 
 		// register custom interceptors
 		registerCustomInterceptors(fhirServer, appContext, appProperties.getCustomInterceptorClasses());
