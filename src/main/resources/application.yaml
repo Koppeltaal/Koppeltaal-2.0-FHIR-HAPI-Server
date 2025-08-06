@@ -187,6 +187,7 @@ hapi:
       - Device
       - Endpoint
       - NamingSystem
+      - OperationOutcome
       - Organization
       - Patient
       - Practitioner
@@ -223,6 +224,8 @@ hapi:
     ###  !!Extended Lucene/Elasticsearch Indexing is still a experimental feature, expect some features (e.g. _total=accurate) to not work as expected!!
     ###  more information here: https://hapifhir.io/hapi-fhir/docs/server_jpa/elastic.html
     advanced_lucene_indexing: true
+    search_index_full_text_enabled: false
+    bulk_export_enabled: false
     bulk_import_enabled: false
     #    language_search_parameter_enabled: true
     #    enforce_referential_integrity_on_delete: false
@@ -258,10 +261,11 @@ hapi:
       - https://unitsofmeasure.org/*
       - http://loinc.org/*
       - https://loinc.org/*
-      #    partitioning:
-      #      allow_references_across_partitions: false
-      #      partitioning_include_in_search_hashes: false
-      #      conditional_create_duplicate_identifiers_enabled: false
+    #    partitioning:
+    #      allow_references_across_partitions: false
+    #      partitioning_include_in_search_hashes: false
+    #      conditional_create_duplicate_identifiers_enabled: false
+    #      request_tenant_partitioning_mode: true
     cors:
       allow_Credentials: true
       # These are allowed_origin patterns, see: https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/cors/CorsConfiguration.html#setAllowedOriginPatterns-java.util.List-
@@ -294,28 +298,41 @@ hapi:
     # or will be instantiated via reflection using an no-arg contructor; then registered with the server
     #custom-interceptor-classes:
 
-    # comma-separated list of fully qualified provider classes.
-    # classes listed here will be fetched from the Spring context when combined with 'custom-bean-packages',
-    # or will be instantiated via reflection using an no-arg contructor; then registered with the server
-    #custom-provider-classes:
-
+    # comma-separated list of fully qualified provider classes. 
+    # classes listed here will be fetched from the Spring context when combined with 'custom-bean-packages', 
+    # or will be instantiated via reflection using an no-arg contructor; then registered with the server  
+    #custom-provider-classes:  
+    # specify what should be stored in meta.source based on StoreMetaSourceInformationEnum defaults to NONE
+    # store_meta_source_information: NONE
     # Threadpool size for BATCH'ed GETs in a bundle.
     #    bundle_batch_pool_size: 10
     #    bundle_batch_pool_max_size: 50
 
-#    logger:
-#      error_format: 'ERROR - ${requestVerb} ${requestUrl}'
-#      format: >-
-#        Path[${servletPath}] Source[${requestHeader.x-forwarded-for}]
-#        Operation[${operationType} ${operationName} ${idOrResourceName}]
-#        UA[${requestHeader.user-agent}] Params[${requestParameters}]
-#        ResponseEncoding[${responseEncodingNoDefault}]
-#      log_exceptions: true
-#      name: fhirtest.access
-#    max_binary_size: 104857600
+    #    logger:
+    #      error_format: 'ERROR - ${requestVerb} ${requestUrl}'
+    #      format: >-
+    #        Path[${servletPath}] Source[${requestHeader.x-forwarded-for}]
+    #        Operation[${operationType} ${operationName} ${idOrResourceName}]
+    #        UA[${requestHeader.user-agent}] Params[${requestParameters}]
+    #        ResponseEncoding[${responseEncodingNoDefault}]
+    #      log_exceptions: true
+    #      name: fhirtest.access
+    #    max_binary_size: 104857600
     max_page_size: 200
     retain_cached_searches_mins: 60
     reuse_cached_search_results_millis: 0
+    # The remote_terminology_service block is commented out by default because it requires external terminology service endpoints.
+    # Uncomment and configure the block below if you need to enable remote terminology validation or mapping.
+    #remote_terminology_service:
+    #  all:
+    #    system: '*'
+    #    url: 'https://tx.fhir.org/r4/'
+    #  snomed:
+    #    system: 'http://snomed.info/sct'
+    #    url: 'https://tx.fhir.org/r4/'
+    #  loinc:
+    #    system: 'http://loinc.org'
+    #    url: 'https://hapi.fhir.org/baseR4/'
     tester:
       home:
         name: Local Tester
@@ -332,7 +349,6 @@ hapi:
       responses_enabled: false
 #    binary_storage_enabled: true
     inline_resource_storage_below_size: 4000
-    bulk_export_enabled: true
     subscription:
       resthook_enabled: true
 #      websocket_enabled: false
