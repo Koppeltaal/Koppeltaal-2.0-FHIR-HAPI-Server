@@ -45,13 +45,22 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 
   @Hook(value = Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED, order = -9)
   public void authorizeRequest(RequestDetails requestDetails) {
+    
+    LOG.debug("=== ResourceOriginAuthorizationInterceptor.authorizeRequest() CALLED ===");
+    LOG.debug("Request: {} {}", requestDetails.getRequestType(), requestDetails.getCompleteUrl());
+    LOG.debug("Resource Name: {}", requestDetails.getResourceName());
+    LOG.debug("Resource ID: {}", requestDetails.getId());
+    LOG.debug("Request Headers: Authorization={}", requestDetails.getHeader("Authorization") != null ? "Present" : "Missing");
 
     final String resourceName = requestDetails.getResourceName();
 
-    if (StringUtils.isBlank(resourceName))
+    if (StringUtils.isBlank(resourceName)) {
+      LOG.debug("Skipping authorization - blank resource name (capabilities service)");
       return; // capabilities service
+    }
 
     if ("ImplementationGuide".equals(resourceName) && requestDetails.getRequestType() == RequestTypeEnum.GET) {
+      LOG.debug("Skipping authorization - ImplementationGuide GET request");
       return; // part of the `CapabilityStatement.implementationGuides`
     }
 
@@ -61,11 +70,17 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
       // to create the initial device needed for the domain admin without whitelisting
       final String requesterClientId = ResourceOriginUtil.getRequesterClientId(requestDetails)
           .orElseThrow(() -> new AuthenticationException("client_id not present"));
+      
+      LOG.debug("Device resource - checking if domain admin. ClientId: {}, DomainAdminClientId: {}", 
+          requesterClientId, smartBackendServiceConfiguration.getDomainAdminClientId());
 
-      if (StringUtils.equals(smartBackendServiceConfiguration.getDomainAdminClientId(), requesterClientId))
+      if (StringUtils.equals(smartBackendServiceConfiguration.getDomainAdminClientId(), requesterClientId)) {
+        LOG.debug("Skipping authorization - domain admin accessing Device resource");
         return;
+      }
     }
 
+    LOG.debug("Proceeding to validate() for resource: {}", resourceName);
     validate(requestDetails);
   }
 
@@ -95,11 +110,28 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
           .anyMatch((permission) -> permission.matches(crudsRegex + ".*"));
     } else {
       String existingEntityResourceOrigin = getEntityResourceOrigin(requestDetails);
+      
+      LOG.debug("=== AUTHORIZATION CHECK ===");
+      LOG.debug("Request Type: {}, Resource: {}/{}", requestType, requestDetails.getResourceName(), requestDetails.getId());
+      LOG.debug("Existing entity resource-origin: {}", existingEntityResourceOrigin);
+      LOG.debug("CRUDS regex: {}", crudsRegex);
+      LOG.debug("Relevant permissions from scope: {}", relevantPermissions);
+      LOG.debug("Full scope: {}", PermissionUtil.getFullScope(requestDetails));
+      LOG.debug("Request parameters: {}", requestDetails.getParameters());
 
-      hasPermission = relevantPermissions.stream()
-          .map((permission) -> StringUtils.substringAfter(permission, "."))
-          .anyMatch((permission) -> permission
-              .matches(crudsRegex + "(?:\\?resource-origin=.*" + existingEntityResourceOrigin + "(,.*|$))?"));
+//      system/Practitioner.crus?resource-origin=Device/b4decd94-15c0-43c1-8200-f8e5f04cf90b
+      hasPermission = relevantPermissions.stream(
+        )
+          .map((permission) -> {
+            String afterDot = StringUtils.substringAfter(permission, ".");
+            String pattern = crudsRegex + "(?:\\?resource-origin=.*" + existingEntityResourceOrigin + "(,.*|$))?";
+            boolean matches = afterDot.matches(pattern);
+            LOG.debug("Checking permission '{}' against pattern '{}': {}", afterDot, pattern, matches);
+            return matches;
+          })
+          .anyMatch(Boolean::booleanValue);
+      
+      LOG.debug("Final authorization result: {}", hasPermission);
     }
 
     if (!hasPermission) {

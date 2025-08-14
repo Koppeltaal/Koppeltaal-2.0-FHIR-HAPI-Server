@@ -441,5 +441,6 @@ smart:
 
 logging:
   level:
+    ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.ResourceOriginAuthorizationInterceptor: DEBUG
     ca.uhn.fhir.jpa.search.builder.sql: TRACE
     ca.uhn.fhir.rest.server.interceptor: TRACE
