@@ -45,7 +45,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 
   @Hook(value = Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED, order = -9)
   public void authorizeRequest(RequestDetails requestDetails) {
-    
+
     LOG.debug("=== ResourceOriginAuthorizationInterceptor.authorizeRequest() CALLED ===");
     LOG.debug("Request: {} {}", requestDetails.getRequestType(), requestDetails.getCompleteUrl());
     LOG.debug("Resource Name: {}", requestDetails.getResourceName());
@@ -70,8 +70,8 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
       // to create the initial device needed for the domain admin without whitelisting
       final String requesterClientId = ResourceOriginUtil.getRequesterClientId(requestDetails)
           .orElseThrow(() -> new AuthenticationException("client_id not present"));
-      
-      LOG.debug("Device resource - checking if domain admin. ClientId: {}, DomainAdminClientId: {}", 
+
+      LOG.debug("Device resource - checking if domain admin. ClientId: {}, DomainAdminClientId: {}",
           requesterClientId, smartBackendServiceConfiguration.getDomainAdminClientId());
 
       if (StringUtils.equals(smartBackendServiceConfiguration.getDomainAdminClientId(), requesterClientId)) {
@@ -89,11 +89,11 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     LOG.debug("Request URL: {}", requestDetails.getCompleteUrl());
     LOG.debug("Request Method: {}", requestDetails.getRequestType());
     LOG.debug("Resource Name: {}", requestDetails.getResourceName());
-    LOG.debug("Resource ID: {}", requestDetails.getId() != null ? requestDetails.getId().getValue() : "null");
+    LOG.debug("Resource ID: {}", requestDetails.getId() != null ? requestDetails.getId() : "null");
 
     List<String> relevantPermissions = PermissionUtil.getScopesForRequest(requestDetails);
     RequestTypeEnum requestType = requestDetails.getRequestType();
-    
+
     LOG.debug("Relevant permissions found: {}", relevantPermissions);
     LOG.debug("Full scope available: {}", PermissionUtil.getFullScope(requestDetails));
 
@@ -115,7 +115,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 
     boolean hasPermission;
 
-    if (requestDetails.getRequestType() == RequestTypeEnum.GET && requestDetails.getResource() == null) { // read all
+    if (requestDetails.getRequestType() == RequestTypeEnum.GET && requestDetails.getId() == null) { // read all
       LOG.debug("GET request for multiple resources (read all) - checking permissions");
       hasPermission = relevantPermissions.stream()
           .map((permission) -> {
@@ -128,7 +128,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     } else {
       LOG.debug("Checking permission for specific resource operation");
       String existingEntityResourceOrigin = getEntityResourceOrigin(requestDetails);
-      
+
       LOG.debug("=== DETAILED AUTHORIZATION CHECK ===");
       LOG.debug("Request Type: {}, Resource: {}/{}", requestType, requestDetails.getResourceName(), requestDetails.getId());
       LOG.debug("Existing entity resource-origin: {}", existingEntityResourceOrigin);
@@ -136,7 +136,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
       LOG.debug("Relevant permissions from scope: {}", relevantPermissions);
       LOG.debug("Full scope: {}", PermissionUtil.getFullScope(requestDetails));
       LOG.debug("Request parameters: {}", requestDetails.getParameters());
-      LOG.debug("Request headers present: Authorization={}, Content-Type={}", 
+      LOG.debug("Request headers present: Authorization={}, Content-Type={}",
           requestDetails.getHeader("Authorization") != null ? "Yes" : "No",
           requestDetails.getHeader("Content-Type"));
 
@@ -151,7 +151,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
             return matches;
           })
           .anyMatch(Boolean::booleanValue);
-      
+
       LOG.debug("Final authorization result: {}", hasPermission);
     }
 
@@ -162,7 +162,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     } else {
       LOG.debug("Request authorized successfully for {} on {}", requestType, requestDetails.getResourceName());
     }
-    
+
     LOG.debug("=== VALIDATE METHOD END ===");
   }
 
