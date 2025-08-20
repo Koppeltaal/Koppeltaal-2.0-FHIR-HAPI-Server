@@ -85,39 +85,60 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
   }
 
   private void validate(RequestDetails requestDetails) {
+    LOG.debug("=== VALIDATE METHOD START ===");
+    LOG.debug("Request URL: {}", requestDetails.getCompleteUrl());
+    LOG.debug("Request Method: {}", requestDetails.getRequestType());
+    LOG.debug("Resource Name: {}", requestDetails.getResourceName());
+    LOG.debug("Resource ID: {}", requestDetails.getId() != null ? requestDetails.getId().getValue() : "null");
 
     List<String> relevantPermissions = PermissionUtil.getScopesForRequest(requestDetails);
     RequestTypeEnum requestType = requestDetails.getRequestType();
+    
+    LOG.debug("Relevant permissions found: {}", relevantPermissions);
+    LOG.debug("Full scope available: {}", PermissionUtil.getFullScope(requestDetails));
 
     if (requestType == RequestTypeEnum.POST) {
+      LOG.debug("POST request - checking for any relevant permissions");
 
       if (relevantPermissions.isEmpty()) {
         LOG.warn("No permission found, user tried to [{}] a [{}], but the found scopes are [{}]",
             requestType, requestDetails.getResourceName(), PermissionUtil.getFullScope(requestDetails));
         throw new ForbiddenOperationException("Unauthorized");
       }
+      LOG.debug("POST request authorized - permissions found: {}", relevantPermissions);
       return;
     }
 
     // non-create request, always involves existing entities
     String crudsRegex = PermissionUtil.getCrudsRegex(requestType);
+    LOG.debug("CRUDS regex for {} operation: {}", requestType, crudsRegex);
 
     boolean hasPermission;
 
     if (requestDetails.getRequestType() == RequestTypeEnum.GET && requestDetails.getResource() == null) { // read all
+      LOG.debug("GET request for multiple resources (read all) - checking permissions");
       hasPermission = relevantPermissions.stream()
-          .map((permission) -> StringUtils.substringAfter(permission, "."))
+          .map((permission) -> {
+            String afterDot = StringUtils.substringAfter(permission, ".");
+            LOG.trace("Checking permission part '{}' against pattern '{}'", afterDot, crudsRegex + ".*");
+            return afterDot;
+          })
           .anyMatch((permission) -> permission.matches(crudsRegex + ".*"));
+      LOG.debug("Read-all permission check result: {}", hasPermission);
     } else {
+      LOG.debug("Checking permission for specific resource operation");
       String existingEntityResourceOrigin = getEntityResourceOrigin(requestDetails);
       
-      LOG.debug("=== AUTHORIZATION CHECK ===");
+      LOG.debug("=== DETAILED AUTHORIZATION CHECK ===");
       LOG.debug("Request Type: {}, Resource: {}/{}", requestType, requestDetails.getResourceName(), requestDetails.getId());
       LOG.debug("Existing entity resource-origin: {}", existingEntityResourceOrigin);
       LOG.debug("CRUDS regex: {}", crudsRegex);
       LOG.debug("Relevant permissions from scope: {}", relevantPermissions);
       LOG.debug("Full scope: {}", PermissionUtil.getFullScope(requestDetails));
       LOG.debug("Request parameters: {}", requestDetails.getParameters());
+      LOG.debug("Request headers present: Authorization={}, Content-Type={}", 
+          requestDetails.getHeader("Authorization") != null ? "Yes" : "No",
+          requestDetails.getHeader("Content-Type"));
 
 //      system/Practitioner.crus?resource-origin=Device/b4decd94-15c0-43c1-8200-f8e5f04cf90b
       hasPermission = relevantPermissions.stream(
@@ -138,7 +159,11 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
       LOG.warn("No permission found, user tried to [{}] a [{}], but the found scopes are [{}]",
           requestType, requestDetails.getResourceName(), PermissionUtil.getFullScope(requestDetails));
       throw new ForbiddenOperationException("Unauthorized");
+    } else {
+      LOG.debug("Request authorized successfully for {} on {}", requestType, requestDetails.getResourceName());
     }
+    
+    LOG.debug("=== VALIDATE METHOD END ===");
   }
 
   private String getEntityResourceOrigin(RequestDetails requestDetails) {
