@@ -55,7 +55,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     final String resourceName = requestDetails.getResourceName();
 
     if (StringUtils.isBlank(resourceName)) {
-      LOG.debug("Skipping authorization - blank resource name (capabilities service)");
+      LOG.debug("Skipping authorization - capabilities service");
       return; // capabilities service
     }
 
@@ -71,26 +71,16 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
       final String requesterClientId = ResourceOriginUtil.getRequesterClientId(requestDetails)
           .orElseThrow(() -> new AuthenticationException("client_id not present"));
 
-      LOG.debug("Device resource - checking if domain admin. ClientId: {}, DomainAdminClientId: {}",
-          requesterClientId, smartBackendServiceConfiguration.getDomainAdminClientId());
-
       if (StringUtils.equals(smartBackendServiceConfiguration.getDomainAdminClientId(), requesterClientId)) {
         LOG.debug("Skipping authorization - domain admin accessing Device resource");
-        return;
+        return; // domain admin can access Device resources
       }
     }
 
-    LOG.debug("Proceeding to validate() for resource: {}", resourceName);
     validate(requestDetails);
   }
 
   private void validate(RequestDetails requestDetails) {
-    LOG.debug("=== VALIDATE METHOD START ===");
-    LOG.debug("Request URL: {}", requestDetails.getCompleteUrl());
-    LOG.debug("Request Method: {}", requestDetails.getRequestType());
-    LOG.debug("Resource Name: {}", requestDetails.getResourceName());
-    LOG.debug("Resource ID: {}", requestDetails.getId() != null ? requestDetails.getId() : "null");
-
     List<String> relevantPermissions = PermissionUtil.getScopesForRequest(requestDetails);
     RequestTypeEnum requestType = requestDetails.getRequestType();
 
@@ -98,47 +88,33 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     LOG.debug("Full scope available: {}", PermissionUtil.getFullScope(requestDetails));
 
     if (requestType == RequestTypeEnum.POST) {
-      LOG.debug("POST request - checking for any relevant permissions");
 
       if (relevantPermissions.isEmpty()) {
         LOG.warn("No permission found, user tried to [{}] a [{}], but the found scopes are [{}]",
             requestType, requestDetails.getResourceName(), PermissionUtil.getFullScope(requestDetails));
         throw new ForbiddenOperationException("Unauthorized");
       }
-      LOG.debug("POST request authorized - permissions found: {}", relevantPermissions);
+      LOG.debug("POST request authorized for {}", requestDetails.getResourceName());
       return;
     }
 
     // non-create request, always involves existing entities
     String crudsRegex = PermissionUtil.getCrudsRegex(requestType);
-    LOG.debug("CRUDS regex for {} operation: {}", requestType, crudsRegex);
 
     boolean hasPermission;
 
     if (requestDetails.getRequestType() == RequestTypeEnum.GET && requestDetails.getId() == null) { // read all
       LOG.debug("GET request for multiple resources (read all) - checking permissions");
       hasPermission = relevantPermissions.stream()
-          .map((permission) -> {
-            String afterDot = StringUtils.substringAfter(permission, ".");
-            LOG.trace("Checking permission part '{}' against pattern '{}'", afterDot, crudsRegex + ".*");
-            return afterDot;
-          })
+          .map((permission) -> StringUtils.substringAfter(permission, "."))
           .anyMatch((permission) -> permission.matches(crudsRegex + ".*"));
       LOG.debug("Read-all permission check result: {}", hasPermission);
     } else {
       LOG.debug("Checking permission for specific resource operation");
       String existingEntityResourceOrigin = getEntityResourceOrigin(requestDetails);
 
-      LOG.debug("=== DETAILED AUTHORIZATION CHECK ===");
-      LOG.debug("Request Type: {}, Resource: {}/{}", requestType, requestDetails.getResourceName(), requestDetails.getId());
-      LOG.debug("Existing entity resource-origin: {}", existingEntityResourceOrigin);
-      LOG.debug("CRUDS regex: {}", crudsRegex);
-      LOG.debug("Relevant permissions from scope: {}", relevantPermissions);
-      LOG.debug("Full scope: {}", PermissionUtil.getFullScope(requestDetails));
-      LOG.debug("Request parameters: {}", requestDetails.getParameters());
-      LOG.debug("Request headers present: Authorization={}, Content-Type={}",
-          requestDetails.getHeader("Authorization") != null ? "Yes" : "No",
-          requestDetails.getHeader("Content-Type"));
+      LOG.debug("Checking permission for {}/{} with resource-origin: {}",
+          requestDetails.getResourceName(), requestDetails.getId(), existingEntityResourceOrigin);
 
 //      system/Practitioner.crus?resource-origin=Device/b4decd94-15c0-43c1-8200-f8e5f04cf90b
       hasPermission = relevantPermissions.stream(
@@ -163,7 +139,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
       LOG.debug("Request authorized successfully for {} on {}", requestType, requestDetails.getResourceName());
     }
 
-    LOG.debug("=== VALIDATE METHOD END ===");
+    LOG.debug("{} request authorized for {}", requestType, requestDetails.getResourceName());
   }
 
   private String getEntityResourceOrigin(RequestDetails requestDetails) {
