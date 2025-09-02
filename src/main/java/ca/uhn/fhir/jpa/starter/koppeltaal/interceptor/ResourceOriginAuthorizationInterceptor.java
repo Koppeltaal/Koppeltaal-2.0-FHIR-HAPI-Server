@@ -9,9 +9,11 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguratio
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.PermissionUtil;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
+import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
+import ca.uhn.fhir.rest.server.exceptions.ResourceGoneException;
 import ca.uhn.fhir.rest.server.interceptor.auth.AuthorizationInterceptor;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -116,17 +118,25 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
       LOG.debug("Checking permission for {}/{} with resource-origin: {}",
           requestDetails.getResourceName(), requestDetails.getId(), existingEntityResourceOrigin);
 
+      // Special handling for deleted resources in history requests
+      if ("deleted-resource-history".equals(existingEntityResourceOrigin)) {
+        LOG.debug("Checking permissions for deleted resource history - using resource-type level permissions");
+        hasPermission = relevantPermissions.stream()
+            .map((permission) -> StringUtils.substringAfter(permission, "."))
+            .anyMatch((permission) -> permission.matches(crudsRegex + ".*"));
+      } else {
 //      system/Practitioner.crus?resource-origin=Device/b4decd94-15c0-43c1-8200-f8e5f04cf90b
-      hasPermission = relevantPermissions.stream(
-        )
-          .map((permission) -> {
-            String afterDot = StringUtils.substringAfter(permission, ".");
-            String pattern = crudsRegex + "(?:\\?resource-origin=.*" + existingEntityResourceOrigin + "(,.*|$))?";
-            boolean matches = afterDot.matches(pattern);
-            LOG.debug("Checking permission '{}' against pattern '{}': {}", afterDot, pattern, matches);
-            return matches;
-          })
-          .anyMatch(Boolean::booleanValue);
+        hasPermission = relevantPermissions.stream(
+          )
+            .map((permission) -> {
+              String afterDot = StringUtils.substringAfter(permission, ".");
+              String pattern = crudsRegex + "(?:\\?resource-origin=.*" + existingEntityResourceOrigin + "(,.*|$))?";
+              boolean matches = afterDot.matches(pattern);
+              LOG.debug("Checking permission '{}' against pattern '{}': {}", afterDot, pattern, matches);
+              return matches;
+            })
+            .anyMatch(Boolean::booleanValue);
+      }
 
       LOG.debug("Final authorization result: {}", hasPermission);
     }
@@ -145,9 +155,37 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
   private String getEntityResourceOrigin(RequestDetails requestDetails) {
     final IIdType resourceId = requestDetails.getId();
     if (resourceId != null) {
-      final IFhirResourceDao<?> resourceDao = daoRegistry.getResourceDao(requestDetails.getResourceName());
-      IBaseResource existingResource = resourceDao.read(resourceId, requestDetails);
-      return getResourceOriginDeviceReference(existingResource, requestDetails);
+      // Check if this is a history request using the proper enum
+      RestOperationTypeEnum restOperationType = requestDetails.getRestOperationType();
+      boolean isHistoryRequest = restOperationType == RestOperationTypeEnum.VREAD || 
+                                 restOperationType == RestOperationTypeEnum.HISTORY_INSTANCE;
+      
+      if (isHistoryRequest) {
+        LOG.debug("History request detected (operation: {}) for {}/{} - checking for deleted resource", 
+                  restOperationType, requestDetails.getResourceName(), resourceId.getIdPart());
+      }
+      
+      try {
+        final IFhirResourceDao<?> resourceDao = daoRegistry.getResourceDao(requestDetails.getResourceName());
+        IBaseResource existingResource = resourceDao.read(resourceId, requestDetails);
+        return getResourceOriginDeviceReference(existingResource, requestDetails);
+      } catch (ResourceGoneException e) {
+        // Resource has been deleted - this is expected for history requests
+        LOG.debug("Resource {}/{} has been deleted (ResourceGoneException). Operation type: {}", 
+                  requestDetails.getResourceName(), resourceId.getIdPart(), restOperationType);
+        
+        if (isHistoryRequest) {
+          // For history requests on deleted resources, we'll allow access based on scope alone
+          // since we can't check the resource-origin of a deleted resource
+          LOG.debug("Allowing history request for deleted resource based on general resource type permissions");
+          return "deleted-resource-history";
+        } else {
+          // For non-history requests, deleted resources should still throw the exception
+          LOG.warn("Attempted to access deleted resource {}/{} outside of history context (operation: {})", 
+                   requestDetails.getResourceName(), resourceId.getIdPart(), restOperationType);
+          throw e;
+        }
+      }
     }
 
     return null; // no entity id - read all - will be managed by search narrowing
