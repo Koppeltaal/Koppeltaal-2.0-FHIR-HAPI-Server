@@ -80,7 +80,7 @@ public abstract class AbstractAuditEventInterceptor {
         case CREATE:
           dto.setEventType(AuditEventDto.EventType.Create);
           return true;
-        case READ:
+        case READ, VREAD, HISTORY_INSTANCE:
           dto.setEventType(AuditEventDto.EventType.Read);
           return true;
         case GET_PAGE:
