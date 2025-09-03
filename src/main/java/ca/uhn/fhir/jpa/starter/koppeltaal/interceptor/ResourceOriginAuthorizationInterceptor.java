@@ -35,6 +35,7 @@ import java.util.Optional;
 public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInterceptor {
 
   private static final Logger LOG = LoggerFactory.getLogger(ResourceOriginAuthorizationInterceptor.class);
+  private static final String DELETED_RESOURCE_HISTORY_MARKER = "deleted-resource-history";
   private final SmartBackendServiceConfiguration smartBackendServiceConfiguration;
 
   public ResourceOriginAuthorizationInterceptor(DaoRegistry daoRegistry,
@@ -119,7 +120,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
           requestDetails.getResourceName(), requestDetails.getId(), existingEntityResourceOrigin);
 
       // Special handling for deleted resources in history requests
-      if ("deleted-resource-history".equals(existingEntityResourceOrigin)) {
+      if (StringUtils.equals(DELETED_RESOURCE_HISTORY_MARKER, existingEntityResourceOrigin)) {
         LOG.debug("Checking permissions for deleted resource history - using resource-type level permissions");
         hasPermission = relevantPermissions.stream()
             .map((permission) -> StringUtils.substringAfter(permission, "."))
@@ -157,31 +158,30 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     if (resourceId != null) {
       // Check if this is a history request using the proper enum
       RestOperationTypeEnum restOperationType = requestDetails.getRestOperationType();
-      boolean isHistoryRequest = restOperationType == RestOperationTypeEnum.VREAD || 
-                                 restOperationType == RestOperationTypeEnum.HISTORY_INSTANCE;
-      
+      boolean isHistoryRequest = isIsHistoryRequest(restOperationType);
+
       if (isHistoryRequest) {
-        LOG.debug("History request detected (operation: {}) for {}/{} - checking for deleted resource", 
+        LOG.debug("History request detected (operation: {}) for {}/{} - checking for deleted resource",
                   restOperationType, requestDetails.getResourceName(), resourceId.getIdPart());
       }
-      
+
       try {
         final IFhirResourceDao<?> resourceDao = daoRegistry.getResourceDao(requestDetails.getResourceName());
         IBaseResource existingResource = resourceDao.read(resourceId, requestDetails);
         return getResourceOriginDeviceReference(existingResource, requestDetails);
       } catch (ResourceGoneException e) {
         // Resource has been deleted - this is expected for history requests
-        LOG.debug("Resource {}/{} has been deleted (ResourceGoneException). Operation type: {}", 
+        LOG.debug("Resource {}/{} has been deleted (ResourceGoneException). Operation type: {}",
                   requestDetails.getResourceName(), resourceId.getIdPart(), restOperationType);
-        
+
         if (isHistoryRequest) {
           // For history requests on deleted resources, we'll allow access based on scope alone
           // since we can't check the resource-origin of a deleted resource
           LOG.debug("Allowing history request for deleted resource based on general resource type permissions");
-          return "deleted-resource-history";
+          return DELETED_RESOURCE_HISTORY_MARKER;
         } else {
           // For non-history requests, deleted resources should still throw the exception
-          LOG.warn("Attempted to access deleted resource {}/{} outside of history context (operation: {})", 
+          LOG.warn("Attempted to access deleted resource {}/{} outside of history context (operation: {})",
                    requestDetails.getResourceName(), resourceId.getIdPart(), restOperationType);
           throw e;
         }
@@ -189,6 +189,11 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     }
 
     return null; // no entity id - read all - will be managed by search narrowing
+  }
+
+  private static boolean isIsHistoryRequest(RestOperationTypeEnum restOperationType) {
+    return restOperationType == RestOperationTypeEnum.VREAD ||
+      restOperationType == RestOperationTypeEnum.HISTORY_INSTANCE;
   }
 
   String getResourceOriginDeviceReference(IBaseResource requestDetailsResource, RequestDetails requestDetails) {
