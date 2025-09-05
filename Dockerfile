@@ -71,4 +71,23 @@ WORKDIR /app
 COPY --chown=nonroot:nonroot --from=build-distroless /app /app
 COPY --chown=nonroot:nonroot --from=build-hapi /tmp/hapi-fhir-jpaserver-starter/opentelemetry-javaagent.jar /app
 
-ENTRYPOINT ["java", "--class-path", "/app/main.war", "-Dloader.path=main.war!/WEB-INF/classes/,main.war!/WEB-INF/,/app/extra-classes", "org.springframework.boot.loader.PropertiesLauncher"]
+ENTRYPOINT ["java", \
+  "-XX:+PrintGCDetails", \
+  "-XX:+PrintGCDateStamps", \
+  "-XX:+PrintGCTimeStamps", \
+  "-XX:+PrintHeapAtGC", \
+  "-XX:+PrintTenuringDistribution", \
+  "-XX:+PrintGCApplicationStoppedTime", \
+  "-Xloggc:/tmp/gc.log", \
+  "-XX:+UseGCLogFileRotation", \
+  "-XX:NumberOfGCLogFiles=10", \
+  "-XX:GCLogFileSize=10M", \
+  "-XX:+HeapDumpOnOutOfMemoryError", \
+  "-XX:HeapDumpPath=/tmp/heapdump.hprof", \
+  "-XX:+ExitOnOutOfMemoryError", \
+  "-XX:+UnlockDiagnosticVMOptions", \
+  "-XX:+PrintNMTStatistics", \
+  "-XX:NativeMemoryTracking=summary", \
+  "--class-path", "/app/main.war", \
+  "-Dloader.path=main.war!/WEB-INF/classes/,main.war!/WEB-INF/,/app/extra-classes", \
+  "org.springframework.boot.loader.PropertiesLauncher"]
