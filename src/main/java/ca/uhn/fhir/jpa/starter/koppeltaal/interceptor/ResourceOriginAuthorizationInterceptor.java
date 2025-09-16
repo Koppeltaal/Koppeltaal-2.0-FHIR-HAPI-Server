@@ -177,9 +177,55 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
         return "no-resource-origin-on-search-parameter";
       }
 
+      // Check if this is a deleted resource for a full history request
+      if (requestDetailsResource.isDeleted() && isFullHistoryCheck(requestDetails)) {
+        LOG.debug("Found deleted resource for history request, attempting to get resource-origin from history");
+        return getResourceOriginFromHistory(requestDetailsResource, requestDetails);
+      }
+
       throw new ForbiddenOperationException("Unauthorized");
     }
 
     return resourceOriginOptional.get().getValue();
+  }
+
+  private boolean isFullHistoryCheck(RequestDetails requestDetails) {
+    String completeUrl = requestDetails.getCompleteUrl();
+    return completeUrl != null && completeUrl.endsWith("/_history");
+  }
+
+  private String getResourceOriginFromHistory(IBaseResource deletedResource, RequestDetails requestDetails) {
+    try {
+      final IFhirResourceDao<?> resourceDao = daoRegistry.getResourceDao(requestDetails.getResourceName());
+      IIdType resourceId = deletedResource.getIdElement();
+
+      LOG.debug("Attempting to find resource-origin from history for resource {}", resourceId);
+
+      if (resourceId.hasVersionIdPart()) {
+        try {
+          long currentVersion = Long.parseLong(resourceId.getVersionIdPart());
+          if (currentVersion > 1) {
+            IIdType previousVersionId = resourceId.withVersion(String.valueOf(currentVersion - 1));
+            IBaseResource previousVersion = resourceDao.read(previousVersionId, requestDetails, true);
+
+            Optional<IIdType> resourceOriginOptional = ResourceOriginUtil.getResourceOriginDeviceId(previousVersion);
+            if (resourceOriginOptional.isPresent()) {
+              LOG.debug("Found resource-origin from previous version: {}", resourceOriginOptional.get().getValue());
+              return resourceOriginOptional.get().getValue();
+            }
+          }
+        } catch (Exception e) {
+          LOG.debug("Could not read previous version: {}", e.getMessage());
+        }
+      }
+
+      LOG.warn("Could not determine resource-origin from history for deleted resource {}", resourceId);
+      throw new ForbiddenOperationException("Cannot authorize history access for deleted resource without resource-origin");
+
+    } catch (Exception e) {
+      LOG.error("Error while trying to get resource-origin from history for resource {}: {}",
+                deletedResource.getIdElement(), e.getMessage());
+      throw new ForbiddenOperationException("Cannot authorize history access for deleted resource");
+    }
   }
 }

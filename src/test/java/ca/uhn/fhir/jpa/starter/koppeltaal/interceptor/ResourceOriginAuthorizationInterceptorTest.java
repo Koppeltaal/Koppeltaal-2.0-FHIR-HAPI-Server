@@ -8,6 +8,7 @@ import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
 import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.hl7.fhir.r4.model.ActivityDefinition;
 import org.hl7.fhir.r4.model.Device;
 import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.ResourceType;
@@ -19,14 +20,18 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mockStatic;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class ResourceOriginAuthorizationInterceptorTest extends BaseResourceOriginTest {
 
   private static MockedStatic<ResourceOriginUtil> resourceOriginUtil;
@@ -229,6 +234,137 @@ class ResourceOriginAuthorizationInterceptorTest extends BaseResourceOriginTest 
 
     assertThrows(ForbiddenOperationException.class, () ->
       interceptor.authorizeRequest(requestDetails)
+    );
+  }
+
+  @Test
+  public void shouldAllowHistoryAccessForDeletedResourceWithResourceOriginFromPreviousVersion() {
+    // Test case: Successful history access for deleted resource by finding resource-origin from previous version
+    final IdType resourceId = new IdType(ResourceType.ActivityDefinition.name(), "307e46d5-b1b8-4197-af3b-f7e149a42e2a", "2");
+
+    // Create a proper history request using the test framework with authorization
+    RequestDetails historyRequestDetails = getRequestDetailsAndConfigurePermission(
+        RequestTypeEnum.GET,
+        ResourceType.ActivityDefinition,
+        resourceId,
+        "rs", // read and search permissions
+        "Device/test-device-123"
+    );
+
+    historyRequestDetails.setCompleteUrl("https://fhir-server.koppeltaal.headease.nl/fhir/DEFAULT/ActivityDefinition/307e46d5-b1b8-4197-af3b-f7e149a42e2a/_history");
+
+    // Mock the deleted resource (current version without resource-origin)
+    ActivityDefinition deletedResource = mock(ActivityDefinition.class);
+    when(deletedResource.getIdElement()).thenReturn(resourceId);
+    when(deletedResource.isDeleted()).thenReturn(true); // Mark as deleted
+
+    // Mock the previous version with resource-origin
+    IdType previousVersionId = new IdType(ResourceType.ActivityDefinition.name(), "307e46d5-b1b8-4197-af3b-f7e149a42e2a", "1");
+    ActivityDefinition previousResource = new ActivityDefinition();
+    previousResource.setId(previousVersionId);
+
+    // Mock DAO registry to return the ActivityDefinition DAO
+    @SuppressWarnings("unchecked")
+    IFhirResourceDao<ActivityDefinition> activityDefinitionDao = (IFhirResourceDao<ActivityDefinition>) mock(IFhirResourceDao.class);
+    when(daoRegistry.getResourceDao(ResourceType.ActivityDefinition.name())).thenReturn(activityDefinitionDao);
+
+    // Mock the DAO to return deleted resource on first call, previous version on second call
+    when(activityDefinitionDao.read(eq(resourceId), eq(historyRequestDetails), eq(true))).thenReturn(deletedResource);
+    when(activityDefinitionDao.read(eq(previousVersionId), eq(historyRequestDetails), eq(true))).thenReturn(previousResource);
+
+    // Mock resource origin utility - no origin for deleted resource, but has origin for previous version
+    IdType expectedDeviceRef = new IdType("Device", "test-device-123");
+    resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(eq(deletedResource)))
+        .thenReturn(Optional.empty()); // Deleted resource has no resource-origin
+    resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(eq(previousResource)))
+        .thenReturn(Optional.of(expectedDeviceRef)); // Previous version has resource-origin
+
+    // This should succeed - the interceptor should find the resource-origin from the previous version
+    interceptor.authorizeRequest(historyRequestDetails);
+
+    // If we reach here, the test passed (no exception thrown)
+  }
+
+  @Test
+  public void shouldDenyHistoryAccessForDeletedResourceWhenNoPreviousVersionHasResourceOrigin() {
+    // Test case: Failed history access when no previous version has resource-origin
+    final IdType resourceId = new IdType(ResourceType.ActivityDefinition.name(), "no-origin-resource", "2");
+
+    // Override the URL to be a history request - create a new mock for this specific test
+    RequestDetails historyRequestDetails = mock(RequestDetails.class);
+    when(historyRequestDetails.getResourceName()).thenReturn(ResourceType.ActivityDefinition.name());
+    when(historyRequestDetails.getId()).thenReturn(resourceId);
+    when(historyRequestDetails.getRequestType()).thenReturn(RequestTypeEnum.GET);
+    when(historyRequestDetails.getCompleteUrl()).thenReturn("https://fhir-server.koppeltaal.headease.nl/fhir/DEFAULT/ActivityDefinition/no-origin-resource/_history");
+
+    // Mock the deleted resource (current version without resource-origin)
+    ActivityDefinition deletedResource = mock(ActivityDefinition.class);
+    when(deletedResource.getIdElement()).thenReturn(resourceId);
+    when(deletedResource.isDeleted()).thenReturn(true); // Mark as deleted
+
+    // Mock the previous version also without resource-origin
+    IdType previousVersionId = new IdType(ResourceType.ActivityDefinition.name(), "no-origin-resource", "1");
+    ActivityDefinition previousResource = new ActivityDefinition();
+    previousResource.setId(previousVersionId);
+
+    // Mock DAO registry
+    @SuppressWarnings("unchecked")
+    IFhirResourceDao<ActivityDefinition> activityDefinitionDao = (IFhirResourceDao<ActivityDefinition>) mock(IFhirResourceDao.class);
+    when(daoRegistry.getResourceDao(ResourceType.ActivityDefinition.name())).thenReturn(activityDefinitionDao);
+
+    // Mock the DAO calls
+    when(activityDefinitionDao.read(eq(resourceId), eq(historyRequestDetails), eq(true))).thenReturn(deletedResource);
+    when(activityDefinitionDao.read(eq(previousVersionId), eq(historyRequestDetails), eq(true))).thenReturn(previousResource);
+
+    // Mock resource origin utility - no origin for either version
+    resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(eq(deletedResource)))
+        .thenReturn(Optional.empty()); // Deleted resource has no resource-origin
+    resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(eq(previousResource)))
+        .thenReturn(Optional.empty()); // Previous version also has no resource-origin
+
+    // This should fail - no resource-origin found in history
+    assertThrows(ForbiddenOperationException.class, () ->
+        interceptor.authorizeRequest(historyRequestDetails),
+        "Should deny access when no version in history has resource-origin"
+    );
+  }
+
+  @Test
+  public void shouldDenyAccessForDeletedResourceWhenNotHistoryRequest() {
+    // Test case: Normal GET request for deleted resource should still fail
+    final IdType resourceId = new IdType(ResourceType.ActivityDefinition.name(), "deleted-resource", "2");
+
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(
+        RequestTypeEnum.GET,
+        ResourceType.ActivityDefinition,
+        resourceId,
+        "rs", // read and search permissions
+        "Device/test-device-123"
+    );
+
+    // This is NOT a history request - just a regular GET
+    requestDetails.setCompleteUrl("https://fhir-server.koppeltaal.headease.nl/fhir/DEFAULT/ActivityDefinition/deleted-resource");
+
+    // Mock the deleted resource
+    ActivityDefinition deletedResource = mock(ActivityDefinition.class);
+    when(deletedResource.getIdElement()).thenReturn(resourceId);
+    when(deletedResource.isDeleted()).thenReturn(true); // Mark as deleted
+
+    // Mock DAO registry
+    @SuppressWarnings("unchecked")
+    IFhirResourceDao<ActivityDefinition> activityDefinitionDao = (IFhirResourceDao<ActivityDefinition>) mock(IFhirResourceDao.class);
+    when(daoRegistry.getResourceDao(ResourceType.ActivityDefinition.name())).thenReturn(activityDefinitionDao);
+
+    when(activityDefinitionDao.read(eq(resourceId), eq(requestDetails), eq(true))).thenReturn(deletedResource);
+
+    // Mock resource origin utility - no origin for deleted resource
+    resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(eq(deletedResource)))
+        .thenReturn(Optional.empty());
+
+    // This should fail - regular requests for deleted resources without resource-origin should be denied
+    assertThrows(ForbiddenOperationException.class, () ->
+        interceptor.authorizeRequest(requestDetails),
+        "Should deny regular GET access to deleted resource without resource-origin"
     );
   }
 
