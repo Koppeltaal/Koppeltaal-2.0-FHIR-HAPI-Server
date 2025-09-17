@@ -251,7 +251,7 @@ class ResourceOriginAuthorizationInterceptorTest extends BaseResourceOriginTest 
         "Device/test-device-123"
     );
 
-    historyRequestDetails.setCompleteUrl("https://fhir-server.koppeltaal.headease.nl/fhir/DEFAULT/ActivityDefinition/307e46d5-b1b8-4197-af3b-f7e149a42e2a/_history");
+    historyRequestDetails.setRequestPath("ActivityDefinition/307e46d5-b1b8-4197-af3b-f7e149a42e2a/_history");
 
     // Mock the deleted resource (current version without resource-origin)
     ActivityDefinition deletedResource = mock(ActivityDefinition.class);

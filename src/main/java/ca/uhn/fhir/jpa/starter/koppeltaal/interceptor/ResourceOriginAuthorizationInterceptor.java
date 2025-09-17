@@ -190,8 +190,8 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
   }
 
   private boolean isFullHistoryCheck(RequestDetails requestDetails) {
-    String completeUrl = requestDetails.getCompleteUrl();
-    return completeUrl != null && completeUrl.endsWith("/_history");
+    String requestPath = requestDetails.getRequestPath();
+    return requestPath != null && requestPath.endsWith("/_history");
   }
 
   private String getResourceOriginFromHistory(IBaseResource deletedResource, RequestDetails requestDetails) {
