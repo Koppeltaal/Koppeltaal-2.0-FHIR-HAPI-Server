@@ -7,6 +7,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
+import ca.uhn.fhir.rest.server.exceptions.ResourceGoneException;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.ActivityDefinition;
 import org.hl7.fhir.r4.model.Device;
@@ -365,6 +366,38 @@ class ResourceOriginAuthorizationInterceptorTest extends BaseResourceOriginTest 
     assertThrows(ForbiddenOperationException.class, () ->
         interceptor.authorizeRequest(requestDetails),
         "Should deny regular GET access to deleted resource without resource-origin"
+    );
+  }
+
+  @Test
+  public void shouldReturn410GoneForDeletedResourceOnNonHistoryRequest() {
+    // Test case: Regular GET request to deleted resource should return 410 Gone
+    final IdType resourceId = new IdType(ResourceType.ActivityDefinition.name(), "deleted-resource", "2");
+
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(
+        RequestTypeEnum.GET,
+        ResourceType.ActivityDefinition,
+        resourceId,
+        "rs", // read and search permissions
+        "Device/test-device-123"
+    );
+
+    // This is NOT a history request - just a regular GET (no /_history in path)
+    requestDetails.setRequestPath("ActivityDefinition/deleted-resource");
+
+    // Mock DAO registry
+    @SuppressWarnings("unchecked")
+    IFhirResourceDao<ActivityDefinition> activityDefinitionDao = (IFhirResourceDao<ActivityDefinition>) mock(IFhirResourceDao.class);
+    when(daoRegistry.getResourceDao(ResourceType.ActivityDefinition.name())).thenReturn(activityDefinitionDao);
+
+    // Mock the DAO to throw ResourceGoneException when trying to read the deleted resource
+    when(activityDefinitionDao.read(eq(resourceId), eq(requestDetails)))
+        .thenThrow(new ResourceGoneException("Resource has been deleted"));
+
+    // This should throw ResourceGoneException (which translates to HTTP 410 Gone)
+    assertThrows(ResourceGoneException.class, () ->
+        interceptor.authorizeRequest(requestDetails),
+        "Should return 410 Gone for regular GET request to deleted resource"
     );
   }
 

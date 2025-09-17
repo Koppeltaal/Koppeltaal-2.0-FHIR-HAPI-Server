@@ -148,8 +148,26 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     if (resourceId != null) {
       try {
         final IFhirResourceDao<?> resourceDao = daoRegistry.getResourceDao(requestDetails.getResourceName());
-        // Allow reading deleted resources to check their resource-origin
-        IBaseResource existingResource = resourceDao.read(resourceId, requestDetails, true);
+
+        // First try to read without allowDeleted flag
+        IBaseResource existingResource;
+        try {
+          existingResource = resourceDao.read(resourceId, requestDetails);
+        } catch (ResourceGoneException e) {
+          // Resource is deleted - check if this is a history request
+          if (isFullHistoryCheck(requestDetails)) {
+            LOG.debug("Resource {}/{} is deleted, but this is a history request - reading with allowDeleted=true",
+                     requestDetails.getResourceName(), resourceId.getIdPart());
+            // For history requests, we need to read the deleted resource to check its resource-origin
+            existingResource = resourceDao.read(resourceId, requestDetails, true);
+          } else {
+            // For non-history requests, deleted resources should return 410 Gone
+            LOG.debug("Resource {}/{} is deleted and this is not a history request - returning 410 Gone",
+                     requestDetails.getResourceName(), resourceId.getIdPart());
+            throw e;
+          }
+        }
+
         return getResourceOriginDeviceReference(existingResource, requestDetails);
       } catch (ResourceGoneException e) {
         LOG.warn("Failed to read resource {}/{} for authorization check",
