@@ -40,9 +40,6 @@ jobs:
             git remote add gitlab "$GITLAB_REMOTE"
           fi
 
-          # 2. fetch all remote branches as remote tracking branches
-          git fetch origin --tags  --prune --prune-tags
-
-          # 3. mirror branches, then tags; overwrite anything that differs
+          # mirror branches, then tags; overwrite anything that differs
           git push --prune --force --all  gitlab
           git push --prune --force --tags gitlab
