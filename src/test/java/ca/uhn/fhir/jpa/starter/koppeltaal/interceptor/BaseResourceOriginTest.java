@@ -74,7 +74,7 @@ public class BaseResourceOriginTest {
         requestDetails.setResource(instance);
 
         if(requestType != RequestTypeEnum.POST) {
-          when(resourceDaoMock.read(any(IIdType.class), any(RequestDetails.class)))
+          when(resourceDaoMock.read(any(IIdType.class), any(RequestDetails.class), anyBoolean()))
             .thenReturn(instance);
         }
       } catch (Exception e) {
