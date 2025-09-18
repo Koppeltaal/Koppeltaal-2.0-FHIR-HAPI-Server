@@ -356,7 +356,7 @@ class ResourceOriginAuthorizationInterceptorTest extends BaseResourceOriginTest 
     IFhirResourceDao<ActivityDefinition> activityDefinitionDao = (IFhirResourceDao<ActivityDefinition>) mock(IFhirResourceDao.class);
     when(daoRegistry.getResourceDao(ResourceType.ActivityDefinition.name())).thenReturn(activityDefinitionDao);
 
-    when(activityDefinitionDao.read(eq(resourceId), eq(requestDetails), eq(true))).thenReturn(deletedResource);
+    when(activityDefinitionDao.read(eq(resourceId), eq(requestDetails), eq(false))).thenReturn(deletedResource);
 
     // Mock resource origin utility - no origin for deleted resource
     resourceOriginUtil.when(() -> ResourceOriginUtil.getResourceOriginDeviceId(eq(deletedResource)))
@@ -390,8 +390,8 @@ class ResourceOriginAuthorizationInterceptorTest extends BaseResourceOriginTest 
     IFhirResourceDao<ActivityDefinition> activityDefinitionDao = (IFhirResourceDao<ActivityDefinition>) mock(IFhirResourceDao.class);
     when(daoRegistry.getResourceDao(ResourceType.ActivityDefinition.name())).thenReturn(activityDefinitionDao);
 
-    // Mock the DAO to throw ResourceGoneException when trying to read the deleted resource
-    when(activityDefinitionDao.read(eq(resourceId), eq(requestDetails)))
+    // Mock the DAO to throw ResourceGoneException when trying to read the deleted resource (allowDeleted=false)
+    when(activityDefinitionDao.read(eq(resourceId), eq(requestDetails), eq(false)))
         .thenThrow(new ResourceGoneException("Resource has been deleted"));
 
     // This should throw ResourceGoneException (which translates to HTTP 410 Gone)
