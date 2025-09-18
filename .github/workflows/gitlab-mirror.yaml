@@ -41,10 +41,8 @@ jobs:
           fi
 
           # 2. fetch all remote branches as remote tracking branches
-          git fetch origin '+refs/heads/*:refs/remotes/origin/*'
+          git fetch origin --all  --prune --prune-tags
 
-          # 3. push all branches from origin to gitlab (without --prune to avoid deletion issues)
-          git push gitlab 'refs/remotes/origin/*:refs/heads/*' --force
-
-          # 4. push all tags
-          git push gitlab --tags --force
+          # 3. mirror branches, then tags; overwrite anything that differs
+          git push --prune --force --all  gitlab
+          git push --prune --force --tags gitlab
