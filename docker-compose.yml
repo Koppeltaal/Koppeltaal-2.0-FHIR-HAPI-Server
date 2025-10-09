@@ -14,10 +14,12 @@ services:
       SPRING_DATASOURCE_DRIVERCLASSNAME: "org.postgresql.Driver"
     ports:
       - "8080:8080"
+    volumes:
+      - ./heapdumps:/tmp
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 10G
   hapi-fhir-postgres:
     image: postgres:15-alpine
     container_name: hapi-fhir-postgres

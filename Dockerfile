@@ -72,6 +72,8 @@ COPY --chown=nonroot:nonroot --from=build-distroless /app /app
 COPY --chown=nonroot:nonroot --from=build-hapi /tmp/hapi-fhir-jpaserver-starter/opentelemetry-javaagent.jar /app
 
 ENTRYPOINT ["java", \
+  "-Xms4g", \
+  "-Xmx8g", \
   "-Xlog:gc*:file=/tmp/gc.log:time,uptime,level,tags:filecount=10,filesize=10M", \
   "-XX:+HeapDumpOnOutOfMemoryError", \
   "-XX:HeapDumpPath=/tmp/heapdump.hprof", \
