@@ -167,8 +167,8 @@ hapi:
     implementationguides:
       kt2:
         name: koppeltaalv2.00
-        version: 1.4.5-beta.012
-        packageUrl: https://github.com/vzvznl/Koppeltaal-2.0-FHIR/releases/download/v1.4.5-beta.012-minimal-fix%2Fuse-context-rouge-values-12/koppeltaalv2-1.4.5-beta.012-minimal.tgz
+        version: 1.4.5-beta.012a
+        packageUrl: https://github.com/vzvznl/Koppeltaal-2.0-FHIR/releases/download/v1.4.5-beta.012a-minimal-fix%2Fuse-context-rouge-values-13/koppeltaalv2-1.4.5-beta.012a-minimal.tgz
         fetchDependencies: true
         installMode: STORE_AND_INSTALL
     #      example not from registry
