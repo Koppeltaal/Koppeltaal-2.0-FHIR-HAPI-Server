@@ -5,5 +5,4 @@
 	<root level="INFO">
 		<appender-ref ref="CONSOLE" />
 	</root>
-	<logger name = "org.opencds.cqf.cql.engine.debug" level="DEBUG"/>
 </configuration>
