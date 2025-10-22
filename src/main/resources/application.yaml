@@ -167,8 +167,8 @@ hapi:
     implementationguides:
       kt2:
         name: koppeltaalv2.00
-        version: 0.15.0-beta.6a
-        packageUrl: https://github.com/vzvznl/Koppeltaal-2.0-FHIR/releases/download/v0.15.0-beta.6a-feature%2Fkoppeltaal-extension-rename-55/koppeltaalv2-0.15.0-beta.6a.tgz
+        version: 0.15.0-beta.6b
+        packageUrl: https://github.com/vzvznl/Koppeltaal-2.0-FHIR/releases/download/v0.15.0-beta.6b-feature%2Fkoppeltaal-extension-rename-56/koppeltaalv2-0.15.0-beta.6b.tgz
         fetchDependencies: true
         installMode: STORE_AND_INSTALL
     #      example not from registry
