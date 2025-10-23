@@ -21,6 +21,7 @@ This is a HAPI FHIR Server (version 8.2.0) deployment for the Koppeltaal 2.0 pro
 
 - **HFJ_RESOURCE**: Core resource storage (Patient, ValueSet, etc.)
 - **HFJ_RES_VER**: Resource version history
+- **HFJ_RES_VER_PROV**: Resource version provenance (who/when/where)
 - **HFJ_SPIDX_***: Search parameter indexes (STRING, TOKEN, URI, DATE, etc.)
 - **TRM_***: Terminology cache (CodeSystem, ValueSet, Concept storage)
 - **NPM_PACKAGE_***: NPM package metadata and cached resources
@@ -28,9 +29,10 @@ This is a HAPI FHIR Server (version 8.2.0) deployment for the Koppeltaal 2.0 pro
 ### Key Relationships
 
 1. **Resource → Version History**: `HFJ_RESOURCE.res_id` ← `HFJ_RES_VER.res_id`
-2. **Resource → Search Indexes**: `HFJ_RESOURCE.res_id` ← `HFJ_SPIDX_*.res_id`
-3. **CodeSystem → Versions**: `TRM_CODESYSTEM` → `TRM_CODESYSTEM_VER` (circular via `current_version_pid`)
-4. **NPM Package → Resources**: `NPM_PACKAGE` → `NPM_PACKAGE_VER` → `NPM_PACKAGE_VER_RES` → `HFJ_RESOURCE`
+2. **Resource → Version Provenance**: `HFJ_RESOURCE.res_id` ← `HFJ_RES_VER_PROV.res_pid`
+3. **Resource → Search Indexes**: `HFJ_RESOURCE.res_id` ← `HFJ_SPIDX_*.res_id`
+4. **CodeSystem → Versions**: `TRM_CODESYSTEM` → `TRM_CODESYSTEM_VER` (circular via `current_version_pid`)
+5. **NPM Package → Resources**: `NPM_PACKAGE` → `NPM_PACKAGE_VER` → `NPM_PACKAGE_VER_RES` → `HFJ_RESOURCE`
 
 ---
 

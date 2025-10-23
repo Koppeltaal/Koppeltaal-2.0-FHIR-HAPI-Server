@@ -135,6 +135,9 @@ SELECT COUNT(*) as rows_to_delete FROM HFJ_RES_TAG WHERE res_id IN (SELECT res_i
 \echo 'HFJ_RES_PARAM_PRESENT:'
 SELECT COUNT(*) as rows_to_delete FROM HFJ_RES_PARAM_PRESENT WHERE res_id IN (SELECT res_id FROM resources_preview);
 
+\echo 'HFJ_RES_VER_PROV:'
+SELECT COUNT(*) as rows_to_delete FROM HFJ_RES_VER_PROV WHERE res_pid IN (SELECT res_id FROM resources_preview);
+
 \echo 'HFJ_RES_VER:'
 SELECT COUNT(*) as rows_to_delete FROM HFJ_RES_VER WHERE res_id IN (SELECT res_id FROM resources_preview);
 

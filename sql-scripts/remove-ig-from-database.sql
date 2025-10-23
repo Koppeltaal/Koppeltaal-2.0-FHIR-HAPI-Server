@@ -329,6 +329,7 @@ DELETE FROM HFJ_RES_LINK WHERE target_resource_id IN (SELECT res_id FROM resourc
 \echo 'Deleting from other tables...'
 DELETE FROM HFJ_RES_TAG WHERE res_id IN (SELECT res_id FROM resources_to_delete);
 DELETE FROM HFJ_RES_PARAM_PRESENT WHERE res_id IN (SELECT res_id FROM resources_to_delete);
+DELETE FROM HFJ_RES_VER_PROV WHERE res_pid IN (SELECT res_id FROM resources_to_delete);
 DELETE FROM HFJ_RES_VER WHERE res_id IN (SELECT res_id FROM resources_to_delete);
 DELETE FROM HFJ_FORCED_ID WHERE resource_pid IN (SELECT res_id FROM resources_to_delete);
 DELETE FROM HFJ_HISTORY_TAG WHERE res_id IN (SELECT res_id FROM resources_to_delete);
