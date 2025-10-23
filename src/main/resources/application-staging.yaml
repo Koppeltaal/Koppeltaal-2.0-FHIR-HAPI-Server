@@ -11,7 +11,8 @@ spring:
 
 hapi:
   fhir:
-    implementationguides: {}
+    implementationguides:
+      kt2: null
 
 fhir:
   server:
