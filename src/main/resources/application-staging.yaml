@@ -9,10 +9,6 @@ spring:
       hibernate.search.automatic_indexing.synchronization.strategy: read-sync
       hibernate.search.backend.lucene_version: lucene_current
 
-hapi:
-  fhir:
-    implementationguides: null
-
 fhir:
   server:
     security:
