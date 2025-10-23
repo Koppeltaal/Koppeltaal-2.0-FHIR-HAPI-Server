@@ -1,11 +1,11 @@
 spring:
   jpa:
     properties:
-      hibernate.search.enabled: false
+      hibernate.search.enabled: true
       hibernate.search.backend.type: lucene
       hibernate.search.backend.analysis.configurer: ca.uhn.fhir.jpa.search.HapiHSearchAnalysisConfigurers$HapiLuceneAnalysisConfigurer
       hibernate.search.backend.directory.type: local-filesystem
-      hibernate.search.backend.directory.root: /pvc-mount/staging/lucene.v20251014/
+      hibernate.search.backend.directory.root: /pvc-mount/staging/lucene.v20251023/
       hibernate.search.automatic_indexing.synchronization.strategy: read-sync
       hibernate.search.backend.lucene_version: lucene_current
 
