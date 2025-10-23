@@ -28,9 +28,6 @@ services:
       POSTGRES_DB: "hapi"
       POSTGRES_USER: "admin"
       POSTGRES_PASSWORD: "admin"
-    volumes:
-      - hapi-fhir-postgres:/var/lib/postgresql/data
+    # No volume mount - database will be clean on each restart
     ports:
       - "5432:5432"
-volumes:
-  hapi-fhir-postgres:
