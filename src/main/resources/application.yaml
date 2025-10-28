@@ -167,8 +167,8 @@ hapi:
     implementationguides:
       kt2:
         name: koppeltaalv2.00
-        version: 0.15.0-beta.7
-        packageUrl: https://github.com/vzvznl/Koppeltaal-2.0-FHIR/releases/download/v0.15.0-beta.7/koppeltaalv2-0.15.0-beta.7-minimal.tgz
+        version: 0.15.0-beta.8a
+        packageUrl: https://github.com/vzvznl/Koppeltaal-2.0-FHIR/releases/download/v0.15.0-beta.8a-minimal-fix%2FKPTSTD-949-related-person-76/koppeltaalv2-0.15.0-beta.8a-minimal.tgz
         fetchDependencies: true
         installMode: STORE_AND_INSTALL
     #      example not from registry
