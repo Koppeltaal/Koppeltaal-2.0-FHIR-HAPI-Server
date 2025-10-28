@@ -226,7 +226,7 @@ public class StarterJpaConfig {
 							.addDependencyExclude("hl7.fhir.r4.core")
 							.addDependencyExclude("hl7.fhir.r5.core");
 				}
-				
+
 				// Filter out Binary resources to avoid varchar(4000) database errors
 				// Only install configuration and definition resources, skip example instances
 				packageInstallationSpec.addInstallResourceTypes(
@@ -437,7 +437,7 @@ public class StarterJpaConfig {
 		if (validatorModule != null) {
 			if (appProperties.getValidation().getRequests_enabled()) {
 				RequestValidatingInterceptor interceptor = new RequestValidatingInterceptor();
-        interceptor.setIgnoreValidatorExceptions(true); //KOP-431 customization
+        interceptor.setIgnoreValidatorExceptions(false); //Enable validation on POST/PUT (changed from KOP-431)
 				interceptor.setFailOnSeverity(ResultSeverityEnum.ERROR);
 				interceptor.setValidatorModules(Collections.singletonList(validatorModule));
 				fhirServer.registerInterceptor(interceptor);
