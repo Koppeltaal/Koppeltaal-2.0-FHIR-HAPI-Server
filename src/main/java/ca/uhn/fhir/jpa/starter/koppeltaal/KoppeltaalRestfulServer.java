@@ -72,6 +72,9 @@ public class KoppeltaalRestfulServer extends RestfulServer {
   private MimeTypeInterceptor mimeTypeInterceptor;
 
   @Autowired
+  private JsonSyntaxExceptionInterceptor jsonSyntaxExceptionInterceptor;
+
+  @Autowired
   private IInterceptorService myInterceptorRegistry;
 
   @Autowired
@@ -86,6 +89,7 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 
     // Add your own customization here
     registerInterceptor(mimeTypeInterceptor);
+    registerInterceptor(jsonSyntaxExceptionInterceptor);
 
     IFhirResourceDao<Device> deviceDao = daoRegistry.getResourceDao(Device.class);
     if (fhirServerSecurityConfiguration.isEnabled()) {
