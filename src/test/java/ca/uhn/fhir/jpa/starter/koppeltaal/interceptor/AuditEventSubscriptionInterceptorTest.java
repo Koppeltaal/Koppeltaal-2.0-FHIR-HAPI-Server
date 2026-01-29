@@ -76,6 +76,13 @@ public class AuditEventSubscriptionInterceptorTest {
 
     {
       Subscription subscription = setBaseValues(new Subscription());
+      Subscription.SubscriptionChannelComponent channel = new Subscription.SubscriptionChannelComponent();
+      channel.setEndpoint("https://client.example.com/fhir/subscription-notification");
+      subscription.setChannel(channel);
+      // Add resource origin so destination agent is included
+      Device destinationDevice = new Device();
+      destinationDevice.setId("destination-device-id");
+      subscription.addExtension(ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM, new Reference(destinationDevice));
       when(subscriptionDao.read(any(), any(RequestDetails.class), eq(true))).thenReturn(subscription);
     }
 
@@ -128,17 +135,22 @@ public class AuditEventSubscriptionInterceptorTest {
     AuditEvent value = argument.getValue();
     assert value.getAction() == AuditEvent.AuditEventAction.E;
     assert value.getType().equalsShallow(AuditEventBuilder.CODING_TRANSMIT);
-//    assert !value.getAgent().isEmpty();
+    assert !value.getAgent().isEmpty();
     assert "0".equals(value.getOutcome().toCode());
-//    assert "req-dev-id".equals(value.getAgent().get(0).getWho().getReference());//TODO: Fix, only sent on correlation-id
+
+    // Verify destination agent has network address set
+    Optional<AuditEvent.AuditEventAgentComponent> destinationAgent = value.getAgent().stream()
+      .filter(agent -> agent.getType().getCodingFirstRep().getCode().equals("110152"))
+      .findFirst();
+    assert destinationAgent.isPresent();
+    assert destinationAgent.get().getNetwork() != null;
+    assert "https://client.example.com/fhir/subscription-notification".equals(destinationAgent.get().getNetwork().getAddress());
+    assert destinationAgent.get().getNetwork().getType() == AuditEvent.AuditEventAgentNetworkType._5;
 
     String traceIdOnSubscription = value.getExtensionByUrl("http://koppeltaal.nl/fhir/StructureDefinition/trace-id").getValue().toString();
     assert currentTraceId.equals(traceIdOnSubscription);
     String requestIdOnSubscription = value.getExtensionByUrl("http://koppeltaal.nl/fhir/StructureDefinition/request-id").getValue().toString();
     assert currentRequestId.equals(requestIdOnSubscription);
-
-    // String text =
-    // fhirContext.newJsonParser().setPrettyPrint(true).encodeResourceToString(value);
 
   }
 
@@ -162,13 +174,17 @@ public class AuditEventSubscriptionInterceptorTest {
     AuditEvent value = argument.getValue();
     assert value.getAction() == AuditEvent.AuditEventAction.E;
     assert value.getType().equalsShallow(AuditEventBuilder.CODING_TRANSMIT);
-//    assert !value.getAgent().isEmpty();
+    assert !value.getAgent().isEmpty();
     assert "4".equals(value.getOutcome().toCode());
     assert StringUtils.isNotBlank(value.getOutcomeDesc());
-    //    assert "req-dev-id".equals(value.getAgent().get(0).getWho().getReference());//TODO: Fix, only sent on correlation-id
 
-    // String text =
-    // fhirContext.newJsonParser().setPrettyPrint(true).encodeResourceToString(value);
+    // Verify destination agent has network address set even on failure
+    Optional<AuditEvent.AuditEventAgentComponent> destinationAgent = value.getAgent().stream()
+      .filter(agent -> agent.getType().getCodingFirstRep().getCode().equals("110152"))
+      .findFirst();
+    assert destinationAgent.isPresent();
+    assert destinationAgent.get().getNetwork() != null;
+    assert "https://client.example.com/fhir/subscription-notification".equals(destinationAgent.get().getNetwork().getAddress());
 
   }
 }

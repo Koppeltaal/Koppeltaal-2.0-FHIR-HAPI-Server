@@ -161,17 +161,16 @@ public abstract class AbstractAuditEventInterceptor {
   private String getSite(ServletRequestDetails requestDetails) {
     HttpServletRequest servletRequest = requestDetails.getServletRequest();
     String forwardHost = servletRequest.getHeader("X-Forwarded-Host");
-    String forwardProto = servletRequest.getHeader("X-Forwarded-Proto");
     if (StringUtils.isNotEmpty(forwardHost)) {
-      return StringUtils.defaultString(forwardProto, "https") + "://" + forwardHost;
+      return forwardHost;
     }
     String requestUrl = servletRequest.getRequestURL().toString();
     try {
       URL url = new URL(requestUrl);
-      return url.getProtocol() + "://" + url.getHost();
+      return url.getHost();
     } catch (MalformedURLException e) {
       LOG.error("Failed to parse request URL: " + requestUrl, e);
-      return "http://localhost";
+      return "localhost";
     }
   }
 

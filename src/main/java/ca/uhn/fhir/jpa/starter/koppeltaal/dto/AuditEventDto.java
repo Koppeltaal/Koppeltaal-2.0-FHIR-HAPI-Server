@@ -72,6 +72,9 @@ public class AuditEventDto {
 	public void addAgent(Reference agent, Coding type) {
 		this.agents.add(new AgentAndTypeDto(agent, type));
 	}
+	public void addAgent(Reference agent, Coding type, boolean requestor, String networkAddress) {
+		this.agents.add(new AgentAndTypeDto(agent, type, requestor, networkAddress));
+	}
 
 	public EventType getEventType() {
 		return eventType;
@@ -183,17 +186,27 @@ public class AuditEventDto {
     final Reference agent;
     final Coding type;
     final boolean requester;
+    final String networkAddress;
 
     public AgentAndTypeDto(Reference agent, Coding type) {
       this.agent = agent;
       this.type = type;
       this.requester = true;
+      this.networkAddress = null;
     }
 
     public AgentAndTypeDto(Reference agent, Coding type, boolean requester) {
       this.agent = agent;
       this.type = type;
       this.requester = requester;
+      this.networkAddress = null;
+    }
+
+    public AgentAndTypeDto(Reference agent, Coding type, boolean requester, String networkAddress) {
+      this.agent = agent;
+      this.type = type;
+      this.requester = requester;
+      this.networkAddress = networkAddress;
     }
 
     public boolean isRequester() {
@@ -208,12 +221,17 @@ public class AuditEventDto {
       return type;
     }
 
+    public String getNetworkAddress() {
+      return networkAddress;
+    }
+
     @Override
     public String toString() {
       return new ToStringBuilder(this)
         .append("agent", agent)
         .append("type", type)
         .append("requester", requester)
+        .append("networkAddress", networkAddress)
         .toString();
     }
   }

@@ -120,10 +120,10 @@ public class AuditEventBuilder {
     for (AuditEventDto.AgentAndTypeDto agentDto : dto.getAgents()) {
       if (auditEvent.getType().equalsShallow(CODING_TRANSMIT)) {
         // This is a Subscription Notification
-        auditEvent.addAgent(buildAgents(agentDto.getAgent(), agentDto.getType(), agentDto.isRequester()));
+        auditEvent.addAgent(buildAgents(agentDto.getAgent(), agentDto.getType(), agentDto.isRequester(), agentDto.getNetworkAddress()));
       } else if (auditEvent.getType().equalsShallow(CODING_REST)) {
         // This event is a REST operation
-        auditEvent.addAgent(buildAgents(agentDto.getAgent(), agentDto.getType(), agentDto.isRequester()));
+        auditEvent.addAgent(buildAgents(agentDto.getAgent(), agentDto.getType(), agentDto.isRequester(), null));
       }
     }
   }
@@ -145,11 +145,17 @@ public class AuditEventBuilder {
     auditEvent.setMeta(profileMeta);
   }
 
-  private AuditEvent.AuditEventAgentComponent buildAgents(Reference device, Coding role, boolean requestor) {
+  private AuditEvent.AuditEventAgentComponent buildAgents(Reference device, Coding role, boolean requestor, String networkAddress) {
     AuditEvent.AuditEventAgentComponent rv = new AuditEvent.AuditEventAgentComponent();
     rv.setWho(device);
     rv.setType(new CodeableConcept(role));
     rv.setRequestor(requestor);
+    if (StringUtils.isNotEmpty(networkAddress)) {
+      AuditEvent.AuditEventAgentNetworkComponent network = new AuditEvent.AuditEventAgentNetworkComponent();
+      network.setAddress(networkAddress);
+      network.setType(AuditEvent.AuditEventAgentNetworkType._5); // URI
+      rv.setNetwork(network);
+    }
     return rv;
   }
 
@@ -214,7 +220,7 @@ public class AuditEventBuilder {
 					break;
 				case Search:
 					auditEvent.setSubtype(singletonList(CODING_INTERACTION_SEARCH));
-					auditEvent.setAction(AuditEvent.AuditEventAction.R);
+					auditEvent.setAction(AuditEvent.AuditEventAction.E);
 					break;
 				case Update:
 					auditEvent.setSubtype(singletonList(CODING_INTERACTION_UPDATE));

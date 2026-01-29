@@ -76,6 +76,39 @@ public class AuditEventBuilderTest {
     assert StringUtils.equals(getReferenceLikeFhirDoes(event.getEntity().get(2).getWhat()), "Patient/3");
   }
 
+  @Test
+  public void testSearchActionIsExecute() {
+    AuditEventDto dto = new AuditEventDto();
+    dto.setEventType(AuditEventDto.EventType.Search);
+    dto.addResource(new Reference(new Bundle().setId(new IdType("Bundle", "search-result"))));
+    dto.setQuery("/Patient?name=test");
+
+    AuditEvent event = auditEventBuilder.build(dto);
+    assert event.getType().equalsShallow(AuditEventBuilder.CODING_REST);
+    assert event.getSubtype().get(0).equalsShallow(AuditEventBuilder.CODING_INTERACTION_SEARCH);
+    // Search operations should use action "E" (Execute), not "R" (Read)
+    assert StringUtils.equals(event.getAction().toCode(), "E");
+  }
+
+  @Test
+  public void testDeleteEntityType() {
+    AuditEventDto dto = new AuditEventDto();
+    dto.setEventType(AuditEventDto.EventType.Delete);
+    Task task = new Task();
+    task.setId(new IdType("Task", "123"));
+    dto.addResource(new Reference(task));
+
+    AuditEvent event = auditEventBuilder.build(dto);
+    assert event.getType().equalsShallow(AuditEventBuilder.CODING_REST);
+    assert event.getSubtype().get(0).equalsShallow(AuditEventBuilder.CODING_INTERACTION_DELETE);
+    assert StringUtils.equals(event.getAction().toCode(), "D");
+    // Verify entity.type is the actual resource type, not OperationOutcome
+    AuditEvent.AuditEventEntityComponent entity = event.getEntity().get(0);
+    assert StringUtils.equals(entity.getType().getCode(), "Task");
+    // entity.what should be null for delete operations
+    assert entity.getWhat() == null;
+  }
+
   public static String getReferenceLikeFhirDoes(Reference reference) {
     String rv = reference.getReference();
     if (StringUtils.isEmpty(rv)) {
