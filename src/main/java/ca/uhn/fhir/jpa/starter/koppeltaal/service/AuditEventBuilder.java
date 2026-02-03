@@ -44,7 +44,7 @@ public class AuditEventBuilder {
 	public static final Coding CODING_INTERACTION_UPDATE = new Coding("http://hl7.org/fhir/restful-interaction", "update", "update");
 	public static final Coding CODING_INTERACTION_DELETE = new Coding("http://hl7.org/fhir/restful-interaction", "delete", "delete");
 	public static final Coding CODING_INTERACTION_CREATE = new Coding("http://hl7.org/fhir/restful-interaction", "create", "create");
-	public static final Coding CODING_INTERACTION_SEARCH = new Coding("http://hl7.org/fhir/restful-interaction", "search", "search");
+	public static final Coding CODING_INTERACTION_SEARCH = new Coding("http://hl7.org/fhir/restful-interaction", "search-type", "search-type");
 	public static final Coding CODING_INTERACTION_CAPABILITIES = new Coding("http://hl7.org/fhir/restful-interaction", "capabilities", "capabilities");
 	public static final Coding CODING_APPLICATION = new Coding("http://dicom.nema.org/resources/ontology/DCM", "110150", "Application");
 	public static final Coding CODING_APPLICATION_LAUNCHER = new Coding("http://dicom.nema.org/resources/ontology/DCM", "110151", "Application Launcher");
