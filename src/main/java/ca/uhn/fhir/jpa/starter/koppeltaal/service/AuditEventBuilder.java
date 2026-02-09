@@ -214,7 +214,7 @@ public class AuditEventBuilder {
 					break;
 				case Search:
 					auditEvent.setSubtype(singletonList(CODING_INTERACTION_SEARCH));
-					auditEvent.setAction(AuditEvent.AuditEventAction.R);
+					auditEvent.setAction(AuditEvent.AuditEventAction.E);
 					break;
 				case Update:
 					auditEvent.setSubtype(singletonList(CODING_INTERACTION_UPDATE));

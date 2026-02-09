@@ -14,8 +14,13 @@ import org.hl7.fhir.r4.model.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.stream.Stream;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -29,6 +34,18 @@ public class AuditEventBuilderTest {
   AuditEventBuilder auditEventBuilder;
   @Mock
   IFhirResourceDao deviceDao;
+  
+  static Stream<Arguments> eventTypeActionAndSubtype() {
+    return Stream.of(
+      Arguments.of(AuditEventDto.EventType.Create, "C", AuditEventBuilder.CODING_REST, AuditEventBuilder.CODING_INTERACTION_CREATE),
+      Arguments.of(AuditEventDto.EventType.Read, "R", AuditEventBuilder.CODING_REST, AuditEventBuilder.CODING_INTERACTION_READ),
+      Arguments.of(AuditEventDto.EventType.Update, "U", AuditEventBuilder.CODING_REST, AuditEventBuilder.CODING_INTERACTION_UPDATE),
+      Arguments.of(AuditEventDto.EventType.Delete, "D", AuditEventBuilder.CODING_REST, AuditEventBuilder.CODING_INTERACTION_DELETE),
+      Arguments.of(AuditEventDto.EventType.Search, "E", AuditEventBuilder.CODING_REST, AuditEventBuilder.CODING_INTERACTION_SEARCH),
+      Arguments.of(AuditEventDto.EventType.Capability, "R", AuditEventBuilder.CODING_REST, AuditEventBuilder.CODING_INTERACTION_CAPABILITIES),
+      Arguments.of(AuditEventDto.EventType.SendNotification, "E", AuditEventBuilder.CODING_TRANSMIT, null)
+    );
+  }
 
   @BeforeEach
   public void init(@Mock DaoRegistry daoRegistry) {
@@ -74,6 +91,22 @@ public class AuditEventBuilderTest {
     assert StringUtils.equals(getReferenceLikeFhirDoes(event.getEntity().get(0).getWhat()), "Kaas/1");
     assert StringUtils.equals(getReferenceLikeFhirDoes(event.getEntity().get(1).getWhat()), "Patient/2");
     assert StringUtils.equals(getReferenceLikeFhirDoes(event.getEntity().get(2).getWhat()), "Patient/3");
+  }
+
+
+  @ParameterizedTest
+  @MethodSource("eventTypeActionAndSubtype")
+  public void testEventTypeMapping(AuditEventDto.EventType eventType, String expectedAction, Coding expectedType, Coding expectedSubtype) {
+    AuditEventDto dto = new AuditEventDto();
+    dto.setEventType(eventType);
+    AuditEvent event = auditEventBuilder.build(dto);
+    assert event.getType().equalsShallow(expectedType);
+    assert StringUtils.equals(event.getAction().toCode(), expectedAction);
+    if (expectedSubtype != null) {
+      assert event.getSubtype().get(0).equalsShallow(expectedSubtype);
+    } else {
+      assert event.getSubtype().isEmpty();
+    }
   }
 
   public static String getReferenceLikeFhirDoes(Reference reference) {
