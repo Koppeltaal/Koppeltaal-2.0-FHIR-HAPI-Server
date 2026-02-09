@@ -120,10 +120,10 @@ public class AuditEventBuilder {
     for (AuditEventDto.AgentAndTypeDto agentDto : dto.getAgents()) {
       if (auditEvent.getType().equalsShallow(CODING_TRANSMIT)) {
         // This is a Subscription Notification
-        auditEvent.addAgent(buildAgents(agentDto.getAgent(), agentDto.getType(), agentDto.isRequester()));
+        auditEvent.addAgent(buildAgents(agentDto.getAgent(), agentDto.getType(), agentDto.isRequester(), agentDto.getNetworkAddress()));
       } else if (auditEvent.getType().equalsShallow(CODING_REST)) {
         // This event is a REST operation
-        auditEvent.addAgent(buildAgents(agentDto.getAgent(), agentDto.getType(), agentDto.isRequester()));
+        auditEvent.addAgent(buildAgents(agentDto.getAgent(), agentDto.getType(), agentDto.isRequester(), agentDto.getNetworkAddress()));
       }
     }
   }
@@ -145,11 +145,12 @@ public class AuditEventBuilder {
     auditEvent.setMeta(profileMeta);
   }
 
-  private AuditEvent.AuditEventAgentComponent buildAgents(Reference device, Coding role, boolean requestor) {
+  private AuditEvent.AuditEventAgentComponent buildAgents(Reference device, Coding role, boolean requestor, String networkAddress) {
     AuditEvent.AuditEventAgentComponent rv = new AuditEvent.AuditEventAgentComponent();
     rv.setWho(device);
     rv.setType(new CodeableConcept(role));
     rv.setRequestor(requestor);
+    rv.getNetwork().setAddress(networkAddress);
     return rv;
   }
 
