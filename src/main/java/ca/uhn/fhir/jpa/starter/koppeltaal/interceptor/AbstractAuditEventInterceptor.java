@@ -16,8 +16,8 @@ import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 
 /**
@@ -160,19 +160,24 @@ public abstract class AbstractAuditEventInterceptor {
 
   private String getSite(ServletRequestDetails requestDetails) {
     HttpServletRequest servletRequest = requestDetails.getServletRequest();
-    String forwardHost = servletRequest.getHeader("X-Forwarded-Host");
-    String forwardProto = servletRequest.getHeader("X-Forwarded-Proto");
-    if (StringUtils.isNotEmpty(forwardHost)) {
-      return StringUtils.defaultString(forwardProto, "https") + "://" + forwardHost;
-    }
     String requestUrl = servletRequest.getRequestURL().toString();
-    try {
-      URL url = new URL(requestUrl);
-      return url.getProtocol() + "://" + url.getHost();
-    } catch (MalformedURLException e) {
-      LOG.error("Failed to parse request URL: " + requestUrl, e);
-      return "http://localhost";
+    String forwardHost = servletRequest.getHeader("X-Forwarded-Host");
+    return extractHost(requestUrl, forwardHost);
+  }
+
+  static String extractHost(String requestUrl, String forwardHost) {
+    if (StringUtils.isNotEmpty(forwardHost)) {
+      return forwardHost;
     }
+    try {
+      String host = new URI(requestUrl).getHost();
+      if (host != null) {
+        return host;
+      }
+    } catch (URISyntaxException e) {
+      LOG.error("Failed to parse request URL: " + requestUrl, e);
+    }
+    return "localhost";
   }
 
 }
