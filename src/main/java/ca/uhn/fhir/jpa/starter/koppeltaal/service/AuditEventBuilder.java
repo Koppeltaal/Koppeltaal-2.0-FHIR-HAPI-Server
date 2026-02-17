@@ -75,6 +75,17 @@ public class AuditEventBuilder {
     AuditEvent auditEvent = new AuditEvent();
     AuditEventDto.EventType eventType = dto.getEventType();
     buildEventType(auditEvent, eventType);
+
+    // For Search events, add a query-only entity first with type, role and query
+    if (eventType == EventType.Search && StringUtils.isNotEmpty(dto.getQuery())) {
+      AuditEvent.AuditEventEntityComponent queryEntity = new AuditEvent.AuditEventEntityComponent();
+      String searchedType = extractResourceTypeFromQuery(dto.getQuery());
+      queryEntity.setType(new Coding("http://hl7.org/fhir/resource-types", searchedType, searchedType));
+      queryEntity.setRole(new Coding("http://terminology.hl7.org/CodeSystem/object-role", "24", "Query"));
+      queryEntity.setQuery(dto.getQuery().getBytes(StandardCharsets.UTF_8));
+      auditEvent.addEntity(queryEntity);
+    }
+
     List<Reference> resources = dto.getResources();
     for (Reference resource : resources) {
       AuditEvent.AuditEventEntityComponent entity = buildAuditEventEntityComponent(resource, dto);
@@ -164,14 +175,12 @@ public class AuditEventBuilder {
     component.setWhat(reference);
     String type = getTypeFromReference(reference);
     component.setType(new Coding("http://hl7.org/fhir/resource-types", type, type));
+    // For Search events, the query is on the dedicated query entity; result entities get name
     String query = auditEvent.getQuery();
-    if (StringUtils.isNotEmpty(query)) {
+    if (StringUtils.isNotEmpty(query) && auditEvent.getEventType() != EventType.Search) {
       component.setQuery(query.getBytes(StandardCharsets.UTF_8));
     } else {
       component.setName(type); //it's not allowed to both set the name and query http://hl7.org/fhir/R4B/auditevent-definitions.html#AuditEvent.entity.name
-    }
-    if (auditEvent.getEventType() == EventType.Search && "Bundle".equals(type)) {
-      component.setRole(new Coding("http://terminology.hl7.org/CodeSystem/object-role", "24", "Query"));
     }
     return component;
 	}
@@ -270,6 +279,19 @@ public class AuditEventBuilder {
 			return (Device) search.getResources(0, 1).get(0);
 		}
 		return null;
+	}
+
+	static String extractResourceTypeFromQuery(String query) {
+		String path = StringUtils.removeStart(query, "/");
+		int slashIndex = path.indexOf('/');
+		if (slashIndex >= 0) {
+			path = path.substring(0, slashIndex);
+		}
+		int qIndex = path.indexOf('?');
+		if (qIndex >= 0) {
+			path = path.substring(0, qIndex);
+		}
+		return path;
 	}
 
 	@NotNull

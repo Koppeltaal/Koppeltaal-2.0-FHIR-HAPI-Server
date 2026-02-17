@@ -124,8 +124,12 @@ public abstract class AbstractAuditEventInterceptor {
     try {
       if (!(resource instanceof AuditEvent)) {
         AuditEventDto dto = new AuditEventDto();
-        addResources(dto, resource);
         if (setRequestType(requestDetails, dto)) {
+          // For Search events, don't add the Bundle itself as entity;
+          // the query entity is built separately by AuditEventBuilder
+          if (dto.getEventType() != AuditEventDto.EventType.Search) {
+            addResources(dto, resource);
+          }
           setInteraction(requestDetails, dto);
           setAgent(requestDetails, dto, AuditEventBuilder.CODING_SOURCE_ROLE_ID);
           if (resource instanceof Bundle) {
@@ -135,7 +139,6 @@ public abstract class AbstractAuditEventInterceptor {
               for (Bundle.BundleEntryComponent bundleEntryComponent : entry) {
                 addResources(dto, bundleEntryComponent.getResource());
               }
-
             }
           }
 
