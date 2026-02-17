@@ -88,7 +88,7 @@ public class AuditEventBuilder {
 
     List<Reference> resources = dto.getResources();
     for (Reference resource : resources) {
-      AuditEvent.AuditEventEntityComponent entity = buildAuditEventEntityComponent(resource, dto);
+      AuditEvent.AuditEventEntityComponent entity = buildAuditEventEntityComponent(resource);
       if (dto.getEventType() == AuditEventDto.EventType.Delete) {
         entity.setWhat(null); //remove as it's not allowed to reference to deleted objects
       }
@@ -105,7 +105,7 @@ public class AuditEventBuilder {
 		auditEvent.addExtension("http://koppeltaal.nl/fhir/StructureDefinition/correlation-id", new IdType(dto.getCorrelationId()));
 
     if(dto.getOperationOutcome() != null) {
-      AuditEvent.AuditEventEntityComponent entity = buildAuditEventEntityComponent(newReference(dto.getOperationOutcome()), dto);
+      AuditEvent.AuditEventEntityComponent entity = buildAuditEventEntityComponent(newReference(dto.getOperationOutcome()));
       entity.setWhat(null); //remove ad OperationOutcomes aren't persisted and can't be referenced to
       auditEvent.addEntity(entity);
       auditEvent.setOutcomeDesc(
@@ -170,18 +170,12 @@ public class AuditEventBuilder {
     return rv;
   }
 
-  private AuditEvent.AuditEventEntityComponent buildAuditEventEntityComponent(Reference reference, AuditEventDto auditEvent) {
+  private AuditEvent.AuditEventEntityComponent buildAuditEventEntityComponent(Reference reference) {
     AuditEvent.AuditEventEntityComponent component = new AuditEvent.AuditEventEntityComponent();
     component.setWhat(reference);
     String type = getTypeFromReference(reference);
     component.setType(new Coding("http://hl7.org/fhir/resource-types", type, type));
-    // For Search events, the query is on the dedicated query entity; result entities get name
-    String query = auditEvent.getQuery();
-    if (StringUtils.isNotEmpty(query) && auditEvent.getEventType() != EventType.Search) {
-      component.setQuery(query.getBytes(StandardCharsets.UTF_8));
-    } else {
-      component.setName(type); //it's not allowed to both set the name and query http://hl7.org/fhir/R4B/auditevent-definitions.html#AuditEvent.entity.name
-    }
+    component.setName(type);
     return component;
 	}
 
