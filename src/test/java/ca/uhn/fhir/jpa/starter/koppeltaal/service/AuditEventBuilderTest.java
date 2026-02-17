@@ -109,6 +109,25 @@ public class AuditEventBuilderTest {
     }
   }
 
+  @Test
+  public void testDeleteEntityType() {
+    AuditEventDto dto = new AuditEventDto();
+    dto.setEventType(AuditEventDto.EventType.Delete);
+    Task task = new Task();
+    task.setId(new IdType("Task", "123"));
+    dto.addResource(new Reference(task));
+
+    AuditEvent event = auditEventBuilder.build(dto);
+    assert event.getType().equalsShallow(AuditEventBuilder.CODING_REST);
+    assert event.getSubtype().get(0).equalsShallow(AuditEventBuilder.CODING_INTERACTION_DELETE);
+    assert StringUtils.equals(event.getAction().toCode(), "D");
+    // Verify entity.type is the actual resource type, not OperationOutcome
+    AuditEvent.AuditEventEntityComponent entity = event.getEntity().get(0);
+    assert StringUtils.equals(entity.getType().getCode(), "Task");
+    // entity.what should be empty for delete operations
+    assert entity.getWhat().isEmpty();
+  }
+
   public static String getReferenceLikeFhirDoes(Reference reference) {
     String rv = reference.getReference();
     if (StringUtils.isEmpty(rv)) {

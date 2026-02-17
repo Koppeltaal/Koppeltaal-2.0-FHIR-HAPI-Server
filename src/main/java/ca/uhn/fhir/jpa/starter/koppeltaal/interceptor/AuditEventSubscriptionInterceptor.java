@@ -118,7 +118,7 @@ public class AuditEventSubscriptionInterceptor extends AbstractAuditEventInterce
       Subscription subscription = subscriptionDao.read(subscriptionId, requestDetails, true);
       if (subscription != null) {
         Optional<IIdType> subscriptionDeviceId = ResourceOriginUtil.getResourceOriginDeviceId(subscription);
-        String endpointUrl = subscription.getChannel().getEndpoint();
+        String endpointUrl = subscription.getChannel() != null ? subscription.getChannel().getEndpoint() : null;
         subscriptionDeviceId
           .ifPresent(id -> dto.addAgent(new Reference(id), AuditEventBuilder.CODING_DESTINATION_ROLE_ID, false, endpointUrl));
         dto.addResource(new Reference(subscription));
