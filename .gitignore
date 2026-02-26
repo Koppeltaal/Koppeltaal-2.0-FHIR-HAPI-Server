@@ -168,3 +168,8 @@ Temporary Items
 
 # Helm Chart dependencies
 **/charts/*.tgz
+
+# E2E test secrets and reports
+e2e/.env
+e2e/private.pem
+e2e/reports/

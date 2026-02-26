@@ -1,0 +1,12 @@
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "kid": "kt2-e2e-95f25805",
+      "use": "sig",
+      "alg": "RS512",
+      "n": "_DSZ1Qfmoe1nZZ8kcMDhUhXhFfVhF9bEP1GG-zm65GiqklSHGQmXKQh4B4DDXg3mK1FHEX6DB__qqE3pb34pXNZbXbFW-ptyxd83resthXRb2nTEeLm7QAf6sxYCxbA9FM0y9Yg0JG3zVa_NzZGVjsMYyfU0VRM5NaNiyXG_n_ms0rZ0WUS4f34Vq-UksZqVibcnm4w3NUXzWNy7FQWUMTNcDoposxmkt4hgjad6h7HxWzprDaszuD1ogHLWmUmIFiRUcI0wNuOKOWqVp1O0X3lEtxp9BmtWL6zP7qkyyXVRS6n-XuX1QR--6LfzIydY0gKxkYrYsqAnUOjcxbWAnQ",
+      "e": "AQAB"
+    }
+  ]
+}
