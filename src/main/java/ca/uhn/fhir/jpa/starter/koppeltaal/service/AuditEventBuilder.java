@@ -175,7 +175,6 @@ public class AuditEventBuilder {
     component.setWhat(reference);
     String type = getTypeFromReference(reference);
     component.setType(new Coding("http://hl7.org/fhir/resource-types", type, type));
-    component.setName(type);
     return component;
 	}
 
