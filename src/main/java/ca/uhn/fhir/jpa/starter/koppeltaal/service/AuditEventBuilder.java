@@ -92,6 +92,9 @@ public class AuditEventBuilder {
       if (dto.getEventType() == AuditEventDto.EventType.Delete) {
         entity.setWhat(null); //remove as it's not allowed to reference to deleted objects
       }
+      if (eventType == EventType.SendNotification && "Subscription".equals(getTypeFromReference(resource))) {
+        entity.setRole(new Coding("http://terminology.hl7.org/CodeSystem/object-role", "9", "Subscriber"));
+      }
       auditEvent.addEntity(entity);
     }
     auditEvent.setSource(buildEventSource(dto.getSite()));
