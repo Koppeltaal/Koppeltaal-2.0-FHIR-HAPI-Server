@@ -94,6 +94,9 @@ public class AuditEventBuilder {
       }
       if (eventType == EventType.SendNotification && "Subscription".equals(getTypeFromReference(resource))) {
         entity.setRole(new Coding("http://terminology.hl7.org/CodeSystem/object-role", "9", "Subscriber"));
+        if (StringUtils.isNotEmpty(dto.getQuery())) {
+          entity.setQuery(dto.getQuery().getBytes(StandardCharsets.UTF_8));
+        }
       }
       auditEvent.addEntity(entity);
     }
