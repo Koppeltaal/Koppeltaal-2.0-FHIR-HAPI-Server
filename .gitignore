@@ -171,6 +171,8 @@ Temporary Items
 
 # E2E test secrets and reports
 e2e/.env
+e2e/.env.*
+!e2e/.env.example
 e2e/private.pem
 e2e/reports/
 

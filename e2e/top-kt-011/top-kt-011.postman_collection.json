@@ -1,0 +1,1885 @@
+{
+  "info": {
+    "name": "TOP-KT-011 AuditEvent Validation",
+    "description": "E2E tests validating AuditEvent creation for all FHIR REST interactions against the TOP-KT-011 specification.\n\nRequires SMART Backend Service credentials via environment variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// === SMART Backend Service JWT Authentication ===",
+          "",
+          "var tokenExpiresAt = pm.environment.get('tokenExpiresAt');",
+          "var accessToken = pm.environment.get('accessToken');",
+          "if (accessToken && tokenExpiresAt && Date.now() < (parseInt(tokenExpiresAt) - 30000)) {",
+          "  return;",
+          "}",
+          "",
+          "var clientId = pm.environment.get('clientId');",
+          "var privateKeyPem = pm.environment.get('privateKeyPem');",
+          "var keyId = pm.environment.get('keyId');",
+          "var tokenEndpoint = pm.environment.get('tokenEndpoint');",
+          "",
+          "if (!clientId || !privateKeyPem || !keyId) {",
+          "  console.warn('Missing credentials: clientId, privateKeyPem, and keyId must be set');",
+          "  return;",
+          "}",
+          "",
+          "var pem = privateKeyPem.replace(/\\\\n/g, '\\n');",
+          "",
+          "function signAndGetToken() {",
+          "  var navigator = {};",
+          "  var window = {};",
+          "  eval(pm.globals.get('jsrsasign-lib'));",
+          "",
+          "  var header = JSON.stringify({ alg: 'RS512', typ: 'JWT', kid: keyId });",
+          "  var now = Math.floor(Date.now() / 1000);",
+          "  var jti = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {",
+          "    var r = Math.random() * 16 | 0;",
+          "    var v = c === 'x' ? r : (r & 0x3 | 0x8);",
+          "    return v.toString(16);",
+          "  });",
+          "",
+          "  var payload = JSON.stringify({",
+          "    iss: clientId,",
+          "    sub: clientId,",
+          "    aud: tokenEndpoint,",
+          "    jti: jti,",
+          "    exp: now + 300,",
+          "    iat: now",
+          "  });",
+          "",
+          "  var jwt = KJUR.jws.JWS.sign('RS512', header, payload, pem);",
+          "",
+          "  pm.sendRequest({",
+          "    url: tokenEndpoint,",
+          "    method: 'POST',",
+          "    header: { 'Content-Type': 'application/x-www-form-urlencoded' },",
+          "    body: {",
+          "      mode: 'urlencoded',",
+          "      urlencoded: [",
+          "        { key: 'grant_type', value: 'client_credentials' },",
+          "        { key: 'client_assertion_type', value: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer' },",
+          "        { key: 'client_assertion', value: jwt }",
+          "      ]",
+          "    }",
+          "  }, function(err, res) {",
+          "    if (err) { console.error('Token request failed:', err); return; }",
+          "    var body = res.json();",
+          "    if (!body.access_token) {",
+          "      console.error('No access_token in response:', JSON.stringify(body));",
+          "      return;",
+          "    }",
+          "    pm.environment.set('accessToken', body.access_token);",
+          "    pm.environment.set('tokenExpiresAt', String(Date.now() + (body.expires_in || 3600) * 1000));",
+          "  });",
+          "}",
+          "",
+          "// Load jsrsasign from CDN if not cached in globals",
+          "if (!pm.globals.get('jsrsasign-lib')) {",
+          "  pm.sendRequest({",
+          "    url: 'https://cdnjs.cloudflare.com/ajax/libs/jsrsasign/11.1.0/jsrsasign-all-min.js',",
+          "    method: 'GET'",
+          "  }, function(err, res) {",
+          "    if (err) { console.error('Failed to load jsrsasign:', err); return; }",
+          "    pm.globals.set('jsrsasign-lib', res.text());",
+          "    signAndGetToken();",
+          "  });",
+          "} else {",
+          "  signAndGetToken();",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "00. Setup",
+      "item": [
+        {
+          "name": "POST /Patient",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code !== 201) {",
+                  "  console.log('Patient creation failed:', pm.response.code, pm.response.text());",
+                  "}",
+                  "var body = pm.response.json();",
+                  "pm.test('Patient created', function() {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect(body.resourceType).to.eql('Patient');",
+                  "  pm.environment.set('patientId', body.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/fhir+json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resourceType\": \"Patient\",\n  \"meta\": {\n    \"profile\": [\n      \"http://koppeltaal.nl/fhir/StructureDefinition/KT2Patient\"\n    ]\n  },\n  \"identifier\": [\n    {\n      \"use\": \"usual\",\n      \"system\": \"https://e2e-test.koppeltaal.nl/patient-id\",\n      \"value\": \"top-kt-011-test-patient\"\n    },\n    {\n      \"use\": \"official\",\n      \"system\": \"https://e2e-test.koppeltaal.nl/irma-id\",\n      \"value\": \"e2e-test@koppeltaal.nl\"\n    }\n  ],\n  \"active\": true,\n  \"name\": [\n    {\n      \"use\": \"official\",\n      \"text\": \"E2E Test\",\n      \"family\": \"Test\",\n      \"_family\": {\n        \"extension\": [\n          {\n            \"url\": \"http://hl7.org/fhir/StructureDefinition/humanname-own-name\",\n            \"valueString\": \"Test\"\n          }\n        ]\n      },\n      \"given\": [\n        \"E2E\"\n      ],\n      \"_given\": [\n        {\n          \"extension\": [\n            {\n              \"url\": \"http://hl7.org/fhir/StructureDefinition/iso21090-EN-qualifier\",\n              \"valueCode\": \"BR\"\n            }\n          ]\n        }\n      ]\n    }\n  ],\n  \"telecom\": [\n    {\n      \"system\": \"email\",\n      \"value\": \"e2e-test@koppeltaal.nl\",\n      \"use\": \"home\"\n    }\n  ],\n  \"gender\": \"unknown\",\n  \"birthDate\": \"2000-01-01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/Patient",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Patient"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /Organization",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var body = pm.response.json();",
+                  "pm.test('Organization created', function() {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect(body.resourceType).to.eql('Organization');",
+                  "  pm.environment.set('organizationId', body.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/fhir+json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"resourceType\": \"Organization\", \"meta\": {\"profile\": [\"http://koppeltaal.nl/fhir/StructureDefinition/KT2Organization\"]}, \"identifier\": [{\"system\": \"https://e2e-test.koppeltaal.nl/organization-id\", \"value\": \"top-kt-011-test-org\"}], \"active\": true, \"name\": \"E2E Test Organization\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/Organization",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Organization"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "01. Capability",
+      "item": [
+        {
+          "name": "GET /metadata",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('actionTimestamp', new Date().toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Capability statement returned', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.resourceType).to.eql('CapabilityStatement');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metadata",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "metadata"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Validate AuditEvent - capabilities",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var waitMs = parseInt(pm.environment.get('auditEventWaitMs') || '3000');",
+                  "var delaySeconds = Math.ceil(waitMs / 1000);",
+                  "pm.sendRequest('https://postman-echo.com/delay/' + delaySeconds, function() {});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var bundle = pm.response.json();",
+                  "",
+                  "pm.test('AuditEvent bundle returned', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(bundle.resourceType).to.eql('Bundle');",
+                  "  pm.expect(bundle.entry).to.be.an('array').that.is.not.empty;",
+                  "});",
+                  "",
+                  "if (!bundle.entry || !bundle.entry.length) return;",
+                  "var ae = bundle.entry[0].resource;",
+                  "",
+                  "// --- type ---",
+                  "pm.test('type.system = audit-event-type', function() {",
+                  "  pm.expect(ae.type.system).to.eql('http://terminology.hl7.org/CodeSystem/audit-event-type');",
+                  "});",
+                  "pm.test('type.code = rest', function() {",
+                  "  pm.expect(ae.type.code).to.eql('rest');",
+                  "});",
+                  "pm.test('type.display = RESTful Operation', function() {",
+                  "  pm.expect(ae.type.display).to.eql('RESTful Operation');",
+                  "});",
+                  "",
+                  "// --- subtype ---",
+                  "pm.test('subtype[0].system = restful-interaction', function() {",
+                  "  pm.expect(ae.subtype[0].system).to.eql('http://hl7.org/fhir/restful-interaction');",
+                  "});",
+                  "pm.test('subtype[0].code = capabilities', function() {",
+                  "  pm.expect(ae.subtype[0].code).to.eql('capabilities');",
+                  "});",
+                  "pm.test('subtype[0].display = capabilities', function() {",
+                  "  pm.expect(ae.subtype[0].display).to.eql('capabilities');",
+                  "});",
+                  "",
+                  "// --- action ---",
+                  "pm.test('action = R (Read)', function() {",
+                  "  pm.expect(ae.action).to.eql('R');",
+                  "});",
+                  "",
+                  "// --- outcome ---",
+                  "pm.test('outcome = 0 (Success)', function() {",
+                  "  pm.expect(ae.outcome).to.eql('0');",
+                  "});",
+                  "",
+                  "// --- recorded ---",
+                  "pm.test('recorded is present', function() {",
+                  "  pm.expect(ae.recorded).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "// --- agent ---",
+                  "pm.test('agent[0].who is Device reference', function() {",
+                  "  pm.expect(ae.agent[0].who).to.not.be.undefined;",
+                  "  pm.expect(ae.agent[0].who.reference).to.match(/^Device\\//);",
+                  "});",
+                  "pm.test('agent[0].type = Source Role ID (DCM 110153)', function() {",
+                  "  var coding = ae.agent[0].type.coding[0];",
+                  "  pm.expect(coding.system).to.eql('http://dicom.nema.org/resources/ontology/DCM');",
+                  "  pm.expect(coding.code).to.eql('110153');",
+                  "  pm.expect(coding.display).to.eql('Source Role ID');",
+                  "});",
+                  "pm.test('agent[0].requestor = true', function() {",
+                  "  pm.expect(ae.agent[0].requestor).to.eql(true);",
+                  "});",
+                  "pm.test('agent[0].network is absent', function() {",
+                  "  pm.expect(ae.agent[0].network).to.be.undefined;",
+                  "});",
+                  "",
+                  "// --- source ---",
+                  "pm.test('source.site is hostname', function() {",
+                  "  pm.expect(ae.source.site).to.be.a('string').and.not.empty;",
+                  "  pm.expect(ae.source.site).to.not.include('https://');",
+                  "});",
+                  "pm.test('source.observer is Device reference', function() {",
+                  "  pm.expect(ae.source.observer.reference).to.match(/^Device\\//);",
+                  "});",
+                  "",
+                  "// --- entity (capabilities returns CapabilityStatement entity) ---",
+                  "pm.test('entity[0].type.system = resource-types', function() {",
+                  "  pm.expect(ae.entity).to.be.an('array').that.is.not.empty;",
+                  "  pm.expect(ae.entity[0].type.system).to.eql('http://hl7.org/fhir/resource-types');",
+                  "});",
+                  "pm.test('entity[0].type.code = CapabilityStatement', function() {",
+                  "  pm.expect(ae.entity[0].type.code).to.eql('CapabilityStatement');",
+                  "});",
+                  "pm.test('entity[0].type.display = CapabilityStatement', function() {",
+                  "  pm.expect(ae.entity[0].type.display).to.eql('CapabilityStatement');",
+                  "});",
+                  "pm.test('entity[0].query is absent for capabilities', function() {",
+                  "  pm.expect(ae.entity[0].query).to.be.undefined;",
+                  "});",
+                  "pm.test('entity[0].name is absent (deprecated)', function() {",
+                  "  pm.expect(ae.entity[0].name).to.be.undefined;",
+                  "});",
+                  "",
+                  "// --- meta.profile ---",
+                  "pm.test('meta.profile contains KT2AuditEvent', function() {",
+                  "  pm.expect(ae.meta.profile).to.be.an('array');",
+                  "  var hasProfile = ae.meta.profile.some(function(p) { return p.includes('koppeltaal.nl/fhir/StructureDefinition/KT2AuditEvent'); });",
+                  "  pm.expect(hasProfile).to.be.true;",
+                  "});",
+                  "",
+                  "// --- extensions ---",
+                  "pm.test('extension trace-id is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  var traceId = ext.find(function(e) { return e.url.includes('trace-id'); });",
+                  "  pm.expect(traceId).to.not.be.undefined;",
+                  "});",
+                  "pm.test('extension request-id is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  var requestId = ext.find(function(e) { return e.url.includes('request-id'); });",
+                  "  pm.expect(requestId).to.not.be.undefined;",
+                  "});",
+                  "pm.test('extension resource-origin is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  var origin = ext.find(function(e) { return e.url.includes('resource-origin'); });",
+                  "  pm.expect(origin).to.not.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/AuditEvent?subtype=capabilities&date=ge{{actionTimestamp}}&_sort=-date&_count=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "AuditEvent"
+              ],
+              "query": [
+                {
+                  "key": "subtype",
+                  "value": "capabilities"
+                },
+                {
+                  "key": "date",
+                  "value": "ge{{actionTimestamp}}"
+                },
+                {
+                  "key": "_sort",
+                  "value": "-date"
+                },
+                {
+                  "key": "_count",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. Subscribe",
+      "item": [
+        {
+          "name": "POST /Subscription",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('actionTimestamp', new Date().toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var body = pm.response.json();",
+                  "pm.test('Subscription created', function() {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect(body.resourceType).to.eql('Subscription');",
+                  "  pm.environment.set('subscriptionId', body.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/fhir+json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resourceType\": \"Subscription\",\n  \"meta\": {\n    \"profile\": [\"http://koppeltaal.nl/fhir/StructureDefinition/KT2Subscription\"]\n  },\n  \"status\": \"requested\",\n  \"reason\": \"E2E test - TOP-KT-011 SendNotification validation\",\n  \"criteria\": \"Task?code=exercise\",\n  \"channel\": {\n    \"type\": \"rest-hook\",\n    \"endpoint\": \"https://postman-echo.com/post\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/Subscription",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Subscription"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Create",
+      "item": [
+        {
+          "name": "POST /Task",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('actionTimestamp', new Date().toISOString());",
+                  "pm.environment.set('createActionTimestamp', new Date().toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var body = pm.response.json();",
+                  "pm.test('Task created', function() {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect(body.resourceType).to.eql('Task');",
+                  "  pm.environment.set('taskId', body.id);",
+                  "  pm.environment.set('taskVersionId', body.meta.versionId);",
+                  "  var etag = pm.response.headers.get('ETag');",
+                  "  if (etag) pm.environment.set('taskETag', etag);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/fhir+json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"resourceType\": \"Task\", \"meta\": {\"profile\": [\"http://koppeltaal.nl/fhir/StructureDefinition/KT2Task\"]}, \"identifier\": [{\"system\": \"https://e2e-test.koppeltaal.nl/task-id\", \"value\": \"top-kt-011-test\"}], \"status\": \"requested\", \"intent\": \"order\", \"priority\": \"routine\", \"code\": {\"coding\": [{\"system\": \"http://vzvz.nl/fhir/CodeSystem/koppeltaal-task-code\", \"code\": \"exercise\"}]}, \"for\": {\"reference\": \"Patient/{{patientId}}\"}, \"owner\": {\"reference\": \"Patient/{{patientId}}\"}}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/Task",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Task"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Validate AuditEvent - create",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var waitMs = parseInt(pm.environment.get('auditEventWaitMs') || '3000');",
+                  "var delaySeconds = Math.ceil(waitMs / 1000);",
+                  "pm.sendRequest('https://postman-echo.com/delay/' + delaySeconds, function() {});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var taskId = pm.environment.get('taskId');",
+                  "if (!taskId) { pm.test.skip('Skipping - no Task was created'); return; }",
+                  "",
+                  "var bundle = pm.response.json();",
+                  "",
+                  "pm.test('AuditEvent bundle returned', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(bundle.resourceType).to.eql('Bundle');",
+                  "  pm.expect(bundle.entry).to.be.an('array').that.is.not.empty;",
+                  "});",
+                  "",
+                  "if (!bundle.entry || !bundle.entry.length) return;",
+                  "var ae = bundle.entry[0].resource;",
+                  "",
+                  "pm.test('type.system = audit-event-type', function() {",
+                  "  pm.expect(ae.type.system).to.eql('http://terminology.hl7.org/CodeSystem/audit-event-type');",
+                  "});",
+                  "pm.test('type.code = rest', function() {",
+                  "  pm.expect(ae.type.code).to.eql('rest');",
+                  "});",
+                  "pm.test('type.display = RESTful Operation', function() {",
+                  "  pm.expect(ae.type.display).to.eql('RESTful Operation');",
+                  "});",
+                  "pm.test('subtype[0].system = restful-interaction', function() {",
+                  "  pm.expect(ae.subtype[0].system).to.eql('http://hl7.org/fhir/restful-interaction');",
+                  "});",
+                  "pm.test('subtype[0].code = create', function() {",
+                  "  pm.expect(ae.subtype[0].code).to.eql('create');",
+                  "});",
+                  "pm.test('subtype[0].display = create', function() {",
+                  "  pm.expect(ae.subtype[0].display).to.eql('create');",
+                  "});",
+                  "pm.test('action = C (Create)', function() {",
+                  "  pm.expect(ae.action).to.eql('C');",
+                  "});",
+                  "pm.test('outcome = 0 (Success)', function() {",
+                  "  pm.expect(ae.outcome).to.eql('0');",
+                  "});",
+                  "pm.test('recorded is present', function() {",
+                  "  pm.expect(ae.recorded).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.test('agent[0].who is Device reference', function() {",
+                  "  pm.expect(ae.agent[0].who).to.not.be.undefined;",
+                  "  pm.expect(ae.agent[0].who.reference).to.match(/^Device\\//);",
+                  "});",
+                  "pm.test('agent[0].type = Source Role ID (DCM 110153)', function() {",
+                  "  var coding = ae.agent[0].type.coding[0];",
+                  "  pm.expect(coding.system).to.eql('http://dicom.nema.org/resources/ontology/DCM');",
+                  "  pm.expect(coding.code).to.eql('110153');",
+                  "  pm.expect(coding.display).to.eql('Source Role ID');",
+                  "});",
+                  "pm.test('agent[0].requestor = true', function() {",
+                  "  pm.expect(ae.agent[0].requestor).to.eql(true);",
+                  "});",
+                  "pm.test('agent[0].network is absent', function() {",
+                  "  pm.expect(ae.agent[0].network).to.be.undefined;",
+                  "});",
+                  "pm.test('source.site is hostname', function() {",
+                  "  pm.expect(ae.source.site).to.be.a('string').and.not.empty;",
+                  "  pm.expect(ae.source.site).to.not.include('https://');",
+                  "});",
+                  "pm.test('source.observer is Device reference', function() {",
+                  "  pm.expect(ae.source.observer.reference).to.match(/^Device\\//);",
+                  "});",
+                  "pm.test('entity[0].type.system = resource-types', function() {",
+                  "  pm.expect(ae.entity[0].type.system).to.eql('http://hl7.org/fhir/resource-types');",
+                  "});",
+                  "pm.test('entity[0].type.code = Task', function() {",
+                  "  pm.expect(ae.entity[0].type.code).to.eql('Task');",
+                  "});",
+                  "pm.test('entity[0].type.display = Task', function() {",
+                  "  pm.expect(ae.entity[0].type.display).to.eql('Task');",
+                  "});",
+                  "pm.test('entity[0].what contains /_history/', function() {",
+                  "  pm.expect(ae.entity[0].what.reference).to.include('/_history/');",
+                  "  pm.expect(ae.entity[0].what.reference).to.include('Task/' + taskId);",
+                  "});",
+                  "pm.test('entity[0].name is absent (deprecated)', function() {",
+                  "  pm.expect(ae.entity[0].name).to.be.undefined;",
+                  "});",
+                  "pm.test('entity[0].role is absent for create', function() {",
+                  "  pm.expect(ae.entity[0].role).to.be.undefined;",
+                  "});",
+                  "pm.test('entity[0].query is absent for create', function() {",
+                  "  pm.expect(ae.entity[0].query).to.be.undefined;",
+                  "});",
+                  "pm.test('meta.profile contains KT2AuditEvent', function() {",
+                  "  pm.expect(ae.meta.profile).to.be.an('array');",
+                  "  var hasProfile = ae.meta.profile.some(function(p) { return p.includes('koppeltaal.nl/fhir/StructureDefinition/KT2AuditEvent'); });",
+                  "  pm.expect(hasProfile).to.be.true;",
+                  "});",
+                  "pm.test('extension trace-id is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('trace-id'); })).to.not.be.undefined;",
+                  "});",
+                  "pm.test('extension request-id is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('request-id'); })).to.not.be.undefined;",
+                  "});",
+                  "pm.test('extension resource-origin is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('resource-origin'); })).to.not.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/AuditEvent?subtype=create&date=ge{{actionTimestamp}}&_sort=-date&_count=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "AuditEvent"
+              ],
+              "query": [
+                {
+                  "key": "subtype",
+                  "value": "create"
+                },
+                {
+                  "key": "date",
+                  "value": "ge{{actionTimestamp}}"
+                },
+                {
+                  "key": "_sort",
+                  "value": "-date"
+                },
+                {
+                  "key": "_count",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. Read",
+      "item": [
+        {
+          "name": "GET /Task/:id",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('taskId')) { pm.test.skip('Skipping - no Task was created'); }",
+                  "pm.environment.set('actionTimestamp', new Date().toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('taskId')) return;",
+                  "pm.test('Task read successfully', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.resourceType).to.eql('Task');",
+                  "  pm.expect(body.id).to.eql(pm.environment.get('taskId'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/Task/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Task",
+                "{{taskId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Validate AuditEvent - read",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var waitMs = parseInt(pm.environment.get('auditEventWaitMs') || '3000');",
+                  "var delaySeconds = Math.ceil(waitMs / 1000);",
+                  "pm.sendRequest('https://postman-echo.com/delay/' + delaySeconds, function() {});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var taskId = pm.environment.get('taskId');",
+                  "if (!taskId) { pm.test.skip('Skipping - no Task was created'); return; }",
+                  "",
+                  "var bundle = pm.response.json();",
+                  "pm.test('AuditEvent bundle returned', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(bundle.resourceType).to.eql('Bundle');",
+                  "  pm.expect(bundle.entry).to.be.an('array').that.is.not.empty;",
+                  "});",
+                  "",
+                  "if (!bundle.entry || !bundle.entry.length) return;",
+                  "var ae = bundle.entry[0].resource;",
+                  "",
+                  "pm.test('type.system = audit-event-type', function() {",
+                  "  pm.expect(ae.type.system).to.eql('http://terminology.hl7.org/CodeSystem/audit-event-type');",
+                  "});",
+                  "pm.test('type.code = rest', function() {",
+                  "  pm.expect(ae.type.code).to.eql('rest');",
+                  "});",
+                  "pm.test('type.display = RESTful Operation', function() {",
+                  "  pm.expect(ae.type.display).to.eql('RESTful Operation');",
+                  "});",
+                  "pm.test('subtype[0].system = restful-interaction', function() {",
+                  "  pm.expect(ae.subtype[0].system).to.eql('http://hl7.org/fhir/restful-interaction');",
+                  "});",
+                  "pm.test('subtype[0].code = read', function() {",
+                  "  pm.expect(ae.subtype[0].code).to.eql('read');",
+                  "});",
+                  "pm.test('subtype[0].display = read', function() {",
+                  "  pm.expect(ae.subtype[0].display).to.eql('read');",
+                  "});",
+                  "pm.test('action = R (Read)', function() {",
+                  "  pm.expect(ae.action).to.eql('R');",
+                  "});",
+                  "pm.test('outcome = 0 (Success)', function() {",
+                  "  pm.expect(ae.outcome).to.eql('0');",
+                  "});",
+                  "pm.test('recorded is present', function() {",
+                  "  pm.expect(ae.recorded).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.test('agent[0].who is Device reference', function() {",
+                  "  pm.expect(ae.agent[0].who).to.not.be.undefined;",
+                  "  pm.expect(ae.agent[0].who.reference).to.match(/^Device\\//);",
+                  "});",
+                  "pm.test('agent[0].type = Source Role ID (DCM 110153)', function() {",
+                  "  var coding = ae.agent[0].type.coding[0];",
+                  "  pm.expect(coding.system).to.eql('http://dicom.nema.org/resources/ontology/DCM');",
+                  "  pm.expect(coding.code).to.eql('110153');",
+                  "  pm.expect(coding.display).to.eql('Source Role ID');",
+                  "});",
+                  "pm.test('agent[0].requestor = true', function() {",
+                  "  pm.expect(ae.agent[0].requestor).to.eql(true);",
+                  "});",
+                  "pm.test('agent[0].network is absent', function() {",
+                  "  pm.expect(ae.agent[0].network).to.be.undefined;",
+                  "});",
+                  "pm.test('source.site is hostname', function() {",
+                  "  pm.expect(ae.source.site).to.be.a('string').and.not.empty;",
+                  "  pm.expect(ae.source.site).to.not.include('https://');",
+                  "});",
+                  "pm.test('source.observer is Device reference', function() {",
+                  "  pm.expect(ae.source.observer.reference).to.match(/^Device\\//);",
+                  "});",
+                  "pm.test('entity[0].type.system = resource-types', function() {",
+                  "  pm.expect(ae.entity[0].type.system).to.eql('http://hl7.org/fhir/resource-types');",
+                  "});",
+                  "pm.test('entity[0].type.code = Task', function() {",
+                  "  pm.expect(ae.entity[0].type.code).to.eql('Task');",
+                  "});",
+                  "pm.test('entity[0].type.display = Task', function() {",
+                  "  pm.expect(ae.entity[0].type.display).to.eql('Task');",
+                  "});",
+                  "pm.test('entity[0].what contains /_history/', function() {",
+                  "  pm.expect(ae.entity[0].what.reference).to.include('/_history/');",
+                  "  pm.expect(ae.entity[0].what.reference).to.include('Task/' + taskId);",
+                  "});",
+                  "pm.test('entity[0].name is absent (deprecated)', function() {",
+                  "  pm.expect(ae.entity[0].name).to.be.undefined;",
+                  "});",
+                  "pm.test('entity[0].role is absent for read', function() {",
+                  "  pm.expect(ae.entity[0].role).to.be.undefined;",
+                  "});",
+                  "pm.test('entity[0].query is absent for read', function() {",
+                  "  pm.expect(ae.entity[0].query).to.be.undefined;",
+                  "});",
+                  "pm.test('meta.profile contains KT2AuditEvent', function() {",
+                  "  pm.expect(ae.meta.profile).to.be.an('array');",
+                  "  var hasProfile = ae.meta.profile.some(function(p) { return p.includes('koppeltaal.nl/fhir/StructureDefinition/KT2AuditEvent'); });",
+                  "  pm.expect(hasProfile).to.be.true;",
+                  "});",
+                  "pm.test('extension trace-id is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('trace-id'); })).to.not.be.undefined;",
+                  "});",
+                  "pm.test('extension request-id is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('request-id'); })).to.not.be.undefined;",
+                  "});",
+                  "pm.test('extension resource-origin is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('resource-origin'); })).to.not.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/AuditEvent?subtype=read&date=ge{{actionTimestamp}}&_sort=-date&_count=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "AuditEvent"
+              ],
+              "query": [
+                {
+                  "key": "subtype",
+                  "value": "read"
+                },
+                {
+                  "key": "date",
+                  "value": "ge{{actionTimestamp}}"
+                },
+                {
+                  "key": "_sort",
+                  "value": "-date"
+                },
+                {
+                  "key": "_count",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. Update",
+      "item": [
+        {
+          "name": "PUT /Task/:id",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('taskId')) { pm.test.skip('Skipping - no Task was created'); }",
+                  "pm.environment.set('actionTimestamp', new Date().toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('taskId')) return;",
+                  "pm.test('Task updated', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.resourceType).to.eql('Task');",
+                  "  pm.expect(body.status).to.eql('in-progress');",
+                  "  pm.environment.set('taskVersionId', body.meta.versionId);",
+                  "  var etag = pm.response.headers.get('ETag');",
+                  "  if (etag) pm.environment.set('taskETag', etag);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/fhir+json"
+              },
+              {
+                "key": "If-Match",
+                "value": "W/\"{{taskVersionId}}\""
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"resourceType\": \"Task\", \"meta\": {\"profile\": [\"http://koppeltaal.nl/fhir/StructureDefinition/KT2Task\"]}, \"id\": \"{{taskId}}\", \"identifier\": [{\"system\": \"https://e2e-test.koppeltaal.nl/task-id\", \"value\": \"top-kt-011-test\"}], \"status\": \"in-progress\", \"intent\": \"order\", \"priority\": \"routine\", \"code\": {\"coding\": [{\"system\": \"http://vzvz.nl/fhir/CodeSystem/koppeltaal-task-code\", \"code\": \"exercise\"}]}, \"for\": {\"reference\": \"Patient/{{patientId}}\"}, \"owner\": {\"reference\": \"Patient/{{patientId}}\"}}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/Task/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Task",
+                "{{taskId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Validate AuditEvent - update",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var waitMs = parseInt(pm.environment.get('auditEventWaitMs') || '3000');",
+                  "var delaySeconds = Math.ceil(waitMs / 1000);",
+                  "pm.sendRequest('https://postman-echo.com/delay/' + delaySeconds, function() {});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var taskId = pm.environment.get('taskId');",
+                  "if (!taskId) { pm.test.skip('Skipping - no Task was created'); return; }",
+                  "",
+                  "var bundle = pm.response.json();",
+                  "pm.test('AuditEvent bundle returned', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(bundle.resourceType).to.eql('Bundle');",
+                  "  pm.expect(bundle.entry).to.be.an('array').that.is.not.empty;",
+                  "});",
+                  "",
+                  "if (!bundle.entry || !bundle.entry.length) return;",
+                  "var ae = bundle.entry[0].resource;",
+                  "",
+                  "pm.test('type.system = audit-event-type', function() {",
+                  "  pm.expect(ae.type.system).to.eql('http://terminology.hl7.org/CodeSystem/audit-event-type');",
+                  "});",
+                  "pm.test('type.code = rest', function() {",
+                  "  pm.expect(ae.type.code).to.eql('rest');",
+                  "});",
+                  "pm.test('type.display = RESTful Operation', function() {",
+                  "  pm.expect(ae.type.display).to.eql('RESTful Operation');",
+                  "});",
+                  "pm.test('subtype[0].system = restful-interaction', function() {",
+                  "  pm.expect(ae.subtype[0].system).to.eql('http://hl7.org/fhir/restful-interaction');",
+                  "});",
+                  "pm.test('subtype[0].code = update', function() {",
+                  "  pm.expect(ae.subtype[0].code).to.eql('update');",
+                  "});",
+                  "pm.test('subtype[0].display = update', function() {",
+                  "  pm.expect(ae.subtype[0].display).to.eql('update');",
+                  "});",
+                  "pm.test('action = U (Update)', function() {",
+                  "  pm.expect(ae.action).to.eql('U');",
+                  "});",
+                  "pm.test('outcome = 0 (Success)', function() {",
+                  "  pm.expect(ae.outcome).to.eql('0');",
+                  "});",
+                  "pm.test('recorded is present', function() {",
+                  "  pm.expect(ae.recorded).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.test('agent[0].who is Device reference', function() {",
+                  "  pm.expect(ae.agent[0].who).to.not.be.undefined;",
+                  "  pm.expect(ae.agent[0].who.reference).to.match(/^Device\\//);",
+                  "});",
+                  "pm.test('agent[0].type = Source Role ID (DCM 110153)', function() {",
+                  "  var coding = ae.agent[0].type.coding[0];",
+                  "  pm.expect(coding.system).to.eql('http://dicom.nema.org/resources/ontology/DCM');",
+                  "  pm.expect(coding.code).to.eql('110153');",
+                  "  pm.expect(coding.display).to.eql('Source Role ID');",
+                  "});",
+                  "pm.test('agent[0].requestor = true', function() {",
+                  "  pm.expect(ae.agent[0].requestor).to.eql(true);",
+                  "});",
+                  "pm.test('agent[0].network is absent', function() {",
+                  "  pm.expect(ae.agent[0].network).to.be.undefined;",
+                  "});",
+                  "pm.test('source.site is hostname', function() {",
+                  "  pm.expect(ae.source.site).to.be.a('string').and.not.empty;",
+                  "  pm.expect(ae.source.site).to.not.include('https://');",
+                  "});",
+                  "pm.test('source.observer is Device reference', function() {",
+                  "  pm.expect(ae.source.observer.reference).to.match(/^Device\\//);",
+                  "});",
+                  "pm.test('entity[0].type.system = resource-types', function() {",
+                  "  pm.expect(ae.entity[0].type.system).to.eql('http://hl7.org/fhir/resource-types');",
+                  "});",
+                  "pm.test('entity[0].type.code = Task', function() {",
+                  "  pm.expect(ae.entity[0].type.code).to.eql('Task');",
+                  "});",
+                  "pm.test('entity[0].type.display = Task', function() {",
+                  "  pm.expect(ae.entity[0].type.display).to.eql('Task');",
+                  "});",
+                  "pm.test('entity[0].what contains /_history/', function() {",
+                  "  pm.expect(ae.entity[0].what.reference).to.include('/_history/');",
+                  "  pm.expect(ae.entity[0].what.reference).to.include('Task/' + taskId);",
+                  "});",
+                  "pm.test('entity[0].name is absent (deprecated)', function() {",
+                  "  pm.expect(ae.entity[0].name).to.be.undefined;",
+                  "});",
+                  "pm.test('entity[0].role is absent for update', function() {",
+                  "  pm.expect(ae.entity[0].role).to.be.undefined;",
+                  "});",
+                  "pm.test('entity[0].query is absent for update', function() {",
+                  "  pm.expect(ae.entity[0].query).to.be.undefined;",
+                  "});",
+                  "pm.test('meta.profile contains KT2AuditEvent', function() {",
+                  "  pm.expect(ae.meta.profile).to.be.an('array');",
+                  "  var hasProfile = ae.meta.profile.some(function(p) { return p.includes('koppeltaal.nl/fhir/StructureDefinition/KT2AuditEvent'); });",
+                  "  pm.expect(hasProfile).to.be.true;",
+                  "});",
+                  "pm.test('extension trace-id is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('trace-id'); })).to.not.be.undefined;",
+                  "});",
+                  "pm.test('extension request-id is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('request-id'); })).to.not.be.undefined;",
+                  "});",
+                  "pm.test('extension resource-origin is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('resource-origin'); })).to.not.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/AuditEvent?subtype=update&date=ge{{actionTimestamp}}&_sort=-date&_count=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "AuditEvent"
+              ],
+              "query": [
+                {
+                  "key": "subtype",
+                  "value": "update"
+                },
+                {
+                  "key": "date",
+                  "value": "ge{{actionTimestamp}}"
+                },
+                {
+                  "key": "_sort",
+                  "value": "-date"
+                },
+                {
+                  "key": "_count",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. Search",
+      "item": [
+        {
+          "name": "GET /Task?status=in-progress",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set('actionTimestamp', new Date().toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Search returned Bundle', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.resourceType).to.eql('Bundle');",
+                  "  pm.expect(body.type).to.eql('searchset');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/Task?status=in-progress&_count=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Task"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "in-progress"
+                },
+                {
+                  "key": "_count",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Validate AuditEvent - search-type",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var waitMs = parseInt(pm.environment.get('auditEventWaitMs') || '3000');",
+                  "var delaySeconds = Math.ceil(waitMs / 1000);",
+                  "pm.sendRequest('https://postman-echo.com/delay/' + delaySeconds, function() {});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var bundle = pm.response.json();",
+                  "",
+                  "pm.test('AuditEvent bundle returned', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(bundle.resourceType).to.eql('Bundle');",
+                  "  pm.expect(bundle.entry).to.be.an('array').that.is.not.empty;",
+                  "});",
+                  "",
+                  "if (!bundle.entry || !bundle.entry.length) return;",
+                  "var ae = bundle.entry[0].resource;",
+                  "",
+                  "pm.test('type.system = audit-event-type', function() {",
+                  "  pm.expect(ae.type.system).to.eql('http://terminology.hl7.org/CodeSystem/audit-event-type');",
+                  "});",
+                  "pm.test('type.code = rest', function() {",
+                  "  pm.expect(ae.type.code).to.eql('rest');",
+                  "});",
+                  "pm.test('type.display = RESTful Operation', function() {",
+                  "  pm.expect(ae.type.display).to.eql('RESTful Operation');",
+                  "});",
+                  "pm.test('subtype[0].system = restful-interaction', function() {",
+                  "  pm.expect(ae.subtype[0].system).to.eql('http://hl7.org/fhir/restful-interaction');",
+                  "});",
+                  "pm.test('subtype[0].code = search-type', function() {",
+                  "  pm.expect(ae.subtype[0].code).to.eql('search-type');",
+                  "});",
+                  "pm.test('subtype[0].display = search-type', function() {",
+                  "  pm.expect(ae.subtype[0].display).to.eql('search-type');",
+                  "});",
+                  "pm.test('action = E (Execute)', function() {",
+                  "  pm.expect(ae.action).to.eql('E');",
+                  "});",
+                  "pm.test('outcome = 0 (Success)', function() {",
+                  "  pm.expect(ae.outcome).to.eql('0');",
+                  "});",
+                  "pm.test('recorded is present', function() {",
+                  "  pm.expect(ae.recorded).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.test('agent[0].who is Device reference', function() {",
+                  "  pm.expect(ae.agent[0].who).to.not.be.undefined;",
+                  "  pm.expect(ae.agent[0].who.reference).to.match(/^Device\\//);",
+                  "});",
+                  "pm.test('agent[0].type = Source Role ID (DCM 110153)', function() {",
+                  "  var coding = ae.agent[0].type.coding[0];",
+                  "  pm.expect(coding.system).to.eql('http://dicom.nema.org/resources/ontology/DCM');",
+                  "  pm.expect(coding.code).to.eql('110153');",
+                  "  pm.expect(coding.display).to.eql('Source Role ID');",
+                  "});",
+                  "pm.test('agent[0].requestor = true', function() {",
+                  "  pm.expect(ae.agent[0].requestor).to.eql(true);",
+                  "});",
+                  "pm.test('agent[0].network is absent', function() {",
+                  "  pm.expect(ae.agent[0].network).to.be.undefined;",
+                  "});",
+                  "pm.test('source.site is hostname', function() {",
+                  "  pm.expect(ae.source.site).to.be.a('string').and.not.empty;",
+                  "  pm.expect(ae.source.site).to.not.include('https://');",
+                  "});",
+                  "pm.test('source.observer is Device reference', function() {",
+                  "  pm.expect(ae.source.observer.reference).to.match(/^Device\\//);",
+                  "});",
+                  "pm.test('entity[0].type.system = resource-types', function() {",
+                  "  pm.expect(ae.entity[0].type.system).to.eql('http://hl7.org/fhir/resource-types');",
+                  "});",
+                  "pm.test('entity[0].type.code = Task', function() {",
+                  "  pm.expect(ae.entity[0].type.code).to.eql('Task');",
+                  "});",
+                  "pm.test('entity[0].type.display = Task', function() {",
+                  "  pm.expect(ae.entity[0].type.display).to.eql('Task');",
+                  "});",
+                  "pm.test('entity[0].what is absent for search query entity', function() {",
+                  "  pm.expect(ae.entity[0].what).to.be.undefined;",
+                  "});",
+                  "pm.test('entity[0].name is absent (deprecated)', function() {",
+                  "  pm.expect(ae.entity[0].name).to.be.undefined;",
+                  "});",
+                  "pm.test('entity[0].role.system = object-role', function() {",
+                  "  pm.expect(ae.entity[0].role.system).to.eql('http://terminology.hl7.org/CodeSystem/object-role');",
+                  "});",
+                  "pm.test('entity[0].role.code = 24 (Query)', function() {",
+                  "  pm.expect(ae.entity[0].role.code).to.eql('24');",
+                  "});",
+                  "pm.test('entity[0].role.display = Query', function() {",
+                  "  pm.expect(ae.entity[0].role.display).to.eql('Query');",
+                  "});",
+                  "pm.test('entity[0].query is base64 encoded query string', function() {",
+                  "  var q = ae.entity[0].query;",
+                  "  pm.expect(q).to.be.a('string').and.not.empty;",
+                  "  var decoded = Buffer.from(q, 'base64').toString('utf-8');",
+                  "  pm.expect(decoded).to.include('status=in-progress');",
+                  "});",
+                  "pm.test('entity[1] exists (search result)', function() {",
+                  "  pm.expect(ae.entity.length).to.be.at.least(2);",
+                  "});",
+                  "pm.test('entity[1].type.code = Task', function() {",
+                  "  pm.expect(ae.entity[1].type.code).to.eql('Task');",
+                  "});",
+                  "pm.test('entity[1].what contains /_history/', function() {",
+                  "  pm.expect(ae.entity[1].what.reference).to.include('/_history/');",
+                  "});",
+                  "pm.test('entity[1].name is absent (deprecated)', function() {",
+                  "  pm.expect(ae.entity[1].name).to.be.undefined;",
+                  "});",
+                  "pm.test('entity[1].query is absent for search result', function() {",
+                  "  pm.expect(ae.entity[1].query).to.be.undefined;",
+                  "});",
+                  "pm.test('meta.profile contains KT2AuditEvent', function() {",
+                  "  pm.expect(ae.meta.profile).to.be.an('array');",
+                  "  var hasProfile = ae.meta.profile.some(function(p) { return p.includes('koppeltaal.nl/fhir/StructureDefinition/KT2AuditEvent'); });",
+                  "  pm.expect(hasProfile).to.be.true;",
+                  "});",
+                  "pm.test('extension trace-id is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('trace-id'); })).to.not.be.undefined;",
+                  "});",
+                  "pm.test('extension request-id is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('request-id'); })).to.not.be.undefined;",
+                  "});",
+                  "pm.test('extension resource-origin is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('resource-origin'); })).to.not.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/AuditEvent?subtype=search-type&date=ge{{actionTimestamp}}&_sort=-date&_count=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "AuditEvent"
+              ],
+              "query": [
+                {
+                  "key": "subtype",
+                  "value": "search-type"
+                },
+                {
+                  "key": "date",
+                  "value": "ge{{actionTimestamp}}"
+                },
+                {
+                  "key": "_sort",
+                  "value": "-date"
+                },
+                {
+                  "key": "_count",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "07. Delete",
+      "item": [
+        {
+          "name": "DELETE /Task/:id",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('taskId')) { pm.test.skip('Skipping - no Task was created'); }",
+                  "pm.environment.set('actionTimestamp', new Date().toISOString());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('taskId')) return;",
+                  "pm.test('Task deleted', function() {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/Task/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Task",
+                "{{taskId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Validate AuditEvent - delete",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var waitMs = parseInt(pm.environment.get('auditEventWaitMs') || '3000');",
+                  "var delaySeconds = Math.ceil(waitMs / 1000);",
+                  "pm.sendRequest('https://postman-echo.com/delay/' + delaySeconds, function() {});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var taskId = pm.environment.get('taskId');",
+                  "if (!taskId) { pm.test.skip('Skipping - no Task was created'); return; }",
+                  "",
+                  "var bundle = pm.response.json();",
+                  "pm.test('AuditEvent bundle returned', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(bundle.resourceType).to.eql('Bundle');",
+                  "  pm.expect(bundle.entry).to.be.an('array').that.is.not.empty;",
+                  "});",
+                  "",
+                  "if (!bundle.entry || !bundle.entry.length) return;",
+                  "var ae = bundle.entry[0].resource;",
+                  "",
+                  "pm.test('type.system = audit-event-type', function() {",
+                  "  pm.expect(ae.type.system).to.eql('http://terminology.hl7.org/CodeSystem/audit-event-type');",
+                  "});",
+                  "pm.test('type.code = rest', function() {",
+                  "  pm.expect(ae.type.code).to.eql('rest');",
+                  "});",
+                  "pm.test('type.display = RESTful Operation', function() {",
+                  "  pm.expect(ae.type.display).to.eql('RESTful Operation');",
+                  "});",
+                  "pm.test('subtype[0].system = restful-interaction', function() {",
+                  "  pm.expect(ae.subtype[0].system).to.eql('http://hl7.org/fhir/restful-interaction');",
+                  "});",
+                  "pm.test('subtype[0].code = delete', function() {",
+                  "  pm.expect(ae.subtype[0].code).to.eql('delete');",
+                  "});",
+                  "pm.test('subtype[0].display = delete', function() {",
+                  "  pm.expect(ae.subtype[0].display).to.eql('delete');",
+                  "});",
+                  "pm.test('action = D (Delete)', function() {",
+                  "  pm.expect(ae.action).to.eql('D');",
+                  "});",
+                  "pm.test('outcome = 0 (Success)', function() {",
+                  "  pm.expect(ae.outcome).to.eql('0');",
+                  "});",
+                  "pm.test('recorded is present', function() {",
+                  "  pm.expect(ae.recorded).to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.test('agent[0].who is Device reference', function() {",
+                  "  pm.expect(ae.agent[0].who).to.not.be.undefined;",
+                  "  pm.expect(ae.agent[0].who.reference).to.match(/^Device\\//);",
+                  "});",
+                  "pm.test('agent[0].type = Source Role ID (DCM 110153)', function() {",
+                  "  var coding = ae.agent[0].type.coding[0];",
+                  "  pm.expect(coding.system).to.eql('http://dicom.nema.org/resources/ontology/DCM');",
+                  "  pm.expect(coding.code).to.eql('110153');",
+                  "  pm.expect(coding.display).to.eql('Source Role ID');",
+                  "});",
+                  "pm.test('agent[0].requestor = true', function() {",
+                  "  pm.expect(ae.agent[0].requestor).to.eql(true);",
+                  "});",
+                  "pm.test('agent[0].network is absent', function() {",
+                  "  pm.expect(ae.agent[0].network).to.be.undefined;",
+                  "});",
+                  "pm.test('source.site is hostname', function() {",
+                  "  pm.expect(ae.source.site).to.be.a('string').and.not.empty;",
+                  "  pm.expect(ae.source.site).to.not.include('https://');",
+                  "});",
+                  "pm.test('source.observer is Device reference', function() {",
+                  "  pm.expect(ae.source.observer.reference).to.match(/^Device\\//);",
+                  "});",
+                  "pm.test('entity[0].type.system = resource-types', function() {",
+                  "  pm.expect(ae.entity[0].type.system).to.eql('http://hl7.org/fhir/resource-types');",
+                  "});",
+                  "pm.test('entity[0].type.code = Task', function() {",
+                  "  pm.expect(ae.entity[0].type.code).to.eql('Task');",
+                  "});",
+                  "pm.test('entity[0].type.display = Task', function() {",
+                  "  pm.expect(ae.entity[0].type.display).to.eql('Task');",
+                  "});",
+                  "pm.test('entity[0].what is absent for delete', function() {",
+                  "  pm.expect(ae.entity[0].what).to.be.undefined;",
+                  "});",
+                  "pm.test('entity[0].name is absent (deprecated)', function() {",
+                  "  pm.expect(ae.entity[0].name).to.be.undefined;",
+                  "});",
+                  "pm.test('entity[0].role is absent for delete', function() {",
+                  "  pm.expect(ae.entity[0].role).to.be.undefined;",
+                  "});",
+                  "pm.test('entity[0].query is absent for delete', function() {",
+                  "  pm.expect(ae.entity[0].query).to.be.undefined;",
+                  "});",
+                  "pm.test('meta.profile contains KT2AuditEvent', function() {",
+                  "  pm.expect(ae.meta.profile).to.be.an('array');",
+                  "  var hasProfile = ae.meta.profile.some(function(p) { return p.includes('koppeltaal.nl/fhir/StructureDefinition/KT2AuditEvent'); });",
+                  "  pm.expect(hasProfile).to.be.true;",
+                  "});",
+                  "pm.test('extension trace-id is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('trace-id'); })).to.not.be.undefined;",
+                  "});",
+                  "pm.test('extension request-id is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('request-id'); })).to.not.be.undefined;",
+                  "});",
+                  "pm.test('extension resource-origin is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('resource-origin'); })).to.not.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/AuditEvent?subtype=delete&date=ge{{actionTimestamp}}&_sort=-date&_count=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "AuditEvent"
+              ],
+              "query": [
+                {
+                  "key": "subtype",
+                  "value": "delete"
+                },
+                {
+                  "key": "date",
+                  "value": "ge{{actionTimestamp}}"
+                },
+                {
+                  "key": "_sort",
+                  "value": "-date"
+                },
+                {
+                  "key": "_count",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "08. Validate AuditEvent - transmit",
+      "item": [
+        {
+          "name": "Validate AuditEvent - transmit",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Subscription delivery is async and may take 15-30 seconds.",
+                  "// Use 10s delay on top of natural delay from other test steps (~30s total).",
+                  "pm.sendRequest('https://postman-echo.com/delay/10', function() {});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var responseBody = pm.response.json();",
+                  "console.log('Transmit AuditEvent search result: total=' + (responseBody.total || 0) + ', entries=' + ((responseBody.entry||[]).length));",
+                  "if (responseBody.entry && responseBody.entry.length > 0) {",
+                  "  console.log('Found AuditEvent outcome=' + responseBody.entry[0].resource.outcome);",
+                  "}",
+                  "",
+                  "var subscriptionId = pm.environment.get('subscriptionId');",
+                  "if (!subscriptionId) { pm.test.skip('Skipping - no Subscription was created'); return; }",
+                  "var taskId = pm.environment.get('taskId');",
+                  "if (!taskId) { pm.test.skip('Skipping - no Task was created'); return; }",
+                  "",
+                  "var bundle = pm.response.json();",
+                  "",
+                  "pm.test('AuditEvent bundle returned', function() {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(bundle.resourceType).to.eql('Bundle');",
+                  "  pm.expect(bundle.entry).to.be.an('array').that.is.not.empty;",
+                  "});",
+                  "",
+                  "if (!bundle.entry || !bundle.entry.length) return;",
+                  "var ae = bundle.entry[0].resource;",
+                  "",
+                  "// --- type ---",
+                  "pm.test('type.system = iso-21089-lifecycle', function() {",
+                  "  pm.expect(ae.type.system).to.eql('http://terminology.hl7.org/CodeSystem/iso-21089-lifecycle');",
+                  "});",
+                  "pm.test('type.code = transmit', function() {",
+                  "  pm.expect(ae.type.code).to.eql('transmit');",
+                  "});",
+                  "pm.test('type.display = Transmit Record Lifecycle Event', function() {",
+                  "  pm.expect(ae.type.display).to.eql('Transmit Record Lifecycle Event');",
+                  "});",
+                  "",
+                  "// --- subtype (absent for SendNotification) ---",
+                  "pm.test('subtype is absent or empty', function() {",
+                  "  pm.expect(ae.subtype).to.satisfy(function(s) { return !s || s.length === 0; });",
+                  "});",
+                  "",
+                  "// --- action ---",
+                  "pm.test('action = E (Execute)', function() {",
+                  "  pm.expect(ae.action).to.eql('E');",
+                  "});",
+                  "",
+                  "// --- outcome ---",
+                  "pm.test('outcome = 0 or 4', function() {",
+                  "  pm.expect(['0', '4']).to.include(ae.outcome, 'outcome should be 0 (success) or 4 (minor failure)');",
+                  "});",
+                  "",
+                  "// --- recorded ---",
+                  "pm.test('recorded is present', function() {",
+                  "  pm.expect(ae.recorded).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "// --- agent[0] (Source) ---",
+                  "pm.test('agent[0].who is Device reference', function() {",
+                  "  pm.expect(ae.agent[0].who).to.not.be.undefined;",
+                  "  pm.expect(ae.agent[0].who.reference).to.match(/^Device\\//);",
+                  "});",
+                  "pm.test('agent[0].type = Source Role ID (DCM 110153)', function() {",
+                  "  var coding = ae.agent[0].type.coding[0];",
+                  "  pm.expect(coding.system).to.eql('http://dicom.nema.org/resources/ontology/DCM');",
+                  "  pm.expect(coding.code).to.eql('110153');",
+                  "  pm.expect(coding.display).to.eql('Source Role ID');",
+                  "});",
+                  "pm.test('agent[0].requestor = true', function() {",
+                  "  pm.expect(ae.agent[0].requestor).to.eql(true);",
+                  "});",
+                  "if (ae.agent.length > 1) {",
+                  "  pm.test('agent[1].who is Device reference', function() {",
+                  "    pm.expect(ae.agent[1].who.reference).to.match(/^Device\\//);",
+                  "  });",
+                  "  pm.test('agent[1].type = Destination Role ID (DCM 110152)', function() {",
+                  "    var coding = ae.agent[1].type.coding[0];",
+                  "    pm.expect(coding.system).to.eql('http://dicom.nema.org/resources/ontology/DCM');",
+                  "    pm.expect(coding.code).to.eql('110152');",
+                  "    pm.expect(coding.display).to.eql('Destination Role ID');",
+                  "  });",
+                  "  pm.test('agent[1].requestor = false', function() {",
+                  "    pm.expect(ae.agent[1].requestor).to.eql(false);",
+                  "  });",
+                  "  pm.test('agent[1].network.address is endpoint URL', function() {",
+                  "    pm.expect(ae.agent[1].network.address).to.eql('https://postman-echo.com/post');",
+                  "  });",
+                  "  pm.test('agent[1].network.type = 5 (URI)', function() {",
+                  "    pm.expect(ae.agent[1].network.type).to.eql('5');",
+                  "  });",
+                  "} else {",
+                  "  console.log('agent[1] (Destination) not present - skipping destination agent tests');",
+                  "}",
+                  "",
+                  "// --- source ---",
+                  "pm.test('source.observer is Device reference', function() {",
+                  "  pm.expect(ae.source.observer.reference).to.match(/^Device\\//);",
+                  "});",
+                  "",
+                  "// --- entity[0] (Delivered Resource - Task) ---",
+                  "pm.test('entity[0].type.system = resource-types', function() {",
+                  "  pm.expect(ae.entity[0].type.system).to.eql('http://hl7.org/fhir/resource-types');",
+                  "});",
+                  "pm.test('entity[0].type.code = Task', function() {",
+                  "  pm.expect(ae.entity[0].type.code).to.eql('Task');",
+                  "});",
+                  "pm.test('entity[0].type.display = Task', function() {",
+                  "  pm.expect(ae.entity[0].type.display).to.eql('Task');",
+                  "});",
+                  "pm.test('entity[0].what references Task with version', function() {",
+                  "  pm.expect(ae.entity[0].what.reference).to.include('Task/' + taskId);",
+                  "  pm.expect(ae.entity[0].what.reference).to.include('/_history/');",
+                  "});",
+                  "pm.test('entity[0].name is absent', function() {",
+                  "  pm.expect(ae.entity[0].name).to.be.undefined;",
+                  "});",
+                  "",
+                  "// --- entity[1] (Subscription) ---",
+                  "pm.test('entity[1].type.system = resource-types', function() {",
+                  "  pm.expect(ae.entity[1].type.system).to.eql('http://hl7.org/fhir/resource-types');",
+                  "});",
+                  "pm.test('entity[1].type.code = Subscription', function() {",
+                  "  pm.expect(ae.entity[1].type.code).to.eql('Subscription');",
+                  "});",
+                  "pm.test('entity[1].type.display = Subscription', function() {",
+                  "  pm.expect(ae.entity[1].type.display).to.eql('Subscription');",
+                  "});",
+                  "pm.test('entity[1].what references Subscription', function() {",
+                  "  pm.expect(ae.entity[1].what.reference).to.include('Subscription/' + subscriptionId);",
+                  "});",
+                  "pm.test('entity[1].name is absent', function() {",
+                  "  pm.expect(ae.entity[1].name).to.be.undefined;",
+                  "});",
+                  "pm.test('entity[1].role = Subscriber (code 9)', function() {",
+                  "  pm.expect(ae.entity[1].role.system).to.eql('http://terminology.hl7.org/CodeSystem/object-role');",
+                  "  pm.expect(ae.entity[1].role.code).to.eql('9');",
+                  "  pm.expect(ae.entity[1].role.display).to.eql('Subscriber');",
+                  "});",
+                  "pm.test('entity[1].query is base64 encoded criteria', function() {",
+                  "  var q = ae.entity[1].query;",
+                  "  pm.expect(q).to.be.a('string').and.not.empty;",
+                  "  var decoded = Buffer.from(q, 'base64').toString('utf-8');",
+                  "  pm.expect(decoded).to.include('Task');",
+                  "});",
+                  "",
+                  "// --- meta.profile ---",
+                  "pm.test('meta.profile contains KT2AuditEvent', function() {",
+                  "  pm.expect(ae.meta.profile).to.be.an('array');",
+                  "  var hasProfile = ae.meta.profile.some(function(p) { return p.includes('koppeltaal.nl/fhir/StructureDefinition/KT2AuditEvent'); });",
+                  "  pm.expect(hasProfile).to.be.true;",
+                  "});",
+                  "",
+                  "// --- extensions ---",
+                  "pm.test('extension trace-id is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('trace-id'); })).to.not.be.undefined;",
+                  "});",
+                  "pm.test('extension request-id is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('request-id'); })).to.not.be.undefined;",
+                  "});",
+                  "pm.test('extension resource-origin is present', function() {",
+                  "  var ext = ae.extension || [];",
+                  "  pm.expect(ext.find(function(e) { return e.url.includes('resource-origin'); })).to.not.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/AuditEvent?type=transmit&date=ge{{createActionTimestamp}}&_sort=-date&_count=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "AuditEvent"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "transmit"
+                },
+                {
+                  "key": "date",
+                  "value": "ge{{createActionTimestamp}}"
+                },
+                {
+                  "key": "_sort",
+                  "value": "-date"
+                },
+                {
+                  "key": "_count",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "09. Cleanup Subscription",
+      "item": [
+        {
+          "name": "DELETE /Subscription/:id",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('subscriptionId')) { pm.test.skip('Skipping - no Subscription was created'); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('subscriptionId')) return;",
+                  "pm.test('Subscription deleted', function() {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/Subscription/{{subscriptionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Subscription",
+                "{{subscriptionId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Cleanup Resources",
+      "item": [
+        {
+          "name": "DELETE /Patient/:id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('patientId')) return;",
+                  "pm.test('Patient deleted', function() {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/Patient/{{patientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Patient",
+                "{{patientId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /Organization/:id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.environment.get('organizationId')) return;",
+                  "pm.test('Organization deleted', function() {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/Organization/{{organizationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "Organization",
+                "{{organizationId}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
