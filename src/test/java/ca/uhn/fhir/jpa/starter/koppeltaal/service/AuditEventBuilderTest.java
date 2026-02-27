@@ -20,8 +20,11 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -126,6 +129,114 @@ public class AuditEventBuilderTest {
     assert StringUtils.equals(entity.getType().getCode(), "Task");
     // entity.what should be empty for delete operations
     assert entity.getWhat().isEmpty();
+  }
+
+  @Test
+  public void testSearchEntityStructure() {
+    AuditEventDto dto = new AuditEventDto();
+    dto.setEventType(AuditEventDto.EventType.Search);
+    dto.setQuery("/Task?status=active");
+    dto.addResource(new Reference(new Task().setId(new IdType("Task", "1"))));
+    dto.addResource(new Reference(new Task().setId(new IdType("Task", "2"))));
+
+    AuditEvent event = auditEventBuilder.build(dto);
+    List<AuditEvent.AuditEventEntityComponent> entities = event.getEntity();
+    assertEquals(3, entities.size());
+
+    // First entity: query entity with only type, role and query
+    AuditEvent.AuditEventEntityComponent queryEntity = entities.get(0);
+    assertEquals("http://hl7.org/fhir/resource-types", queryEntity.getType().getSystem());
+    assertEquals("Task", queryEntity.getType().getCode());
+    assertEquals("Task", queryEntity.getType().getDisplay());
+    assertEquals("http://terminology.hl7.org/CodeSystem/object-role", queryEntity.getRole().getSystem());
+    assertEquals("24", queryEntity.getRole().getCode());
+    assertEquals("Query", queryEntity.getRole().getDisplay());
+    assertEquals("/Task?status=active", new String(queryEntity.getQuery(), StandardCharsets.UTF_8));
+    assertTrue(queryEntity.getWhat().isEmpty());
+    assertNull(queryEntity.getName());
+
+    // Result entities: name set, no query, no role
+    for (int i = 1; i <= 2; i++) {
+      AuditEvent.AuditEventEntityComponent resultEntity = entities.get(i);
+      assertEquals("Task", resultEntity.getName());
+      assertNull(resultEntity.getQuery());
+      assertTrue(resultEntity.getRole().isEmpty());
+    }
+  }
+
+  @Test
+  public void testReadEntityHasNoQuery() {
+    AuditEventDto dto = new AuditEventDto();
+    dto.setEventType(AuditEventDto.EventType.Read);
+    dto.setQuery("/Patient/123");
+    dto.addResource(new Reference(new Patient().setId(new IdType("Patient", "123"))));
+
+    AuditEvent event = auditEventBuilder.build(dto);
+    List<AuditEvent.AuditEventEntityComponent> entities = event.getEntity();
+    assertEquals(1, entities.size());
+    assertNull(entities.get(0).getQuery());
+    assertEquals("Patient", entities.get(0).getName());
+  }
+
+  @Test
+  public void testCreateEntityHasNoQuery() {
+    AuditEventDto dto = new AuditEventDto();
+    dto.setEventType(AuditEventDto.EventType.Create);
+    dto.setQuery("/Patient");
+    dto.addResource(new Reference(new Patient().setId(new IdType("Patient", "1"))));
+
+    AuditEvent event = auditEventBuilder.build(dto);
+    List<AuditEvent.AuditEventEntityComponent> entities = event.getEntity();
+    assertEquals(1, entities.size());
+    assertNull(entities.get(0).getQuery());
+    assertEquals("Patient", entities.get(0).getName());
+  }
+
+  @Test
+  public void testSendNotificationSubscriptionEntity() {
+    AuditEventDto dto = new AuditEventDto();
+    dto.setEventType(AuditEventDto.EventType.SendNotification);
+    dto.setQuery("Task?status=active");
+
+    // Entity 1: the delivered resource
+    Task task = new Task();
+    task.setId(new IdType("Task", "1"));
+    dto.addResource(new Reference(task));
+
+    // Entity 2: the Subscription with versioned reference
+    Reference subscriptionRef = new Reference();
+    subscriptionRef.setReference("Subscription/42/_history/3");
+    subscriptionRef.setType("Subscription");
+    dto.addResource(subscriptionRef);
+
+    AuditEvent event = auditEventBuilder.build(dto);
+    List<AuditEvent.AuditEventEntityComponent> entities = event.getEntity();
+    assertEquals(2, entities.size());
+
+    // Entity 1: delivered resource, no role, no query
+    AuditEvent.AuditEventEntityComponent entity1 = entities.get(0);
+    assertEquals("Task", entity1.getType().getCode());
+    assertNull(entity1.getQuery());
+    assertTrue(entity1.getRole().isEmpty());
+
+    // Entity 2: Subscription with role Subscriber and query
+    AuditEvent.AuditEventEntityComponent entity2 = entities.get(1);
+    assertEquals("Subscription", entity2.getType().getCode());
+    assertEquals("Subscription/42/_history/3", entity2.getWhat().getReference());
+    assertEquals("http://terminology.hl7.org/CodeSystem/object-role", entity2.getRole().getSystem());
+    assertEquals("9", entity2.getRole().getCode());
+    assertEquals("Subscriber", entity2.getRole().getDisplay());
+    assertEquals("Task?status=active", new String(entity2.getQuery(), StandardCharsets.UTF_8));
+  }
+
+  @Test
+  public void testExtractResourceTypeFromQuery() {
+    assertEquals("Patient", AuditEventBuilder.extractResourceTypeFromQuery("/Patient?resource-origin=x"));
+    assertEquals("Patient", AuditEventBuilder.extractResourceTypeFromQuery("Patient?resource-origin=x"));
+    assertEquals("Patient", AuditEventBuilder.extractResourceTypeFromQuery("/Patient/123"));
+    assertEquals("Patient", AuditEventBuilder.extractResourceTypeFromQuery("Patient/123"));
+    assertEquals("Task", AuditEventBuilder.extractResourceTypeFromQuery("/Task?status=active&_count=10"));
+    assertEquals("Task", AuditEventBuilder.extractResourceTypeFromQuery("/Task/456/_history/2"));
   }
 
   public static String getReferenceLikeFhirDoes(Reference reference) {

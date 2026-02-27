@@ -100,6 +100,16 @@ public class AuditEventBuilder {
       }
       auditEvent.addEntity(entity);
     }
+
+    // For SendNotification, set role and query on the Subscription entity
+    if (eventType == EventType.SendNotification && StringUtils.isNotEmpty(dto.getQuery())) {
+      for (AuditEvent.AuditEventEntityComponent entity : auditEvent.getEntity()) {
+        if ("Subscription".equals(entity.getType().getCode())) {
+          entity.setRole(new Coding("http://terminology.hl7.org/CodeSystem/object-role", "9", "Subscriber"));
+          entity.setQuery(dto.getQuery().getBytes(StandardCharsets.UTF_8));
+        }
+      }
+    }
     auditEvent.setSource(buildEventSource(dto.getSite()));
     auditEvent.setRecorded(dto.getDateTime());
 

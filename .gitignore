@@ -173,3 +173,6 @@ Temporary Items
 e2e/.env
 e2e/private.pem
 e2e/reports/
+
+# Local work documents
+work-documents/
