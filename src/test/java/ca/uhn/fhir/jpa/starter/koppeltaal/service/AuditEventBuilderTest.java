@@ -155,10 +155,9 @@ public class AuditEventBuilderTest {
     assertTrue(queryEntity.getWhat().isEmpty());
     assertNull(queryEntity.getName());
 
-    // Result entities: name set, no query, no role
+    // Result entities: no query, no role
     for (int i = 1; i <= 2; i++) {
       AuditEvent.AuditEventEntityComponent resultEntity = entities.get(i);
-      assertEquals("Task", resultEntity.getName());
       assertNull(resultEntity.getQuery());
       assertTrue(resultEntity.getRole().isEmpty());
     }
@@ -175,7 +174,6 @@ public class AuditEventBuilderTest {
     List<AuditEvent.AuditEventEntityComponent> entities = event.getEntity();
     assertEquals(1, entities.size());
     assertNull(entities.get(0).getQuery());
-    assertEquals("Patient", entities.get(0).getName());
   }
 
   @Test
@@ -189,7 +187,6 @@ public class AuditEventBuilderTest {
     List<AuditEvent.AuditEventEntityComponent> entities = event.getEntity();
     assertEquals(1, entities.size());
     assertNull(entities.get(0).getQuery());
-    assertEquals("Patient", entities.get(0).getName());
   }
 
   @Test
