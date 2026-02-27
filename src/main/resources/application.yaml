@@ -395,6 +395,10 @@ fhir:
       authorizationEndpoint: ${fhir.server.security.issuer}/oauth2/authorize
       tokenEndpoint: ${fhir.server.security.issuer}/oauth2/token
       jwksEndpoint: ${fhir.server.security.issuer}/.well-known/jwks.json
+    subscription:
+      retry:
+        # Maximum number of delivery attempts. 1 = no retries (try once, give up on failure).
+        max-attempts: 1
     auditlog:
       enabled: true
       site: "Koppeltaal domein VZVZ"
