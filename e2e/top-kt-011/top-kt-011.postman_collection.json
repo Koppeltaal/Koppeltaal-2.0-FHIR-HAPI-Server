@@ -452,7 +452,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"resourceType\": \"Subscription\",\n  \"meta\": {\n    \"profile\": [\"http://koppeltaal.nl/fhir/StructureDefinition/KT2Subscription\"]\n  },\n  \"status\": \"requested\",\n  \"reason\": \"E2E test - TOP-KT-011 SendNotification validation\",\n  \"criteria\": \"Task?code=exercise\",\n  \"channel\": {\n    \"type\": \"rest-hook\",\n    \"endpoint\": \"https://postman-echo.com/post\"\n  }\n}"
+              "raw": "{\n  \"resourceType\": \"Subscription\",\n  \"meta\": {\n    \"profile\": [\"http://koppeltaal.nl/fhir/StructureDefinition/KT2Subscription\"]\n  },\n  \"status\": \"active\",\n  \"reason\": \"E2E test - TOP-KT-011 SendNotification validation\",\n  \"criteria\": \"Task?code=exercise\",\n  \"channel\": {\n    \"type\": \"rest-hook\",\n    \"endpoint\": \"https://postman-echo.com/post\"\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/Subscription",
@@ -1570,12 +1570,6 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "var responseBody = pm.response.json();",
-                  "console.log('Transmit AuditEvent search result: total=' + (responseBody.total || 0) + ', entries=' + ((responseBody.entry||[]).length));",
-                  "if (responseBody.entry && responseBody.entry.length > 0) {",
-                  "  console.log('Found AuditEvent outcome=' + responseBody.entry[0].resource.outcome);",
-                  "}",
-                  "",
                   "var subscriptionId = pm.environment.get('subscriptionId');",
                   "if (!subscriptionId) { pm.test.skip('Skipping - no Subscription was created'); return; }",
                   "var taskId = pm.environment.get('taskId');",
@@ -1590,6 +1584,7 @@
                   "});",
                   "",
                   "if (!bundle.entry || !bundle.entry.length) return;",
+                  "",
                   "var ae = bundle.entry[0].resource;",
                   "",
                   "// --- type ---",
@@ -1739,7 +1734,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/AuditEvent?type=transmit&date=ge{{createActionTimestamp}}&_sort=-date&_count=1",
+              "raw": "{{baseUrl}}/AuditEvent?type=transmit&entity=Subscription/{{subscriptionId}}&date=ge{{createActionTimestamp}}&_sort=-date&_count=1",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1750,6 +1745,10 @@
                 {
                   "key": "type",
                   "value": "transmit"
+                },
+                {
+                  "key": "entity",
+                  "value": "Subscription/{{subscriptionId}}"
                 },
                 {
                   "key": "date",
