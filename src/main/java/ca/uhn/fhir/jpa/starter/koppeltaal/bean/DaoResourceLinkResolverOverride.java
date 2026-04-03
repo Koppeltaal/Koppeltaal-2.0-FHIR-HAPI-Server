@@ -49,7 +49,7 @@ public class DaoResourceLinkResolverOverride<T extends IResourcePersistentId<?>>
       }
     }
 
-    if (StringUtils.equals("Bundle", theSourceResourceName) || StringUtils.equals("CapabilityStatement", theSourceResourceName) || StringUtils.equals("ConceptMap", theSourceResourceName)) {
+    if (StringUtils.equals("Bundle", theSourceResourceName) || StringUtils.equals("CapabilityStatement", theSourceResourceName) || StringUtils.equals("ConceptMap", theSourceResourceName) || StringUtils.equals("ImplementationGuide", theSourceResourceName)) {
       LOG.info("Skipping findTargetResource() as [{}] is excluded - custom KT2 addition!", theSourceResourceName);
       return null;
     }

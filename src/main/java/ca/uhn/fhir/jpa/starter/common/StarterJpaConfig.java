@@ -233,6 +233,9 @@ public class StarterJpaConfig {
 					"StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter",
 					"CapabilityStatement", "OperationDefinition", "ConceptMap", "NamingSystem"
 				);
+				/* CUSTOM ADDITION START - Include ImplementationGuide so the installed version is queryable at runtime */
+				packageInstallationSpec.addInstallResourceTypes("ImplementationGuide");
+				/* CUSTOM ADDITION END */
 				packageInstallerSvc.install(packageInstallationSpec);
 			}
 		}
