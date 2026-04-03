@@ -264,9 +264,11 @@ public class PackageInstallerWithExclusionSvcImpl implements IPackageInstallerSv
           continue;
         }
         
-        /* CUSTOMIZATION START - Skip ImplementationGuide resources to avoid reference validation issues */
-        if("ImplementationGuide".equals(myFhirContext.getResourceType(next))) {
-          ourLog.info("Skipping ImplementationGuide resource [{}] to avoid reference validation issues", next.getIdElement().getValueAsString());
+        /* CUSTOMIZATION START - Skip ImplementationGuide resources from dependencies to avoid reference validation issues.
+           The main Koppeltaal IG resource is allowed through so the version is visible at runtime. */
+        if("ImplementationGuide".equals(myFhirContext.getResourceType(next))
+            && !next.getIdElement().getIdPart().startsWith("koppeltaalv2")) {
+          ourLog.info("Skipping non-Koppeltaal ImplementationGuide resource [{}]", next.getIdElement().getValueAsString());
           continue;
         }
         /* CUSTOMIZATION END */
