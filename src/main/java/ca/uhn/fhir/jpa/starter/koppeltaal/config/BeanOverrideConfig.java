@@ -31,7 +31,7 @@ public class BeanOverrideConfig {
 
   @Primary
   @Bean
-  public RetryPolicyProvider retryPolicyProvider(SubscriptionRetryProperties retryProperties) {
+  public RetryPolicyProvider koppeltaalRetryPolicyProvider(SubscriptionRetryProperties retryProperties) {
     int maxAttempts = retryProperties.getMaxAttempts();
     LOG.info("Configuring subscription retry policy with maxAttempts={}", maxAttempts);
     return new RetryPolicyProvider() {
