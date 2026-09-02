@@ -1,5 +1,6 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.cleanup;
 
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.DeleteFlowTaskUtil;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -19,10 +20,7 @@ import org.hl7.fhir.r4.model.Task;
  */
 public class AnnouncementFactory {
 
-	static final String TASK_PROFILE = "http://koppeltaal.nl/fhir/StructureDefinition/KT2DeletePendingTask";
 	static final String AUDIT_PROFILE = "http://koppeltaal.nl/fhir/StructureDefinition/KT2AuditEvent";
-	static final String SECURITY_SYSTEM = "http://vzvz.nl/fhir/CodeSystem/koppeltaal-security-label";
-	static final String TASK_CODE_SYSTEM = "http://vzvz.nl/fhir/CodeSystem/koppeltaal-task-code";
 	static final String LIFECYCLE_SYSTEM = "http://terminology.hl7.org/CodeSystem/iso-21089-lifecycle";
 	static final String DCM_SYSTEM = "http://dicom.nema.org/resources/ontology/DCM";
 
@@ -37,11 +35,12 @@ public class AnnouncementFactory {
 	public Task buildDeletePendingTask(IIdType patientId, IIdType appDeviceId, IIdType serverDeviceId) {
 		Instant now = clock.instant();
 		Task task = new Task();
-		task.getMeta().addProfile(TASK_PROFILE);
+		task.getMeta().addProfile(DeleteFlowTaskUtil.TASK_PROFILE);
 		task.getMeta().addSecurity(deleteFlowLabel());
 		task.setStatus(Task.TaskStatus.REQUESTED);
 		task.setIntent(Task.TaskIntent.ORDER);
-		task.setCode(new CodeableConcept().addCoding(new Coding(TASK_CODE_SYSTEM, "delete-pending", "Delete pending")));
+		task.setCode(new CodeableConcept().addCoding(new Coding(DeleteFlowTaskUtil.TASK_CODE_SYSTEM, DeleteFlowTaskUtil.DELETE_PENDING_CODE,
+				"Delete pending")));
 		task.setFor(typedReference("Patient", patientId));
 		task.setOwner(typedReference("Device", appDeviceId));
 		task.setRequester(typedReference("Device", serverDeviceId));
@@ -74,7 +73,7 @@ public class AnnouncementFactory {
 	}
 
 	private static Coding deleteFlowLabel() {
-		return new Coding(SECURITY_SYSTEM, "kt2-delete-flow", "KT2 delete flow");
+		return DeleteFlowTaskUtil.deleteFlowLabel();
 	}
 
 	private static Reference typedReference(String type, IIdType id) {

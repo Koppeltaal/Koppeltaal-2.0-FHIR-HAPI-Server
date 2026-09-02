@@ -30,6 +30,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.DeleteFlowTaskUtil;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -86,8 +87,19 @@ class EligibilityServiceTest {
 	private static Task deletePendingTask() {
 		Task task = new Task();
 		task.getCode().addCoding(
-				new Coding(AnnouncementFactory.TASK_CODE_SYSTEM, "delete-pending", "Delete pending"));
+				new Coding(DeleteFlowTaskUtil.TASK_CODE_SYSTEM, "delete-pending", "Delete pending"));
 		return task;
+	}
+
+	@Test
+	void anOrdinaryTaskCarryingTheDeleteFlowMarkerStillCountsAsActivity() {
+		Task task = new Task();
+		task.getMeta().addSecurity(DeleteFlowTaskUtil.deleteFlowLabel());
+		task.getCode().addCoding(new Coding(DeleteFlowTaskUtil.TASK_CODE_SYSTEM, "view", "View"));
+
+		stubRecentTasks(task);
+
+		assertFalse(eligibilityService.isEligible(PATIENT_ID));
 	}
 
 	@Test

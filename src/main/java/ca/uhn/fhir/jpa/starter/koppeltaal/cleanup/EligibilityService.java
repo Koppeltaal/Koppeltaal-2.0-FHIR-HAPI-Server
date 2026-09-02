@@ -27,6 +27,7 @@ import org.hl7.fhir.r4.model.RelatedPerson;
 import org.hl7.fhir.r4.model.Task;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.DeleteFlowTaskUtil;
 
 /**
  * Implements the eligibility rule from the opschoning IG page, evaluated per
@@ -128,19 +129,15 @@ public class EligibilityService {
 		query.setCount(500);
 		for (IBaseResource resource : daoRegistry.getResourceDao(Task.class)
 				.search(query, new SystemRequestDetails()).getResources(0, 500)) {
-			if (!isDeletePendingTask((Task) resource)) {
+			// Only the delete-pending Task itself is excluded from patient activity (IG:
+			// "de delete-pending Task zelf uitgezonderd"), or announcing would block
+			// every later run and the per-app top-up for two years. Deliberately
+			// narrower than the delete-flow marker: an ordinary Task that happens to
+			// carry the marker is still activity.
+			if (!DeleteFlowTaskUtil.isDeletePendingTask((Task) resource)) {
 				return true;
 			}
 		}
 		return false;
-	}
-
-	private static boolean isDeletePendingTask(Task task) {
-		// The delete-pending Task itself must not count as patient activity (IG:
-		// "de delete-pending Task zelf uitgezonderd"), or announcing would block
-		// every later run and the per-app top-up for two years.
-		return task.getCode().getCoding().stream()
-				.anyMatch(coding -> AnnouncementFactory.TASK_CODE_SYSTEM.equals(coding.getSystem())
-						&& "delete-pending".equals(coding.getCode()));
 	}
 }

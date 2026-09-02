@@ -143,7 +143,7 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 
     registerInterceptor(new DefaultDescendingSortInterceptor());
 
-    registerInterceptor(new ValidSubTaskInterceptor());
+    registerInterceptor(new TaskValidationInterceptor(getFhirContext()));
 
     registerInterceptor(enforceHttpsSubscriptionEndpointInterceptor);
 

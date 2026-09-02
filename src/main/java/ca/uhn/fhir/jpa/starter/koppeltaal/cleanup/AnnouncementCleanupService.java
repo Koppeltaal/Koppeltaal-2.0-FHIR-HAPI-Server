@@ -17,6 +17,7 @@ import org.hl7.fhir.r4.model.Patient;
 import org.hl7.fhir.r4.model.Task;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.DeleteFlowTaskUtil;
 
 /**
  * The announcement run: evaluates every patient, and for each eligible one
@@ -151,7 +152,7 @@ public class AnnouncementCleanupService implements CleanupService {
 	private Set<String> existingDeletePendingOwners(IIdType patientId) {
 		SearchParameterMap query = SearchParameterMap.newSynchronous()
 				.add(Task.SP_PATIENT, new ReferenceParam("Patient/" + patientId.getIdPart()))
-				.add(Task.SP_CODE, new TokenParam(AnnouncementFactory.TASK_CODE_SYSTEM, "delete-pending"));
+				.add(Task.SP_CODE, new TokenParam(DeleteFlowTaskUtil.TASK_CODE_SYSTEM, "delete-pending"));
 		query.setCount(500);
 		Set<String> owners = new HashSet<>();
 		List<IBaseResource> found = daoRegistry.getResourceDao(Task.class)
