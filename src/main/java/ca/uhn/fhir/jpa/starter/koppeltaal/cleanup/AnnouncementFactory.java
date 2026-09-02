@@ -21,7 +21,6 @@ import org.hl7.fhir.r4.model.Task;
 public class AnnouncementFactory {
 
 	static final String AUDIT_PROFILE = "http://koppeltaal.nl/fhir/StructureDefinition/KT2AuditEvent";
-	static final String LIFECYCLE_SYSTEM = "http://terminology.hl7.org/CodeSystem/iso-21089-lifecycle";
 	static final String DCM_SYSTEM = "http://dicom.nema.org/resources/ontology/DCM";
 
 	private final CleanupProperties properties;
@@ -51,11 +50,22 @@ public class AnnouncementFactory {
 	}
 
 	public AuditEvent buildArchiveEvent(IIdType patientId, IIdType serverDeviceId, String site) {
+		return buildLifecycleEvent(DeleteFlowLifecycleEvent.ANNOUNCED, patientId, serverDeviceId, site);
+	}
+
+	/**
+	 * The aggregated cleanup lifecycle event for one patient. It carries the
+	 * patient, never the Task: the audit trail records the state of the process,
+	 * not the individual application's status write.
+	 */
+	public AuditEvent buildLifecycleEvent(DeleteFlowLifecycleEvent lifecycleEvent, IIdType patientId,
+			IIdType serverDeviceId, String site) {
 		AuditEvent event = new AuditEvent();
 		event.getMeta().addProfile(AUDIT_PROFILE);
 		event.getMeta().addSecurity(deleteFlowLabel());
-		event.setType(new Coding(LIFECYCLE_SYSTEM, "archive", "Archive Record Lifecycle Event"));
-		event.setAction(AuditEvent.AuditEventAction.C);
+		event.setType(new Coding(DeleteFlowLifecycleEvent.LIFECYCLE_SYSTEM, lifecycleEvent.getCode(),
+				lifecycleEvent.getDisplay()));
+		event.setAction(lifecycleEvent.getAction());
 		event.setOutcome(AuditEvent.AuditEventOutcome._0);
 		event.setRecorded(Date.from(clock.instant()));
 		event.addAgent()
