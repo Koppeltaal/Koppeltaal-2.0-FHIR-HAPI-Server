@@ -1,10 +1,15 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.cleanup;
 
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
+import ca.uhn.fhir.jpa.api.svc.IDeleteExpungeSvc;
+import ca.uhn.fhir.jpa.api.svc.IIdHelperService;
+import ca.uhn.fhir.jpa.model.dao.JpaPid;
+import ca.uhn.fhir.jpa.util.MemoryCacheService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerAuditLogConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.DeleteFlowLifecycleAuditInterceptor;
 import jakarta.persistence.EntityManagerFactory;
 import java.time.Clock;
+import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -49,6 +54,40 @@ public class CleanupConfig {
 	 * Spring exposes an EntityManagerFactory, not an EntityManager, so the
 	 * transaction-bound one is derived from it.
 	 */
+	@Bean
+	public PatientDeletionScope patientDeletionScope(EntityManagerFactory entityManagerFactory) {
+		return new PatientDeletionScope(
+				SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory));
+	}
+
+	@Bean
+	public ResourceEraser resourceEraser(IDeleteExpungeSvc<JpaPid> deleteExpungeSvc,
+			IIdHelperService<JpaPid> idHelper, EntityManagerFactory entityManagerFactory,
+			MemoryCacheService memoryCacheService) {
+
+		return new ResourceEraser(deleteExpungeSvc, idHelper,
+				SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory), memoryCacheService);
+	}
+
+	@Bean
+	public DeleteFlowInventory deleteFlowInventory(DataSource dataSource) {
+		return new DeleteFlowInventory(dataSource);
+	}
+
+	@Bean
+	public ErasureCleanupService erasureCleanupService(DaoRegistry daoRegistry, CleanupProperties cleanupProperties,
+			AnnouncementFactory announcementFactory, PatientDeletionScope patientDeletionScope,
+			ParticipatingApps participatingApps, DeleteFlowAggregateLock deleteFlowAggregateLock,
+			ResourceEraser resourceEraser, DeleteFlowInventory deleteFlowInventory, PlatformTransactionManager transactionManager,
+			EntityManagerFactory entityManagerFactory, FhirServerAuditLogConfiguration auditLogConfiguration) {
+
+		return new ErasureCleanupService(daoRegistry, cleanupProperties,
+				new EligibilityService(daoRegistry, cleanupProperties, Clock.systemUTC()), announcementFactory,
+				patientDeletionScope, participatingApps, deleteFlowAggregateLock, resourceEraser, deleteFlowInventory, transactionManager,
+				SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory),
+				auditLogConfiguration.getSite());
+	}
+
 	@Bean
 	public DeleteFlowAggregateLock deleteFlowAggregateLock(ObjectProvider<EntityManagerFactory> entityManagerFactory) {
 

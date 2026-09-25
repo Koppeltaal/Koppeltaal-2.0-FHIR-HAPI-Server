@@ -77,10 +77,23 @@ public class EligibilityService {
 	}
 
 	public boolean isEligible(IIdType patientId) {
-		Instant windowStart = clock.instant().minus(properties.getMinPatientAgeDays(), ChronoUnit.DAYS);
+		Instant windowStart = retentionWindowStart();
 		return isOldEnough(patientId, windowStart)
 				&& !hasRecentSuccessfulAuth(patientId, windowStart)
 				&& !(properties.isTransitionRuleActive(clock) && hasRecentTaskActivity(patientId, windowStart));
+	}
+
+	/**
+	 * OPG-011: the check that is run again just before the deletion. Only the auth
+	 * criterion is re-evaluated - age and the transition bridge were settled when
+	 * the patient was selected and cannot turn back.
+	 */
+	public boolean hasRenewedEngagement(IIdType patientId, Instant now) {
+		return hasRecentSuccessfulAuth(patientId, now.minus(properties.getMinPatientAgeDays(), ChronoUnit.DAYS));
+	}
+
+	private Instant retentionWindowStart() {
+		return clock.instant().minus(properties.getMinPatientAgeDays(), ChronoUnit.DAYS);
 	}
 
 	private boolean isOldEnough(IIdType patientId, Instant windowStart) {

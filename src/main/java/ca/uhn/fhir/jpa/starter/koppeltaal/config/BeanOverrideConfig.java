@@ -1,13 +1,25 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.config;
 
+import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
+import ca.uhn.fhir.jpa.api.svc.IIdHelperService;
+import ca.uhn.fhir.jpa.dao.data.IResourceLinkDao;
+import ca.uhn.fhir.jpa.dao.expunge.ResourceTableFKProvider;
 import ca.uhn.fhir.jpa.dao.index.DaoResourceLinkResolver;
+import ca.uhn.fhir.jpa.delete.batch2.DeleteExpungeSqlBuilder;
+import ca.uhn.fhir.jpa.model.config.PartitionSettings;
+import ca.uhn.fhir.jpa.model.dao.JpaPid;
+import ca.uhn.fhir.jpa.starter.koppeltaal.bean.DeleteExpungeSqlBuilderOverride;
 import ca.uhn.fhir.jpa.starter.koppeltaal.bean.DaoResourceLinkResolverOverride;
+import ca.uhn.fhir.jpa.starter.koppeltaal.bean.ErasureAwareMemoryCacheService;
 import ca.uhn.fhir.jpa.subscription.channel.impl.RetryPolicyProvider;
+import ca.uhn.fhir.jpa.util.MemoryCacheService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.retry.RetryPolicy;
 import org.springframework.retry.policy.NeverRetryPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
@@ -25,8 +37,35 @@ public class BeanOverrideConfig {
 
   @Primary
   @Bean
-  public DaoResourceLinkResolver daoResourceLinkResolver() {
+  public DaoResourceLinkResolver koppeltaalDaoResourceLinkResolver() {
     return daoResourceLinkResolverOverride;
+  }
+
+  @Bean
+  public static BeanFactoryPostProcessor selectKoppeltaalResourceLinkResolver() {
+    // HAPI also marks its resolver @Primary. Change that definition after all
+    // configurations have registered, without depending on registration order.
+    return beans -> beans.getBeanDefinition("daoResourceLinkResolver").setPrimary(false);
+  }
+
+  @Bean
+  @Primary
+  public static MemoryCacheService koppeltaalMemoryCacheService(JpaStorageSettings settings, FhirContext context) {
+    return new ErasureAwareMemoryCacheService(settings, context);
+  }
+
+  /**
+   * Deliberately not named after HAPI's own bean: an identical name would make this a replacement whose winner
+   * depends on registration order, where a distinct name plus @Primary decides the injection outright.
+   */
+  @Primary
+  @Bean
+  public DeleteExpungeSqlBuilder koppeltaalDeleteExpungeSqlBuilder(ResourceTableFKProvider resourceTableFKProvider,
+    JpaStorageSettings storageSettings, IIdHelperService<JpaPid> idHelper, IResourceLinkDao resourceLinkDao,
+    PartitionSettings partitionSettings) {
+
+    return new DeleteExpungeSqlBuilderOverride(resourceTableFKProvider, storageSettings, idHelper, resourceLinkDao,
+      partitionSettings);
   }
 
   @Primary

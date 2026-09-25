@@ -4,15 +4,17 @@ import org.hl7.fhir.r4.model.AuditEvent;
 
 /**
  * The aggregated cleanup transitions per patient, as ISO 21089 record lifecycle
- * codes. Only the transitions that are implemented today are listed; the grace
- * reset (archive with action U), the cancellation (reactivate) and the erase
- * (destroy) follow with the runs that drive them.
+ * codes. The announcement and the grace reset deliberately share the archive
+ * code and are told apart by their action.
  */
 public enum DeleteFlowLifecycleEvent {
 
 	ANNOUNCED("archive", "Archive Record Lifecycle Event", AuditEvent.AuditEventAction.C),
 	BLOCKED("hold", "Add Legal Hold Record Lifecycle Event", AuditEvent.AuditEventAction.U),
-	UNBLOCKED("unhold", "Remove Legal Hold Record Lifecycle Event", AuditEvent.AuditEventAction.U);
+	UNBLOCKED("unhold", "Remove Legal Hold Record Lifecycle Event", AuditEvent.AuditEventAction.U),
+	GRACE_RESET("archive", "Archive Record Lifecycle Event", AuditEvent.AuditEventAction.U),
+	REACTIVATED("reactivate", "Re-activate Record Lifecycle Event", AuditEvent.AuditEventAction.U),
+	DESTROYED("destroy", "Destroy/Delete Record Lifecycle Event", AuditEvent.AuditEventAction.D);
 
 	static final String LIFECYCLE_SYSTEM = "http://terminology.hl7.org/CodeSystem/iso-21089-lifecycle";
 
