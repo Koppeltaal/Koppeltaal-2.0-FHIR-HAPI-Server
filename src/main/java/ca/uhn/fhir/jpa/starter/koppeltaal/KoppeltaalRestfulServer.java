@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.util.UUID;
 
 import static ca.uhn.fhir.rest.server.ServletRequestTracing.ATTRIBUTE_REQUEST_ID;
+import java.util.Optional;
 
 @WebServlet(urlPatterns = {"/fhir/*"}, displayName = "Koppeltaal Resource Service")
 public class KoppeltaalRestfulServer extends RestfulServer {
@@ -79,6 +80,9 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 
   @Autowired
   private EnforceHttpsSubscriptionEndpointInterceptor enforceHttpsSubscriptionEndpointInterceptor;
+
+  @Autowired
+  private Optional<DeleteFlowLifecycleAuditInterceptor> deleteFlowLifecycleAuditInterceptor;
 
   public KoppeltaalRestfulServer(FhirContext context) {
     super(context);
@@ -143,9 +147,14 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 
     registerInterceptor(new DefaultDescendingSortInterceptor());
 
-    registerInterceptor(new ValidSubTaskInterceptor());
+    registerInterceptor(new TaskValidationInterceptor(getFhirContext()));
 
     registerInterceptor(enforceHttpsSubscriptionEndpointInterceptor);
+
+    // Storage pointcuts reach BOTH interceptor services: the DAO combines its own
+    // broadcaster with the one carried by the RequestDetails. Register on one of
+    // them only, or every lifecycle event is written twice.
+    deleteFlowLifecycleAuditInterceptor.ifPresent(myInterceptorRegistry::registerInterceptor);
 
     jpaStorageSettings.setResourceServerIdStrategy(JpaStorageSettings.IdStrategyEnum.UUID);
   }

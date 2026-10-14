@@ -102,7 +102,9 @@ public class RepositoryValidationInterceptorFactoryR4 implements IRepositoryVali
       .forResourcesOfType("Subscription")
       .requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2Subscription")
       .forResourcesOfType("Task")
-      .requireAtLeastProfile("http://koppeltaal.nl/fhir/StructureDefinition/KT2Task")
+      .requireAtLeastOneProfileOf(
+          "http://koppeltaal.nl/fhir/StructureDefinition/KT2Task",
+          "http://koppeltaal.nl/fhir/StructureDefinition/KT2DeletePendingTask")
       .and()
       .requireValidationToDeclaredProfiles();
 
