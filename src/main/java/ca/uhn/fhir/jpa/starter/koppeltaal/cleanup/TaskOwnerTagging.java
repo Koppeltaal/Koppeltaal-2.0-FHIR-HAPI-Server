@@ -22,11 +22,15 @@ public final class TaskOwnerTagging {
 			throw new IllegalStateException("Task owner tagging plan does not match the resource: "
 					+ original.getIdElement().toUnqualifiedVersionless().getValue());
 		}
+		return new TagAddition(original.getIdElement().toUnqualifiedVersionless(), deletedReferenceTag());
+	}
+
+	static Meta deletedReferenceTag() {
 		Meta meta = new Meta();
 		// Koppeltaal convention: reuse the reference-to-deleted-content issue code as a workflow tag.
 		// https://hl7.org/fhir/R4/codesystem-issue-type.html#issue-type-deleted
 		meta.addTag().setSystem(SYSTEM).setCode(CODE).setDisplay("Deleted");
-		return new TagAddition(original.getIdElement().toUnqualifiedVersionless(), meta);
+		return meta;
 	}
 
 	private static String patientReference(Reference reference) {

@@ -64,10 +64,15 @@ public class ResourceEraser {
 	 * @return the number of resources removed
 	 */
 	public int erase(List<IIdType> resources) {
-		return erase(resources, List.of());
+		return erase(resources, List.of(), List.of());
 	}
 
-	public int erase(List<IIdType> resources, List<PatientDeletionScope.RetainedTaskOwner> retainedTaskOwners) {
+	/**
+	 * Blocked resources stay for manual review, like Tasks tagged for their erased owner. Only their
+	 * index rows pointing into the erase go; the batch would refuse the patient over them otherwise.
+	 */
+	public int erase(List<IIdType> resources, List<PatientDeletionScope.RetainedTaskOwner> retainedTaskOwners,
+			List<IIdType> blocked) {
 		if (!TransactionSynchronizationManager.isActualTransactionActive()) {
 			throw new IllegalStateException("Erasure requires an active transaction");
 		}
@@ -84,9 +89,10 @@ public class ResourceEraser {
 
 		requireNoLegacyPayloads(pids);
 		removeRetainedOwnerLinks(resources, retainedTaskOwners);
+		removeBlockedLinks(resources, pids, blocked);
 
 		// No cascade: other inbound references still stop the erase. Only retained
-		// AuditEvents and the explicitly planned Task.owner links may remain in JSON.
+		// AuditEvents, the planned Task.owner links and blocked resources may remain in JSON.
 		final int erased = deleteExpungeSvc.deleteExpunge(pids, false, null);
 		entityManager.clear();
 		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -132,6 +138,22 @@ public class ResourceEraser {
 					.setParameter("patientId", patientId.getIdPart())
 					.executeUpdate();
 		}
+	}
+
+	private void removeBlockedLinks(List<IIdType> resources, List<JpaPid> pids, List<IIdType> blocked) {
+		Set<String> erased = resources.stream().map(id -> id.toUnqualifiedVersionless().getValue())
+				.collect(Collectors.toSet());
+		if (blocked.stream().anyMatch(id -> erased.contains(id.toUnqualifiedVersionless().getValue()))) {
+			throw new IllegalStateException("A blocked resource is also listed for erasure");
+		}
+		List<JpaPid> blockedPids = blocked.isEmpty() ? List.of() : idHelper.resolveResourcePids(
+				RequestPartitionId.allPartitions(), blocked, ResolveIdentityMode.includeDeleted().noCacheUnlessDeletesDisabled());
+		if (blockedPids.isEmpty()) return;
+		entityManager.createNativeQuery(
+						"DELETE FROM hfj_res_link WHERE src_resource_id IN (:blocked) AND target_resource_id IN (:erased)")
+				.setParameter("blocked", JpaPid.toLongList(blockedPids))
+				.setParameter("erased", JpaPid.toLongList(pids))
+				.executeUpdate();
 	}
 
 	private void requireNoLegacyPayloads(List<JpaPid> pids) {

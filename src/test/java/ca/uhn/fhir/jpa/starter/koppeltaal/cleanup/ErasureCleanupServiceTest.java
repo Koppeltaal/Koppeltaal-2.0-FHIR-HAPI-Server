@@ -2,6 +2,7 @@ package ca.uhn.fhir.jpa.starter.koppeltaal.cleanup;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -14,6 +15,7 @@ import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.DeleteFlowTaskUtil;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.SimpleBundleProvider;
+import ca.uhn.fhir.rest.server.exceptions.ResourceGoneException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.nio.file.Files;
@@ -29,6 +31,7 @@ import java.util.Set;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.AuditEvent;
 import org.hl7.fhir.r4.model.CareTeam;
+import org.hl7.fhir.r4.model.Group;
 import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.Meta;
 import org.hl7.fhir.r4.model.Period;
@@ -65,6 +68,7 @@ class ErasureCleanupServiceTest {
 	@Mock private IFhirResourceDao<Task> taskDao;
 	@Mock private IFhirResourceDao<AuditEvent> auditEventDao;
 	@Mock private IFhirResourceDao<CareTeam> careTeamDao;
+	@Mock private IFhirResourceDao<Group> groupDao;
 	@Mock private EligibilityService eligibilityService;
 	@Mock private PatientDeletionScope deletionScope;
 	@Mock private ParticipatingApps participatingApps;
@@ -82,6 +86,8 @@ class ErasureCleanupServiceTest {
 		when(daoRegistry.getResourceDao(Task.class)).thenReturn(taskDao);
 		when(daoRegistry.getResourceDao(AuditEvent.class)).thenReturn(auditEventDao);
 		when(daoRegistry.getResourceDao(CareTeam.class)).thenReturn(careTeamDao);
+		when(daoRegistry.<Task>getResourceDao("Task")).thenReturn(taskDao);
+		when(daoRegistry.<Group>getResourceDao("Group")).thenReturn(groupDao);
 		when(participatingApps.serverDeviceId()).thenReturn(new IdType("Device", "server"));
 		when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
 		when(entityManager.unwrap(org.hibernate.Session.class)).thenReturn(session);
@@ -101,7 +107,7 @@ class ErasureCleanupServiceTest {
 		cycle(task("t1", Task.TaskStatus.ONHOLD, AHEAD));
 
 		assertThat(outcomeOf(run())).isEqualTo("WAITING");
-		verify(eraser, never()).erase(any(), any());
+		verify(eraser, never()).erase(any(), any(), any());
 		verify(taskDao, never()).update(any(Task.class), any(RequestDetails.class));
 	}
 
@@ -113,7 +119,7 @@ class ErasureCleanupServiceTest {
 
 		assertThat(outcomeOf(run())).isEqualTo("GRACE_RESET");
 		assertThat(statusWritten()).isEqualTo(Task.TaskStatus.REQUESTED);
-		verify(eraser, never()).erase(any(), any());
+		verify(eraser, never()).erase(any(), any(), any());
 	}
 
 	@Test
@@ -122,7 +128,7 @@ class ErasureCleanupServiceTest {
 		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
 
 		assertThat(outcomeOf(run())).isEqualTo("ERASED");
-		verify(eraser).erase(List.of(new IdType("Task", "t1"), PATIENT), List.of());
+		verify(eraser).erase(List.of(new IdType("Task", "t1"), PATIENT), List.of(), List.of());
 		assertThat(statusWritten()).isEqualTo(Task.TaskStatus.COMPLETED);
 		verify(auditEventDao).create(any(AuditEvent.class), any(RequestDetails.class));
 	}
@@ -134,7 +140,7 @@ class ErasureCleanupServiceTest {
 		cycle(task("t1", Task.TaskStatus.ACCEPTED, AHEAD));
 
 		assertThat(outcomeOf(run())).isEqualTo("ERASED");
-		verify(eraser).erase(any(), any());
+		verify(eraser).erase(any(), any(), any());
 	}
 
 	/** OPG-011: the patient came back, so the deletion is off. */
@@ -146,38 +152,58 @@ class ErasureCleanupServiceTest {
 
 		assertThat(outcomeOf(run())).isEqualTo("ABORTED");
 		assertThat(statusWritten()).isEqualTo(Task.TaskStatus.CANCELLED);
-		verify(eraser, never()).erase(any(), any());
+		verify(eraser, never()).erase(any(), any(), any());
 	}
 
-	/** Contradictory ownership must be corrected before either patient is erased. */
+	/** Contradictory ownership stays behind for manual review; everything that is only this patient's goes. */
 	@Test
-	void anythingSharedWithAnotherPatientStopsTheErase() throws Exception {
+	void aSharedResourceStaysBehindWhileThePatientIsErased() throws Exception {
 
 		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
 		blocked(new PatientDeletionScope.Blocker(new IdType("Task", "shared"), "References another patient as well."));
 
 		final CleanupRunReport report = run();
 
-		assertThat(outcomeOf(report)).isEqualTo("BLOCKED");
-		final var exported = new ObjectMapper().readTree(Files.readString(Path.of(report.getDetailsFile())));
+		assertThat(outcomeOf(report)).isEqualTo("ERASED");
+		assertThat(report.getCounts()).containsEntry("RESOURCES", 2).containsEntry("BLOCKED_RESOURCES", 1);
+		final var exported = new ObjectMapper().readTree(Files.readAllLines(Path.of(report.getDetailsFile())).get(0));
 		assertThat(exported.path("disposition").asText()).isEqualTo("blocked");
 		assertThat(exported.path("blockReason").asText()).contains("another patient");
-		verify(eraser, never()).erase(any(), any());
-		verify(taskDao, never()).update(any(Task.class), any(RequestDetails.class));
+		final var tag = ArgumentCaptor.forClass(Meta.class);
+		verify(taskDao).metaAddOperation(eq(new IdType("Task", "shared")), tag.capture(), any(RequestDetails.class));
+		assertThat(tag.getValue().getTag()).singleElement().satisfies(coding -> {
+			assertThat(coding.getSystem()).isEqualTo("http://hl7.org/fhir/issue-type");
+			assertThat(coding.getCode()).isEqualTo("deleted");
+		});
+		verify(eraser).erase(List.of(new IdType("Task", "t1"), PATIENT), List.of(), List.of(new IdType("Task", "shared")));
 	}
 
 	@Test
-	void anUnclassifiedInboundReferenceBlocksBeforeAnyWrites() throws Exception {
+	void anUnclassifiedInboundReferenceStaysBehindTagged() throws Exception {
 		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
 		blocked(new PatientDeletionScope.Blocker(new IdType("Group", "outside"),
 				"Outside the deletion scope: Group.member.entity references Patient/p1."));
 
 		final CleanupRunReport report = run();
-		assertThat(outcomeOf(report)).isEqualTo("BLOCKED");
-		final var exported = new ObjectMapper().readTree(Files.readString(Path.of(report.getDetailsFile())));
+		assertThat(outcomeOf(report)).isEqualTo("ERASED");
+		final var exported = new ObjectMapper().readTree(Files.readAllLines(Path.of(report.getDetailsFile())).get(0));
 		assertThat(exported.path("blockReason").asText()).contains("Group.member.entity", "Patient/p1");
-		verify(eraser, never()).erase(any(), any());
-		verify(taskDao, never()).update(any(Task.class), any(RequestDetails.class));
+		verify(groupDao).metaAddOperation(eq(new IdType("Group", "outside")), any(Meta.class), any(RequestDetails.class));
+		verify(eraser).erase(List.of(new IdType("Task", "t1"), PATIENT), List.of(), List.of(new IdType("Group", "outside")));
+	}
+
+	@Test
+	void aDeletedBlockedResourceIsReportedButNotTagged() throws Exception {
+		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
+		blocked(new PatientDeletionScope.Blocker(new IdType("Task", "gone"), "Version 1 names another patient."));
+		when(taskDao.read(eq(new IdType("Task", "gone")), any(RequestDetails.class))).thenThrow(new ResourceGoneException("gone"));
+
+		final CleanupRunReport report = run();
+
+		assertThat(outcomeOf(report)).isEqualTo("ERASED");
+		assertThat(report.getCounts()).containsEntry("BLOCKED_RESOURCES", 1);
+		verify(taskDao, never()).metaAddOperation(any(), any(Meta.class), any());
+		verify(eraser).erase(List.of(new IdType("Task", "t1"), PATIENT), List.of(), List.of(new IdType("Task", "gone")));
 	}
 
 	@ParameterizedTest
@@ -190,14 +216,14 @@ class ErasureCleanupServiceTest {
 		final CleanupRunReport report = service.run(dryRun, Clock.fixed(NOW, ZoneOffset.UTC), r -> { });
 		final List<String> lines = Files.readAllLines(Path.of(report.getDetailsFile()));
 
-		assertThat(lines).hasSize(1);
+		assertThat(lines).hasSize(3);
 		final var exported = new ObjectMapper().readTree(lines.get(0));
 		assertThat(exported.path("patient").asText()).isEqualTo("p1");
 		assertThat(exported.path("resourceType").asText()).isEqualTo("Task");
 		assertThat(exported.path("id").asText()).isEqualTo("outside");
 		assertThat(exported.path("disposition").asText()).isEqualTo("blocked");
 		assertThat(exported.path("blockReason").asText()).isEqualTo(reason);
-		verify(eraser, never()).erase(any(), any());
+		if (dryRun) verify(eraser, never()).erase(any(), any(), any());
 	}
 
 	/**
@@ -211,7 +237,7 @@ class ErasureCleanupServiceTest {
 
 		assertThat(outcomeOf(run())).isEqualTo("GRACE_RESET");
 		verify(aggregateLock).lockPatient("p1");
-		verify(eraser, never()).erase(any(), any());
+		verify(eraser, never()).erase(any(), any(), any());
 	}
 
 	@Test
@@ -225,7 +251,7 @@ class ErasureCleanupServiceTest {
 		for (String line : Files.readAllLines(Path.of(report.getDetailsFile()))) {
 			assertThat(new ObjectMapper().readTree(line).has("blockReason")).isFalse();
 		}
-		verify(eraser, never()).erase(any(), any());
+		verify(eraser, never()).erase(any(), any(), any());
 		verify(taskDao, never()).update(any(Task.class), any(RequestDetails.class));
 		verify(auditEventDao, never()).create(any(AuditEvent.class), any(RequestDetails.class));
 		verify(aggregateLock, never()).lockPatient(any());
@@ -246,6 +272,7 @@ class ErasureCleanupServiceTest {
 
 		var report = service.run(dryRun, Clock.fixed(NOW, ZoneOffset.UTC), r -> { });
 		assertThat(outcomeOf(report)).isEqualTo("ERASED");
+		assertThat(report.getCounts()).containsEntry("RESOURCES", 2).containsEntry("DETACHED", 1);
 		var lines = Files.readAllLines(Path.of(report.getDetailsFile()));
 		assertThat(lines).hasSize(3);
 		var detached = new ObjectMapper().readTree(lines.get(2));
@@ -258,7 +285,7 @@ class ErasureCleanupServiceTest {
 			var updated = ArgumentCaptor.forClass(CareTeam.class);
 			order.verify(careTeamDao).update(updated.capture(), any(RequestDetails.class));
 			order.verify(taskDao).update(any(Task.class), any(RequestDetails.class));
-			order.verify(eraser).erase(any(), any());
+			order.verify(eraser).erase(any(), any(), any());
 			order.verify(auditEventDao).create(any(AuditEvent.class), any(RequestDetails.class));
 			assertThat(updated.getValue().getParticipant()).singleElement().satisfies(participant ->
 					assertThat(participant.getMember().getReference()).isEqualTo("Practitioner/practitioner"));
@@ -277,7 +304,7 @@ class ErasureCleanupServiceTest {
 		assertThat(report.getErrors()).singleElement().asString().contains("participant indexes");
 		assertThat(report.getDetailsFile()).isNull();
 		verify(taskDao, never()).update(any(Task.class), any(RequestDetails.class));
-		verify(eraser, never()).erase(any(), any());
+		verify(eraser, never()).erase(any(), any(), any());
 		verify(transactionManager).rollback(any());
 	}
 
@@ -298,6 +325,7 @@ class ErasureCleanupServiceTest {
 		var report = service.run(dryRun, Clock.fixed(NOW, ZoneOffset.UTC), r -> { });
 
 		assertThat(outcomeOf(report)).isEqualTo("ERASED");
+		assertThat(report.getCounts()).containsEntry("RESOURCES", 2).containsEntry("RETAINED", 1);
 		var lines = Files.readAllLines(Path.of(report.getDetailsFile()));
 		assertThat(lines).hasSize(3);
 		assertThat(new ObjectMapper().readTree(lines.get(2)).path("disposition").asText()).isEqualTo("tag-deleted-owner");
@@ -317,7 +345,7 @@ class ErasureCleanupServiceTest {
 			order.verify(taskDao).update(updated.capture(), any(RequestDetails.class));
 			assertThat(updated.getValue().getIdElement().getIdPart()).isEqualTo("t1");
 			order.verify(eraser).erase(List.of(new IdType("Task", "t1"), PATIENT),
-					List.of(new PatientDeletionScope.RetainedTaskOwner(new IdType("Task/retained"), "Patient/p1")));
+					List.of(new PatientDeletionScope.RetainedTaskOwner(new IdType("Task/retained"), "Patient/p1")), List.of());
 		}
 		assertThat(retained.equalsDeep(before)).isTrue();
 	}
@@ -349,7 +377,8 @@ class ErasureCleanupServiceTest {
 	}
 
 	private void blocked(PatientDeletionScope.Blocker blocker) {
-		when(deletionScope.planFor(any())).thenReturn(new PatientDeletionScope.Plan(List.of(), List.of(), List.of(), List.of(blocker)));
+		when(deletionScope.planFor(any())).thenReturn(new PatientDeletionScope.Plan(
+				List.of(new IdType("Task", "t1"), PATIENT), List.of(), List.of(), List.of(blocker)));
 	}
 
 	private CleanupRunReport run() {

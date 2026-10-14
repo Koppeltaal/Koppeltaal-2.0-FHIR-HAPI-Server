@@ -30,7 +30,7 @@ class RetainedTaskOwnerJpaTest extends BaseJpaR4Test {
 		transact(() -> {
 			tag(fixture);
 			tag(fixture); // Repeated additions must not duplicate or replace existing metadata.
-			eraser().erase(List.of(fixture.owner()), List.of(fixture.retainedOwner()));
+			eraser().erase(List.of(fixture.owner()), List.of(fixture.retainedOwner()), List.of());
 		});
 
 		assertThatThrownBy(() -> myPatientDao.read(fixture.owner(), new SystemRequestDetails()))
@@ -64,12 +64,33 @@ class RetainedTaskOwnerJpaTest extends BaseJpaR4Test {
 
 		assertThatThrownBy(() -> transact(() -> {
 			tag(fixture);
-			eraser().erase(List.of(fixture.owner()), List.of(fixture.retainedOwner()));
+			eraser().erase(List.of(fixture.owner()), List.of(fixture.retainedOwner()), List.of());
 		})).isInstanceOf(InvalidRequestException.class).hasMessageContaining("Task.focus");
 
 		assertThat(myPatientDao.read(fixture.owner(), new SystemRequestDetails())).isNotNull();
 		assertThat(read(fixture.taskId()).equalsDeep(before)).isTrue();
 		assertThat(ownerLinkCount(fixture)).isEqualTo(1);
+	}
+
+	@Test
+	void aBlockedReferenceOnTheSameTaskIsKeptWhileItsOwnerIsErased() {
+		Fixture fixture = fixture(true);
+		Task before = read(fixture.taskId());
+		long beneficiaryLinks = linkCount(fixture, "Task.for");
+
+		transact(() -> {
+			tag(fixture);
+			eraser().erase(List.of(fixture.owner()), List.of(fixture.retainedOwner()), List.of(fixture.taskId()));
+		});
+
+		assertThatThrownBy(() -> myPatientDao.read(fixture.owner(), new SystemRequestDetails()))
+				.isInstanceOf(ResourceNotFoundException.class);
+		Task after = read(fixture.taskId());
+		assertThat(after.getFocus().getReference()).isEqualTo(fixture.owner().getValue());
+		assertThat(after.getIdElement().getVersionIdPart()).isEqualTo(before.getIdElement().getVersionIdPart());
+		assertThat(linkCount(fixture, "Task.focus")).isZero();
+		assertThat(ownerLinkCount(fixture)).isZero();
+		assertThat(linkCount(fixture, "Task.for")).isEqualTo(beneficiaryLinks);
 	}
 
 	@Test
@@ -79,7 +100,7 @@ class RetainedTaskOwnerJpaTest extends BaseJpaR4Test {
 
 		assertThatThrownBy(() -> transact(() -> {
 			tag(fixture);
-			eraser().erase(List.of(fixture.owner()), List.of(fixture.retainedOwner()));
+			eraser().erase(List.of(fixture.owner()), List.of(fixture.retainedOwner()), List.of());
 			throw new IllegalStateException("Synthetic audit failure");
 		})).isInstanceOf(IllegalStateException.class).hasMessageContaining("Synthetic audit failure");
 
@@ -107,7 +128,7 @@ class RetainedTaskOwnerJpaTest extends BaseJpaR4Test {
 
 		assertThatThrownBy(() -> transact(() -> {
 			tag(fixture);
-			eraser().erase(List.of(fixture.owner()), List.of(fixture.retainedOwner()));
+			eraser().erase(List.of(fixture.owner()), List.of(fixture.retainedOwner()), List.of());
 		})).isInstanceOf(InvalidRequestException.class).hasMessageContaining("Task.owner");
 
 		assertThat(myPatientDao.read(fixture.owner(), new SystemRequestDetails())).isNotNull();
@@ -132,11 +153,14 @@ class RetainedTaskOwnerJpaTest extends BaseJpaR4Test {
 
 	private Task read(IIdType id) { return myTaskDao.read(id, new SystemRequestDetails()); }
 
-	private long ownerLinkCount(Fixture fixture) {
+	private long ownerLinkCount(Fixture fixture) { return linkCount(fixture, "Task.owner"); }
+
+	private long linkCount(Fixture fixture, String path) {
 		return runInTransaction(() -> ((Number) myEntityManager.createNativeQuery("""
 				SELECT count(*) FROM hfj_res_link l JOIN hfj_resource r ON r.res_id=l.src_resource_id
-				WHERE r.fhir_id=:id AND r.res_type='Task' AND l.src_path='Task.owner'
-				""").setParameter("id", fixture.taskId().getIdPart()).getSingleResult()).longValue());
+				WHERE r.fhir_id=:id AND r.res_type='Task' AND l.src_path=:path
+				""").setParameter("id", fixture.taskId().getIdPart()).setParameter("path", path)
+				.getSingleResult()).longValue());
 	}
 
 	private Fixture fixture(boolean extraReference) {

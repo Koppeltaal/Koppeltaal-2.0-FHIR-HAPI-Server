@@ -1,6 +1,7 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.cleanup;
 
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.DeleteFlowTaskUtil;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -17,6 +18,11 @@ import org.hl7.fhir.r4.model.Task;
  * Builds the announcement resources exactly as prescribed by the
  * KT2DeletePendingTask profile and the auditevent-opschoning-archive example
  * from IG package 0.16.4 (PR-77).
+ * <p>
+ * Both name the server's own Device as resource-origin. Nothing fills it in for
+ * them: these writes go through the DAO without a client request or a bearer
+ * token, which is all {@code InjectResourceOriginInterceptor} works from.
+ * </p>
  */
 public class AnnouncementFactory {
 
@@ -36,6 +42,7 @@ public class AnnouncementFactory {
 		Task task = new Task();
 		task.getMeta().addProfile(DeleteFlowTaskUtil.TASK_PROFILE);
 		task.getMeta().addSecurity(deleteFlowLabel());
+		task.addExtension(ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM, typedReference("Device", serverDeviceId));
 		task.setStatus(Task.TaskStatus.REQUESTED);
 		task.setIntent(Task.TaskIntent.ORDER);
 		task.setCode(new CodeableConcept().addCoding(new Coding(DeleteFlowTaskUtil.TASK_CODE_SYSTEM, DeleteFlowTaskUtil.DELETE_PENDING_CODE,
@@ -63,6 +70,7 @@ public class AnnouncementFactory {
 		AuditEvent event = new AuditEvent();
 		event.getMeta().addProfile(AUDIT_PROFILE);
 		event.getMeta().addSecurity(deleteFlowLabel());
+		event.addExtension(ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM, typedReference("Device", serverDeviceId));
 		event.setType(new Coding(DeleteFlowLifecycleEvent.LIFECYCLE_SYSTEM, lifecycleEvent.getCode(),
 				lifecycleEvent.getDisplay()));
 		event.setAction(lifecycleEvent.getAction());

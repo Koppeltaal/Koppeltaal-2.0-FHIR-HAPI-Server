@@ -152,7 +152,7 @@ class ResourceEraserTest {
 		resolveTo(JpaPid.fromId(1L), JpaPid.fromId(2L), JpaPid.fromId(3L));
 		var retained = new PatientDeletionScope.RetainedTaskOwner(new IdType("Task/retained"), "Patient/unrelated");
 
-		assertThatThrownBy(() -> eraser.erase(SCOPE, List.of(retained)))
+		assertThatThrownBy(() -> eraser.erase(SCOPE, List.of(retained), List.of()))
 				.isInstanceOf(IllegalStateException.class).hasMessageContaining("deletion scope");
 
 		verify(legacyPayloadCount, never()).executeUpdate();
@@ -164,11 +164,38 @@ class ResourceEraserTest {
 		resolveTo(JpaPid.fromId(1L), JpaPid.fromId(2L), JpaPid.fromId(3L));
 		var retained = new PatientDeletionScope.RetainedTaskOwner(new IdType("Task/task-1"), "Patient/patient-1");
 
-		assertThatThrownBy(() -> eraser.erase(SCOPE, List.of(retained)))
+		assertThatThrownBy(() -> eraser.erase(SCOPE, List.of(retained), List.of()))
 				.isInstanceOf(IllegalStateException.class).hasMessageContaining("deletion scope");
 
 		verify(legacyPayloadCount, never()).executeUpdate();
 		verify(deleteExpungeSvc, never()).deleteExpunge(anyList(), eq(false), eq(null));
+	}
+
+	@Test
+	void aBlockedResourceKeepsItsJsonButLosesItsIndexRowsIntoTheErase() {
+		var blocked = new IdType("Group", "outside");
+		when(idHelper.resolveResourcePids(any(), eq(SCOPE), any()))
+				.thenReturn(List.of(JpaPid.fromId(1L), JpaPid.fromId(2L), JpaPid.fromId(3L)));
+		when(idHelper.resolveResourcePids(any(), eq(List.of(blocked)), any())).thenReturn(List.of(JpaPid.fromId(9L)));
+
+		eraser.erase(SCOPE, List.of(), List.of(blocked));
+
+		verify(entityManager).createNativeQuery(
+				"DELETE FROM hfj_res_link WHERE src_resource_id IN (:blocked) AND target_resource_id IN (:erased)");
+		verify(legacyPayloadCount).setParameter("blocked", List.of(9L));
+		verify(legacyPayloadCount).setParameter("erased", List.of(1L, 2L, 3L));
+		verify(legacyPayloadCount).executeUpdate();
+		verify(deleteExpungeSvc).deleteExpunge(anyList(), eq(false), eq(null));
+	}
+
+	@Test
+	void refusesToKeepAResourceItIsErasing() {
+		resolveTo(JpaPid.fromId(1L), JpaPid.fromId(2L), JpaPid.fromId(3L));
+
+		assertThatThrownBy(() -> eraser.erase(SCOPE, List.of(), List.of(new IdType("Task", "task-1"))))
+				.isInstanceOf(IllegalStateException.class).hasMessageContaining("also listed for erasure");
+
+		verify(deleteExpungeSvc, never()).deleteExpunge(anyList(), any(Boolean.class), any());
 	}
 
 	private void resolveTo(JpaPid... pids) {

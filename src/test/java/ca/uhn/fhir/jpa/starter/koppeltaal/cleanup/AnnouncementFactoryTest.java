@@ -1,6 +1,7 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.cleanup;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Clock;
@@ -8,7 +9,10 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import org.hl7.fhir.r4.model.AuditEvent;
 import org.hl7.fhir.r4.model.Coding;
+import org.hl7.fhir.r4.model.DomainResource;
+import org.hl7.fhir.r4.model.Extension;
 import org.hl7.fhir.r4.model.IdType;
+import org.hl7.fhir.r4.model.Reference;
 import org.hl7.fhir.r4.model.Task;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,5 +72,31 @@ class AnnouncementFactoryTest {
 		assertEquals("Patient/p1", event.getEntityFirstRep().getWhat().getReference());
 		assertEquals("Patient", event.getEntityFirstRep().getType().getCode());
 		assertEquals("1", event.getEntityFirstRep().getRole().getCode());
+	}
+
+	@Test
+	void deletePendingTaskNamesTheServerDeviceAsResourceOrigin() {
+		Task task = factory.buildDeletePendingTask(new IdType("Patient", "p1"),
+				new IdType("Device", "app-1"), new IdType("Device", "server-dev"));
+
+		Reference origin = resourceOrigin(task);
+		assertEquals("Device/server-dev", origin.getReference());
+		assertEquals("Device", origin.getType());
+	}
+
+	@Test
+	void lifecycleEventNamesTheServerDeviceAsResourceOrigin() {
+		AuditEvent event = factory.buildLifecycleEvent(DeleteFlowLifecycleEvent.BLOCKED, new IdType("Patient", "p1"),
+				new IdType("Device", "server-dev"), "Koppeltaal domein VZVZ");
+
+		Reference origin = resourceOrigin(event);
+		assertEquals("Device/server-dev", origin.getReference());
+		assertEquals("Device", origin.getType());
+	}
+
+	private static Reference resourceOrigin(DomainResource resource) {
+		Extension extension = resource.getExtensionByUrl("http://koppeltaal.nl/fhir/StructureDefinition/resource-origin");
+		assertNotNull(extension, "resource-origin extension");
+		return (Reference) extension.getValue();
 	}
 }

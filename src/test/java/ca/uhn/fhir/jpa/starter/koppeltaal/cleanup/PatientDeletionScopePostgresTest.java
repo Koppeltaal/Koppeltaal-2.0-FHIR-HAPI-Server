@@ -143,10 +143,44 @@ class PatientDeletionScopePostgresTest {
 		link(10, 1, "Task.owner");
 		link(11, 1, "Task.owner");
 		link(11, 2, "Task.for");
-		assertThat(resources("x")).containsExactly("Patient/x");
+		version(10, 1, "{\"owner\":{\"reference\":\"Patient/x\"}}");
+		assertThat(resources("x")).containsExactly("Task/owned", "Patient/x");
 		assertThat(scope.blockersFor(new IdType("Patient", "y"))).isEmpty();
-		assertThat(scope.planFor(new IdType("Patient", "x")).blockers()).singleElement()
-				.satisfies(blocker -> assertThat(blocker.resourceId().getValue()).isEqualTo("Task/owned"));
+		var plan = scope.planFor(new IdType("Patient", "x"));
+		assertThat(plan.blockers()).isEmpty();
+		assertThat(plan.retainedTaskOwners()).singleElement()
+				.satisfies(owner -> assertThat(owner.taskId().getValue()).isEqualTo("Task/conflicting"));
+	}
+
+	@ParameterizedTest
+	@ValueSource(booleans = {false, true})
+	void taskWithoutBeneficiaryGoesWithTheOnlyPatientItNames(boolean deleted) {
+		resource(10, "Task", "legacy");
+		version(10, 1, "{\"owner\":{\"reference\":\"Patient/x\"}}");
+		version(10, 2, "{\"status\":\"ready\",\"owner\":{\"reference\":\"Patient/x/_history/1\"}}");
+		if (deleted) sql.update("UPDATE hfj_resource SET res_deleted_at=now() WHERE res_id=10");
+		else link(10, 1, "Task.owner");
+
+		var plan = scope.planFor(new IdType("Patient", "x"));
+		assertThat(plan.resources()).extracting(IIdType::getValue).containsExactly("Task/legacy", "Patient/x");
+		assertThat(plan.blockers()).isEmpty();
+		assertThat(plan.retainedTaskOwners()).isEmpty();
+		assertThat(resources("y")).containsExactly("Patient/y");
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"{\"owner\":{\"reference\":\"Patient/y\"}}", "{\"owner\":{\"reference\":\"Practitioner/p\"}}",
+			"{\"for\":{\"identifier\":{\"value\":\"123\"}},\"owner\":{\"reference\":\"Patient/x\"}}", "{}"})
+	void taskWithoutBeneficiaryStillBlocksWhenAnyVersionNamesSomeoneElse(String firstVersion) {
+		resource(10, "Task", "reassigned");
+		version(10, 1, firstVersion);
+		version(10, 2, "{\"owner\":{\"reference\":\"Patient/x\"}}");
+		link(10, 1, "Task.owner");
+
+		var plan = scope.planFor(new IdType("Patient", "x"));
+		assertThat(plan.resources()).extracting(IIdType::getValue).containsExactly("Patient/x");
+		assertThat(plan.blockers()).singleElement()
+				.satisfies(blocker -> assertThat(blocker.resourceId().getValue()).isEqualTo("Task/reassigned"));
 	}
 
 	@Test
@@ -199,8 +233,10 @@ class PatientDeletionScopePostgresTest {
 		link(10, 1, "Task.for");
 		version(10, 1, "{\"for\":{\"reference\":\"Patient/y\"}}");
 		version(10, 2, "{\"for\":{\"reference\":\"Patient/x\"}}");
-		assertThat(scope.planFor(new IdType("Patient/x")).blockers()).singleElement()
+		var plan = scope.planFor(new IdType("Patient/x"));
+		assertThat(plan.blockers()).singleElement()
 				.satisfies(blocker -> assertThat(blocker.blockReason()).contains("Version 1", "Patient/y"));
+		assertThat(plan.resources()).extracting(IIdType::getValue).containsExactly("Patient/x");
 	}
 
 	@Test
@@ -304,7 +340,7 @@ class PatientDeletionScopePostgresTest {
 
 	@ParameterizedTest
 	@ValueSource(booleans = {false, true})
-	void formerPatientOwnedTaskNowAssignedToOrganizationalTeamBlocksErasure(boolean deleted) {
+	void formerPatientOwnedTaskNowAssignedToOrganizationalTeamGoesWithThePatient(boolean deleted) {
 		resource(10, "CareTeam", "patient-team");
 		resource(11, "CareTeam", "organization-team");
 		resource(20, "Task", "ambiguous-owner-only");
@@ -315,11 +351,54 @@ class PatientDeletionScopePostgresTest {
 		else link(20, 11, "Task.owner");
 
 		var plan = scope.planFor(new IdType("Patient", "x"));
-		assertThat(plan.resources()).extracting(IIdType::getValue).doesNotContain("CareTeam/organization-team");
-		assertThat(plan.blockers()).anySatisfy(blocker -> {
-			assertThat(blocker.resourceId().getValue()).isEqualTo("Task/ambiguous-owner-only");
-			assertThat(blocker.blockReason()).contains("Task.owner", "patient ownership");
+		assertThat(plan.resources()).extracting(IIdType::getValue)
+				.contains("Task/ambiguous-owner-only").doesNotContain("CareTeam/organization-team");
+		assertThat(plan.blockers()).isEmpty();
+	}
+
+	@Test
+	void olderVersionsOwnedByAnOrganizationalTeamGoWithTheCurrentBeneficiary() {
+		resource(10, "CareTeam", "organization-team");
+		resource(20, "Task", "assigned-later");
+		link(20, 1, "Task.for");
+		link(20, 10, "Task.owner");
+		version(20, 1, "{\"owner\":{\"reference\":\"CareTeam/organization-team\"}}");
+		version(20, 2, "{\"for\":{\"reference\":\"Patient/x\"},\"owner\":{\"reference\":\"CareTeam/organization-team\"}}");
+
+		var plan = scope.planFor(new IdType("Patient", "x"));
+		assertThat(plan.resources()).extracting(IIdType::getValue).containsExactly("Task/assigned-later", "Patient/x");
+		assertThat(plan.blockers()).isEmpty();
+	}
+
+	@ParameterizedTest
+	@ValueSource(strings = {"Patient/y", "Practitioner/missing"})
+	void aVersionWithoutBeneficiaryWhoseOwnerNamesSomeoneElseIsKeptForReview(String owner) {
+		resource(10, "Task", "reassigned");
+		link(10, 1, "Task.for");
+		version(10, 1, "{\"owner\":{\"reference\":\"" + owner + "\"}}");
+		version(10, 2, "{\"for\":{\"reference\":\"Patient/x\"}}");
+
+		var plan = scope.planFor(new IdType("Patient", "x"));
+		assertThat(plan.blockers()).singleElement().satisfies(blocker -> {
+			assertThat(blocker.resourceId().getValue()).isEqualTo("Task/reassigned");
+			assertThat(blocker.blockReason()).contains("Version 1", "names another patient or does not resolve");
 		});
+		assertThat(plan.resources()).extracting(IIdType::getValue).containsExactly("Patient/x");
+	}
+
+	@Test
+	void referrersOfABlockedResourceAreLeftAlone() {
+		resource(10, "Task", "reassigned");
+		resource(20, "Task", "follow-up");
+		link(10, 1, "Task.for");
+		link(20, 2, "Task.for");
+		link(20, 10, "Task.partOf");
+		version(10, 1, "{\"for\":{\"reference\":\"Patient/y\"}}");
+		version(10, 2, "{\"for\":{\"reference\":\"Patient/x\"}}");
+
+		var plan = scope.planFor(new IdType("Patient", "x"));
+		assertThat(plan.blockers()).extracting(blocker -> blocker.resourceId().getValue()).containsExactly("Task/reassigned");
+		assertThat(plan.resources()).extracting(IIdType::getValue).containsExactly("Patient/x");
 	}
 
 	@ParameterizedTest
@@ -332,10 +411,12 @@ class PatientDeletionScopePostgresTest {
 		version(20, 1, "{\"owner\":{\"reference\":\"CareTeam/changed-team\"}}");
 		link(20, 10, "Task.owner");
 		if (deleted) sql.update("UPDATE hfj_resource SET res_deleted_at=now() WHERE res_id=10");
-		assertThat(scope.planFor(new IdType("Patient", "x")).blockers()).anySatisfy(blocker -> {
-			assertThat(blocker.resourceId().getValue()).isEqualTo("Task/owner-only");
+		var plan = scope.planFor(new IdType("Patient", "x"));
+		assertThat(plan.blockers()).singleElement().satisfies(blocker -> {
+			assertThat(blocker.resourceId().getValue()).isEqualTo("CareTeam/changed-team");
 			assertThat(blocker.blockReason()).contains("patient ownership");
 		});
+		assertThat(plan.resources()).extracting(IIdType::getValue).containsExactly("Task/owner-only", "Patient/x");
 	}
 
 	@Test

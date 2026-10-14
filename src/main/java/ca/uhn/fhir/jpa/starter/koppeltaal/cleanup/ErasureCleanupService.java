@@ -6,6 +6,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.util.DeleteFlowTaskUtil;
 import ca.uhn.fhir.rest.api.server.SystemRequestDetails;
 import ca.uhn.fhir.rest.param.ReferenceParam;
 import ca.uhn.fhir.rest.param.TokenParam;
+import ca.uhn.fhir.rest.server.exceptions.ResourceGoneException;
 import ca.uhn.fhir.util.JsonUtil;
 import jakarta.persistence.EntityManager;
 
@@ -66,13 +67,11 @@ public class ErasureCleanupService implements CleanupService {
 		/** Blocked by a handbrake, or the grace period is still running. */
 		WAITING,
 
-		/** An ownership conflict or an unsupported incoming reference prevents erasure. */
-		BLOCKED,
 		/** A hold outlived the deadline: holds wiped, grace restarted. */
 		GRACE_RESET,
 		/** Renewed engagement: the announcement is cancelled and the clock restarts. */
 		ABORTED,
-		/** Everything for this patient was removed. */
+		/** The patient was removed; blocked resources stayed behind for manual review. */
 		ERASED
 	}
 
@@ -130,18 +129,20 @@ public class ErasureCleanupService implements CleanupService {
 		final Map<Outcome, Integer> outcomes = new EnumMap<>(Outcome.class);
 		final List<String> errors = new ArrayList<>();
 		final List<String> affected = new ArrayList<>();
+		final Map<String, Integer> dispositions = new LinkedHashMap<>();
 
 		final List<String> patients = inventory.patientsWithARunningCycle();
 		LOG.info("Erasure run starting (dryRun={}, patients with a running cycle={})", dryRun, patients.size());
 		progressListener.accept(report(CleanupRunReport.RunStatus.RUNNING, startedAt, null, 0,
-				patients.size(), outcomes, affected, errors, dryRun));
+				patients.size(), outcomes, dispositions, errors, dryRun));
 
 		int evaluated = 0;
 		for (String patientIdPart : patients) {
 			try {
-				final List<String> patientResources = new ArrayList<>();
+				final Affected patientResources = new Affected();
 				final Outcome outcome = handle(patientIdPart, dryRun, clock, patientResources);
-				affected.addAll(patientResources);
+				affected.addAll(patientResources.lines);
+				patientResources.dispositions.forEach((disposition, count) -> dispositions.merge(disposition, count, Integer::sum));
 				outcomes.merge(outcome, 1, Integer::sum);
 			} catch (Exception e) {
 				errors.add(String.format("Patient/%s: %s", patientIdPart, e.getMessage()));
@@ -150,12 +151,12 @@ public class ErasureCleanupService implements CleanupService {
 			evaluated++;
 			if (evaluated % 25 == 0) {
 				progressListener.accept(report(CleanupRunReport.RunStatus.RUNNING, startedAt, null, evaluated,
-						patients.size(), outcomes, affected, errors, dryRun));
+						patients.size(), outcomes, dispositions, errors, dryRun));
 			}
 		}
 
 		final CleanupRunReport finished = report(CleanupRunReport.RunStatus.COMPLETED, startedAt, Instant.now(),
-				evaluated, patients.size(), outcomes, affected, errors, dryRun);
+				evaluated, patients.size(), outcomes, dispositions, errors, dryRun);
 		finished.setDetailsFile(writeDetails(affected, dryRun, startedAt));
 		return finished;
 	}
@@ -184,7 +185,7 @@ public class ErasureCleanupService implements CleanupService {
 		return file.toString();
 	}
 
-	private Outcome handle(String patientIdPart, boolean dryRun, Clock clock, List<String> affected) {
+	private Outcome handle(String patientIdPart, boolean dryRun, Clock clock, Affected affected) {
 
 		if (dryRun) {
 			final List<Task> cycle = cycleFor(patientIdPart);
@@ -212,7 +213,7 @@ public class ErasureCleanupService implements CleanupService {
 	}
 
 	private Outcome decide(String patientIdPart, List<Task> cycle, boolean dryRun, Clock clock,
-			List<String> affected) {
+			Affected affected) {
 
 		final IIdType patientId = new IdType("Patient", patientIdPart);
 		final boolean held = cycle.stream().anyMatch(task -> task.getStatus() == Task.TaskStatus.ONHOLD);
@@ -268,27 +269,23 @@ public class ErasureCleanupService implements CleanupService {
 		return Outcome.ABORTED;
 	}
 
-	private Outcome erase(IIdType patientId, List<Task> cycle, boolean dryRun, List<String> affected) {
+	private Outcome erase(IIdType patientId, List<Task> cycle, boolean dryRun, Affected affected) {
 
 		final PatientDeletionScope.Plan plan = deletionScope.planFor(patientId);
-		final List<PatientDeletionScope.Blocker> blockers = plan.blockers();
 		final List<IIdType> resources = plan.resources();
-		if (!blockers.isEmpty()) {
-			blockers.forEach(blocker -> affected.add(line(patientId, blocker.resourceId(), "blocked", blocker.blockReason())));
-			LOG.warn("Erase refused for {}: {} resources have blocking ownership or reference conflicts",
-					patientId, blockers.size());
-			return Outcome.BLOCKED;
-		}
+		final List<IIdType> blocked = plan.blockers().stream().map(PatientDeletionScope.Blocker::resourceId).toList();
 
-		resources.forEach(id -> affected.add(line(patientId, id, "erase", null)));
-		plan.detachments().forEach(removal -> affected.add(detachmentLine(patientId, removal)));
-		plan.retainedTaskOwners().forEach(owner -> affected.add(retainedTaskOwnerLine(patientId, owner)));
+		plan.blockers().forEach(blocker -> affected.add(row(patientId, blocker.resourceId(), "blocked", blocker.blockReason())));
+		resources.forEach(id -> affected.add(row(patientId, id, "erase", null)));
+		plan.detachments().forEach(removal -> affected.add(detachmentRow(patientId, removal)));
+		plan.retainedTaskOwners().forEach(owner -> affected.add(retainedTaskOwnerRow(patientId, owner)));
 
 		if (!dryRun) {
 			final var taskDao = daoRegistry.getResourceDao(Task.class);
 			final List<TaskOwnerTagging.TagAddition> retainedTasks = plan.retainedTaskOwners().stream().map(owner ->
 					TaskOwnerTagging.prepare(taskDao.read(owner.taskId(), new SystemRequestDetails()),
 							owner.patientReference())).toList();
+			final List<IIdType> reviewTags = blocked.stream().filter(this::stillExists).toList();
 			final var careTeamDao = daoRegistry.getResourceDao(CareTeam.class);
 			final List<CareTeam> retainedTeams = plan.detachments().stream().map(removal ->
 					CareTeamParticipantRemover.remove(careTeamDao.read(removal.careTeamId(), new SystemRequestDetails()),
@@ -298,6 +295,11 @@ public class ErasureCleanupService implements CleanupService {
 			}
 			for (TaskOwnerTagging.TagAddition update : retainedTasks) {
 				taskDao.metaAddOperation(update.taskId(), update.meta(), new SystemRequestDetails());
+			}
+			// The same tag as a retained Task, so a blocked resource can be found for its review.
+			for (IIdType resource : reviewTags) {
+				daoRegistry.getResourceDao(resource.getResourceType())
+						.metaAddOperation(resource, TaskOwnerTagging.deletedReferenceTag(), new SystemRequestDetails());
 			}
 			// All of it commits together or none of it does. Completing the Tasks
 			// outside the erase would strand the cycle: a later failure leaves them
@@ -310,41 +312,65 @@ public class ErasureCleanupService implements CleanupService {
 				completed.setStatus(Task.TaskStatus.COMPLETED);
 				store(completed);
 			}
-			eraser.erase(resources, plan.retainedTaskOwners());
+			eraser.erase(resources, plan.retainedTaskOwners(), blocked);
 			record(DeleteFlowLifecycleEvent.DESTROYED, patientId);
 		}
 		LOG.info("{} {} resources for {}", dryRun ? "Would remove" : "Removed", resources.size(), patientId);
+		if (!blocked.isEmpty()) {
+			LOG.warn("{} blocked resources kept for manual review while erasing {}", blocked.size(), patientId);
+		}
 		return Outcome.ERASED;
 	}
 
-	private static String detachmentLine(IIdType patientId, PatientDeletionScope.ParticipantRemoval removal) {
+	/** A deleted resource needs no tag: searches no longer find it and it has no index rows left. */
+	private boolean stillExists(IIdType resourceId) {
+		try {
+			daoRegistry.getResourceDao(resourceId.getResourceType()).read(resourceId, new SystemRequestDetails());
+			return true;
+		} catch (ResourceGoneException gone) {
+			return false;
+		}
+	}
+
+	private static Map<String, Object> detachmentRow(IIdType patientId, PatientDeletionScope.ParticipantRemoval removal) {
 		final Map<String, Object> row = new LinkedHashMap<>();
 		row.put("patient", patientId.getIdPart());
 		row.put("resourceType", "CareTeam");
 		row.put("id", removal.careTeamId().getIdPart());
 		row.put("disposition", "detach");
 		row.put("removedReferences", removal.references().stream().sorted().toList());
-		return JsonUtil.serialize(row, false);
+		return row;
 	}
 
-	private static String retainedTaskOwnerLine(IIdType patientId, PatientDeletionScope.RetainedTaskOwner owner) {
+	private static Map<String, Object> retainedTaskOwnerRow(IIdType patientId, PatientDeletionScope.RetainedTaskOwner owner) {
 		final Map<String, Object> row = new LinkedHashMap<>();
 		row.put("patient", patientId.getIdPart());
 		row.put("resourceType", "Task");
 		row.put("id", owner.taskId().getIdPart());
 		row.put("disposition", "tag-deleted-owner");
 		row.put("reason", "Task belongs to another patient. Add issue-type#deleted to meta.tag; preserve Task content, status, version and lastUpdated.");
-		return JsonUtil.serialize(row, false);
+		return row;
 	}
 
-	private static String line(IIdType patientId, IIdType resourceId, String disposition, String blockReason) {
-		final Map<String, String> row = new LinkedHashMap<>();
+	private static Map<String, Object> row(IIdType patientId, IIdType resourceId, String disposition, String blockReason) {
+		final Map<String, Object> row = new LinkedHashMap<>();
 		row.put("patient", patientId.getIdPart());
 		row.put("resourceType", resourceId.getResourceType());
 		row.put("id", resourceId.getIdPart());
 		row.put("disposition", disposition);
 		if (blockReason != null) row.put("blockReason", blockReason);
-		return JsonUtil.serialize(row, false);
+		return row;
+	}
+
+	/** One patient's lines for the details file, counted per disposition for the report. */
+	private static final class Affected {
+		private final List<String> lines = new ArrayList<>();
+		private final Map<String, Integer> dispositions = new LinkedHashMap<>();
+
+		private void add(Map<String, Object> row) {
+			lines.add(JsonUtil.serialize(row, false));
+			dispositions.merge((String) row.get("disposition"), 1, Integer::sum);
+		}
 	}
 
 	/**
@@ -405,14 +431,18 @@ public class ErasureCleanupService implements CleanupService {
 	}
 
 	private CleanupRunReport report(CleanupRunReport.RunStatus status, Instant startedAt, Instant finishedAt,
-			int evaluated, int total, Map<Outcome, Integer> outcomes, List<String> affected, List<String> errors,
-			boolean dryRun) {
+			int evaluated, int total, Map<Outcome, Integer> outcomes, Map<String, Integer> dispositions,
+			List<String> errors, boolean dryRun) {
 
 		final Map<String, Integer> counts = new LinkedHashMap<>();
 		for (Outcome outcome : Outcome.values()) {
 			counts.put(outcome.name(), outcomes.getOrDefault(outcome, 0));
 		}
-		counts.put("RESOURCES", affected.size());
+		// Only what is erased counts as a resource; what stays behind is reported on its own line.
+		counts.put("RESOURCES", dispositions.getOrDefault("erase", 0));
+		counts.put("RETAINED", dispositions.getOrDefault("tag-deleted-owner", 0));
+		counts.put("DETACHED", dispositions.getOrDefault("detach", 0));
+		counts.put("BLOCKED_RESOURCES", dispositions.getOrDefault("blocked", 0));
 
 		return new CleanupRunReport(status, startedAt, finishedAt, evaluated,
 				outcomes.getOrDefault(Outcome.ERASED, 0), 0, 0, errors, dryRun, total, counts);
