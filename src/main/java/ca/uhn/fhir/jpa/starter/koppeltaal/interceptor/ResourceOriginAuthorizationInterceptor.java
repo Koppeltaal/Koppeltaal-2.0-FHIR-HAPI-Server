@@ -6,14 +6,18 @@ import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.DeleteFlowTaskUtil;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.PermissionUtil;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
+import ca.uhn.fhir.rest.api.Constants;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
+import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceGoneException;
 import ca.uhn.fhir.rest.server.interceptor.auth.AuthorizationInterceptor;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
@@ -23,12 +27,18 @@ import org.hl7.fhir.r4.model.SearchParameter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
  * Not using the {@link AuthorizationInterceptor} as custom
  * {@link org.hl7.fhir.CompartmentDefinition} objects are not allowed.
+ * <p>
+ * Where the matrix refuses, the kt2-delete-flow marker may still grant access to the delete flow; see
+ * {@link DeleteFlowAccess}.
+ * </p>
  */
 @Interceptor
 public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInterceptor {
@@ -110,9 +120,18 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
           .map((permission) -> StringUtils.substringAfter(permission, "."))
           .anyMatch((permission) -> permission.matches(crudsRegex + ".*"));
       LOG.debug("Read-all permission check result: {}", hasPermission);
+      if (!hasPermission && narrowedToDeleteFlow(requestDetails)) {
+        return;
+      }
     } else {
       LOG.debug("Checking permission for specific resource operation");
-      String existingEntityResourceOrigin = getEntityResourceOrigin(requestDetails);
+      final IBaseResource existingResource = readExistingResource(requestDetails);
+      if (deleteFlowGrants(requestDetails, existingResource)) {
+        return;
+      }
+      String existingEntityResourceOrigin = existingResource == null
+          ? null // no entity id - read all - will be managed by search narrowing
+          : getResourceOriginDeviceReference(existingResource, requestDetails);
 
       LOG.debug("Checking permission for {}/{} with resource-origin: {}",
           requestDetails.getResourceName(), requestDetails.getId(), existingEntityResourceOrigin);
@@ -143,30 +162,74 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     LOG.debug("{} request authorized for {}", requestType, requestDetails.getResourceName());
   }
 
-  private String getEntityResourceOrigin(RequestDetails requestDetails) {
+  private IBaseResource readExistingResource(RequestDetails requestDetails) {
     final IIdType resourceId = requestDetails.getId();
-    if (resourceId != null) {
-      try {
-        final IFhirResourceDao<?> resourceDao = daoRegistry.getResourceDao(requestDetails.getResourceName());
-
-        // Determine if we should allow reading deleted resources based on whether this is a history request
-        boolean allowDeleted = isFullHistoryCheck(requestDetails);
-
-        if (allowDeleted) {
-          LOG.debug("History request for {}/{} - reading with allowDeleted=true",
-                   requestDetails.getResourceName(), resourceId.getIdPart());
-        }
-
-        IBaseResource existingResource = resourceDao.read(resourceId, requestDetails, allowDeleted);
-        return getResourceOriginDeviceReference(existingResource, requestDetails);
-      } catch (ResourceGoneException e) {
-        LOG.warn("Failed to read resource {}/{} for authorization check",
-                 requestDetails.getResourceName(), resourceId.getIdPart());
-        throw e;
-      }
+    if (resourceId == null) {
+      return null;
     }
+    try {
+      final IFhirResourceDao<?> resourceDao = daoRegistry.getResourceDao(requestDetails.getResourceName());
 
-    return null; // no entity id - read all - will be managed by search narrowing
+      // Determine if we should allow reading deleted resources based on whether this is a history request
+      boolean allowDeleted = isFullHistoryCheck(requestDetails);
+
+      if (allowDeleted) {
+        LOG.debug("History request for {}/{} - reading with allowDeleted=true",
+                 requestDetails.getResourceName(), resourceId.getIdPart());
+      }
+
+      return resourceDao.read(resourceId, requestDetails, allowDeleted);
+    } catch (ResourceGoneException e) {
+      LOG.warn("Failed to read resource {}/{} for authorization check",
+               requestDetails.getResourceName(), resourceId.getIdPart());
+      throw e;
+    }
+  }
+
+  /** The kt2-delete-flow marker adds to the matrix; it never takes anything away, and it never grants a delete. */
+  private boolean deleteFlowGrants(RequestDetails requestDetails, IBaseResource existingResource) {
+    if (!DeleteFlowAccess.isDeleteFlowResource(existingResource)) {
+      return false;
+    }
+    final Device caller = ResourceOriginUtil.getDevice(requestDetails, deviceDao).orElse(null);
+    if (requestDetails.getRequestType() == RequestTypeEnum.GET) {
+      return DeleteFlowAccess.mayRead(existingResource, caller);
+    }
+    return requestDetails.getRequestType() == RequestTypeEnum.PUT && DeleteFlowAccess.mayUpdate(existingResource, caller);
+  }
+
+  /**
+   * Without matrix read on Task or AuditEvent, the marker still lets a participant search the delete flow: its
+   * own delete-pending Tasks and every delete-flow AuditEvent. Including other resources would reach past what
+   * the marker grants, so that is refused.
+   */
+  private boolean narrowedToDeleteFlow(RequestDetails requestDetails) {
+    final String resourceName = requestDetails.getResourceName();
+    if (requestDetails.getRestOperationType() != RestOperationTypeEnum.SEARCH_TYPE
+        || !("Task".equals(resourceName) || "AuditEvent".equals(resourceName))) {
+      return false;
+    }
+    final Device caller = ResourceOriginUtil.getDevice(requestDetails, deviceDao).orElse(null);
+    if (!DeleteFlowAccess.isParticipant(caller)) {
+      return false;
+    }
+    final Map<String, String[]> narrowed = new HashMap<>(requestDetails.getParameters());
+    if (narrowed.keySet().stream().anyMatch(name ->
+        name.startsWith(Constants.PARAM_INCLUDE) || name.startsWith(Constants.PARAM_REVINCLUDE))) {
+      throw new ForbiddenOperationException(
+          "_include and _revinclude are not allowed on a search that only the kt2-delete-flow marker permits");
+    }
+    addValue(narrowed, Constants.PARAM_SECURITY, DeleteFlowTaskUtil.DELETE_FLOW_SECURITY_TOKEN);
+    if ("Task".equals(resourceName)) {
+      addValue(narrowed, "owner", "Device/" + caller.getIdElement().getIdPart());
+    }
+    requestDetails.setParameters(narrowed);
+    return true;
+  }
+
+  /** A repeated search parameter is an AND, so an application's own value narrows further, never wider. */
+  private static void addValue(Map<String, String[]> parameters, String name, String value) {
+    parameters.merge(name, new String[] {value}, ArrayUtils::addAll);
   }
 
 

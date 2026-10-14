@@ -6,6 +6,7 @@ import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
+import ca.uhn.fhir.jpa.starter.koppeltaal.cleanup.ParticipatingApps;
 import ca.uhn.fhir.rest.api.server.SystemRequestDetails;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.CrudOperation;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.PermissionUtil;
@@ -41,6 +42,11 @@ public class SubscriptionNarrowingInterceptor {
 
 	@Hook(Pointcut.SUBSCRIPTION_BEFORE_DELIVERY)
 	public boolean subscriptionBeforeDelivery(ResourceDeliveryMessage message, CanonicalSubscription canonicalSubscription) {
+
+		final Optional<Boolean> deleteFlowDecision = deleteFlowDecision(message, canonicalSubscription);
+		if (deleteFlowDecision.isPresent()) {
+			return deleteFlowDecision.get();
+		}
 
 		try {
 			final IBaseResource payload = message.getPayload(context);
@@ -96,6 +102,45 @@ public class SubscriptionNarrowingInterceptor {
 
     LOG.warn("Final fallthrough code reached. Still sending notification.");
 		return true; //TODO: Decide whether we want this to break
+	}
+
+	/**
+	 * Empty unless the payload is a delete-flow resource. Such a notification follows what the subscriber may
+	 * read - the marker grant, or the matrix on top of it - and is withheld whenever that cannot be established.
+	 */
+	private Optional<Boolean> deleteFlowDecision(ResourceDeliveryMessage message, CanonicalSubscription canonicalSubscription) {
+		final IBaseResource payload;
+		try {
+			payload = message.getPayload(context);
+		} catch (Exception e) {
+			return Optional.empty();
+		}
+		if (!DeleteFlowAccess.isDeleteFlowResource(payload)) {
+			return Optional.empty();
+		}
+		try {
+			final SystemRequestDetails requestDetails = new SystemRequestDetails();
+			requestDetails.setTenantId("DEFAULT");
+			final Subscription subscription = subscriptionDao.read(canonicalSubscription.getIdElement(context), requestDetails);
+			final Optional<IIdType> subscriberId = ResourceOriginUtil.getResourceOriginDeviceId(subscription);
+			if (subscriberId.isEmpty()) {
+				return Optional.of(false);
+			}
+			final Device subscriber = deviceDao.read(subscriberId.get(), requestDetails);
+			if (DeleteFlowAccess.mayRead(payload, subscriber)) {
+				return Optional.of(true);
+			}
+			final Optional<IIdType> payloadOrigin = ResourceOriginUtil.getResourceOriginDeviceId(payload);
+			final Optional<String> scope = subscriber.getIdentifier().stream()
+					.filter(identifier -> ParticipatingApps.CLIENT_ID_SYSTEM.equals(identifier.getSystem()))
+					.findAny()
+					.flatMap(identifier -> PermissionUtil.getScope(identifier.getValue()));
+			return Optional.of(payloadOrigin.isPresent() && scope.isPresent() && PermissionUtil.hasPermission(CrudOperation.READ,
+					((DomainResource) payload).getResourceType(), payloadOrigin.get().getIdPart(), scope.get()));
+		} catch (Exception e) {
+			LOG.error("Could not decide on delivering delete-flow resource {}; withholding it", payload.getIdElement(), e);
+			return Optional.of(false);
+		}
 	}
 
 }

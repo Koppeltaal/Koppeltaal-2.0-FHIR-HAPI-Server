@@ -34,6 +34,8 @@ class SubscriptionNarrowingInterceptorTest {
 
   private FhirContext fhirContext = new FhirContext(FhirVersionEnum.R4);
 
+  private Device subscriptionResourceOrigin;
+
   @BeforeEach
   void init(@Mock DaoRegistry daoRegistry) {
     IFhirSystemDao systemDaoMock = mock(IFhirSystemDao.class);
@@ -49,7 +51,9 @@ class SubscriptionNarrowingInterceptorTest {
     when(daoRegistry.getResourceDao(eq(Device.class)))
       .thenReturn(deviceDaoMock);
 
-    Device subscriptionResourceOrigin = new Device();
+    subscriptionResourceOrigin = new Device();
+    subscriptionResourceOrigin.setId("Device/123");
+    subscriptionResourceOrigin.setStatus(Device.FHIRDeviceStatus.ACTIVE);
     Identifier clientIdIdentifier = new Identifier();
     clientIdIdentifier.setSystem("http://vzvz.nl/fhir/NamingSystem/koppeltaal-client-id");
     clientIdIdentifier.setValue("default-client-id");
@@ -109,5 +113,68 @@ class SubscriptionNarrowingInterceptorTest {
     assertTrue(
       interceptor.subscriptionBeforeDelivery(resourceDeliveryMessage, canonicalSubscription)
     );
+  }
+
+  @Test
+  public void theOwnerIsNotifiedOfItsDeletePendingTask() {
+    PermissionUtil.createOrUpdateScope("default-client-id", "system/Task.r?resource-origin=Device/123");
+
+    assertTrue(deliver(deletePendingTask("Device/123", "Device/server")));
+  }
+
+  @Test
+  public void anotherApplicationIsNotNotifiedOfADeletePendingTaskEvenWithoutOrigin() {
+    PermissionUtil.createOrUpdateScope("default-client-id", "system/Task.r?resource-origin=Device/123");
+
+    assertFalse(deliver(deletePendingTask("Device/other", null)));
+  }
+
+  @Test
+  public void theMatrixStillNotifiesAnApplicationThatMayReadAllTasks() {
+    PermissionUtil.createOrUpdateScope("default-client-id", "system/Task.r");
+
+    assertTrue(deliver(deletePendingTask("Device/other", "Device/server")));
+  }
+
+  @Test
+  public void everyParticipantIsNotifiedOfADeleteFlowAuditEvent() {
+    PermissionUtil.createOrUpdateScope("default-client-id", "system/AuditEvent.r?resource-origin=Device/123");
+
+    assertTrue(deliver(deleteFlowAuditEvent()));
+  }
+
+  @Test
+  public void anInactiveApplicationIsNotNotifiedOfADeleteFlowAuditEvent() {
+    subscriptionResourceOrigin.setStatus(Device.FHIRDeviceStatus.INACTIVE);
+    PermissionUtil.createOrUpdateScope("default-client-id", "system/AuditEvent.r?resource-origin=Device/123");
+
+    assertFalse(deliver(deleteFlowAuditEvent()));
+  }
+
+  private boolean deliver(DomainResource payload) {
+    ResourceDeliveryMessage resourceDeliveryMessage = new ResourceDeliveryMessage();
+    resourceDeliveryMessage.setPayload(fhirContext, payload, EncodingEnum.JSON);
+    CanonicalSubscription canonicalSubscription = new CanonicalSubscription();
+    canonicalSubscription.setIdElement(new IdType("sub-id"));
+    return interceptor.subscriptionBeforeDelivery(resourceDeliveryMessage, canonicalSubscription);
+  }
+
+  private static Task deletePendingTask(String owner, String origin) {
+    Task task = new Task();
+    task.setId(UUID.randomUUID().toString());
+    task.getMeta().addSecurity("http://vzvz.nl/fhir/CodeSystem/koppeltaal-security-label", "kt2-delete-flow", null);
+    task.setOwner(new Reference(owner));
+    if (origin != null) {
+      task.addExtension(new Extension(ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM, new Reference(origin)));
+    }
+    return task;
+  }
+
+  private static AuditEvent deleteFlowAuditEvent() {
+    AuditEvent event = new AuditEvent();
+    event.setId(UUID.randomUUID().toString());
+    event.getMeta().addSecurity("http://vzvz.nl/fhir/CodeSystem/koppeltaal-security-label", "kt2-delete-flow", null);
+    event.addExtension(new Extension(ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM, new Reference("Device/server")));
+    return event;
   }
 }
