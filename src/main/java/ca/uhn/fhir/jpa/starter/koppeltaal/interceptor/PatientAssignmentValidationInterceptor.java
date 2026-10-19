@@ -88,10 +88,23 @@ public class PatientAssignmentValidationInterceptor {
 	@Hook(Pointcut.STORAGE_PRECOMMIT_RESOURCE_UPDATED)
 	public void resourceUpdated(IBaseResource previous, IBaseResource updated, RequestDetails request) {
 		if (updated instanceof Task task) {
-			validateTask(task, request);
+			if (!onlyMetaChanged(previous, task)) validateTask(task, request);
 		} else if (patientChanged(previous, updated, request)) {
 			validateOwnedTasks((DomainResource) updated, request);
 		}
+	}
+
+	/**
+	 * $meta-add and $meta-delete fire this hook with the stored Task on both sides. A tag cannot change the
+	 * patient assignment, and a Task kept for manual review must still take its review tag.
+	 */
+	private static boolean onlyMetaChanged(IBaseResource previous, Task updated) {
+		if (!(previous instanceof Task stored)) return false;
+		Task before = stored.copy();
+		Task after = updated.copy();
+		before.setMeta(null);
+		after.setMeta(null);
+		return before.equalsDeep(after);
 	}
 
 	private void validateTask(Task task, RequestDetails request) {

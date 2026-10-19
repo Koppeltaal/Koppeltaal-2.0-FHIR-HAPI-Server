@@ -118,6 +118,26 @@ class PatientAssignmentValidationInterceptorTest {
 	}
 
 	@Test
+	void acceptsTaggingALegacyTaskWithAConflictingRelatedPersonOwner() {
+		store(relatedPerson("relative-a", "Patient/patient-a"));
+		Task legacy = task("task-a", "RelatedPerson/relative-a", "Patient/patient-b");
+		assertThatCode(() -> update(legacy, withDeletedTag(legacy))).doesNotThrowAnyException();
+	}
+
+	@Test
+	void acceptsTaggingATaskWhoseOwnerNoLongerResolves() {
+		Task kept = task("task-a", "CareTeam/erased-team", "Patient/patient-a");
+		assertThatCode(() -> update(kept, withDeletedTag(kept))).doesNotThrowAnyException();
+	}
+
+	@Test
+	void stillRejectsContentChangesToALegacyTaskWithAConflictingOwner() {
+		store(relatedPerson("relative-a", "Patient/patient-a"));
+		Task legacy = task("task-a", "RelatedPerson/relative-a", "Patient/patient-b");
+		assertRejected(() -> update(legacy, withDeletedTag(legacy).setStatus(Task.TaskStatus.CANCELLED)));
+	}
+
+	@Test
 	void comparesVersionedPatientReferencesByIdentity() {
 		assertThatCode(() -> create(task("task-a", "Patient/patient-a/_history/2", "Patient/patient-a/_history/3")))
 				.doesNotThrowAnyException();
@@ -396,6 +416,13 @@ class PatientAssignmentValidationInterceptorTest {
 	private static Task task(String id, String owner, String patient) {
 		Task task = new Task().setOwner(new Reference(owner)).setFor(new Reference(patient));
 		return identified(task, "Task/" + id);
+	}
+
+	/** What HAPI passes as the new version on a $meta-add: the stored Task, one tag richer. */
+	private static Task withDeletedTag(Task stored) {
+		Task tagged = stored.copy();
+		tagged.getMeta().addTag("http://hl7.org/fhir/issue-type", "deleted", "Deleted");
+		return tagged;
 	}
 
 	private static CareTeam careTeam(String id, String patient) {
