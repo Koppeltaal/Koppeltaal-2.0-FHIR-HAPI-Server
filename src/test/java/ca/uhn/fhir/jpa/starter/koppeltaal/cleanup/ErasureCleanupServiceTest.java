@@ -3,6 +3,7 @@ package ca.uhn.fhir.jpa.starter.koppeltaal.cleanup;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -283,7 +284,8 @@ class ErasureCleanupServiceTest {
 		} else {
 			var order = inOrder(careTeamDao, taskDao, eraser, auditEventDao);
 			var updated = ArgumentCaptor.forClass(CareTeam.class);
-			order.verify(careTeamDao).update(updated.capture(), any(RequestDetails.class));
+			// The erase's own write, so a reference an earlier erase left behind does not refuse it.
+			order.verify(careTeamDao).update(updated.capture(), isA(ErasureRequestDetails.class));
 			order.verify(taskDao).update(any(Task.class), any(RequestDetails.class));
 			order.verify(eraser).erase(any(), any(), any());
 			order.verify(auditEventDao).create(any(AuditEvent.class), any(RequestDetails.class));

@@ -291,7 +291,7 @@ public class ErasureCleanupService implements CleanupService {
 					CareTeamParticipantRemover.remove(careTeamDao.read(removal.careTeamId(), new SystemRequestDetails()),
 							removal.references())).toList();
 			for (CareTeam retainedTeam : retainedTeams) {
-				careTeamDao.update(retainedTeam, new SystemRequestDetails());
+				careTeamDao.update(retainedTeam, new ErasureRequestDetails());
 			}
 			for (TaskOwnerTagging.TagAddition update : retainedTasks) {
 				taskDao.metaAddOperation(update.taskId(), update.meta(), new SystemRequestDetails());
