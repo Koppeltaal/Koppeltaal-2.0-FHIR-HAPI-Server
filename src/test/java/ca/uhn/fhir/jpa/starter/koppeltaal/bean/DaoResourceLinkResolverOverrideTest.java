@@ -7,7 +7,9 @@ import ca.uhn.fhir.i18n.Msg;
 import ca.uhn.fhir.interceptor.model.RequestPartitionId;
 import ca.uhn.fhir.jpa.model.cross.IResourceLookup;
 import ca.uhn.fhir.jpa.searchparam.extractor.PathAndRef;
+import ca.uhn.fhir.jpa.starter.koppeltaal.cleanup.ErasureRequestDetails;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
+import ca.uhn.fhir.rest.api.server.SystemRequestDetails;
 import ca.uhn.fhir.rest.api.server.storage.TransactionDetails;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 
@@ -73,12 +75,54 @@ class DaoResourceLinkResolverOverrideTest {
 				.isInstanceOf(InvalidRequestException.class);
 	}
 
+	/** A CareTeam the erase keeps can still name what an earlier erase removed; detaching it must not fail on that. */
+	@Test
+	void theErasesOwnWriteKeepsAReferenceThatNoLongerResolves() {
+
+		hapiReports(1094, "Resource Patient/gone not found, specified in path: ");
+
+		assertThat(resolve("CareTeam", "CareTeam.subject", new ErasureRequestDetails())).isNull();
+	}
+
+	/** The marker belongs to the erase's CareTeam write; on any other resource a missing target still counts. */
+	@Test
+	void theMarkerLoosensNothingButACareTeam() {
+
+		hapiReports(1094, "Resource Patient/gone not found, specified in path: ");
+
+		assertThatThrownBy(() -> resolve("Task", "Task.for", new ErasureRequestDetails()))
+				.isInstanceOf(InvalidRequestException.class);
+	}
+
+	@Test
+	void anyOtherServerWriteStillNeedsItsTarget() {
+
+		hapiReports(1094, "Resource Patient/gone not found, specified in path: ");
+
+		assertThatThrownBy(() -> resolve("CareTeam", "CareTeam.subject", new SystemRequestDetails()))
+				.isInstanceOf(InvalidRequestException.class);
+	}
+
+	@Test
+	void anyOtherComplaintStillStopsTheErasesWrite() {
+
+		hapiReports(1099, "Non-unique ID specified, can not process request");
+
+		assertThatThrownBy(() -> resolve("CareTeam", "CareTeam.subject", new ErasureRequestDetails()))
+				.isInstanceOf(InvalidRequestException.class)
+				.hasMessageContaining("Non-unique ID");
+	}
+
 	private void hapiReports(int code, String message) {
 		thrownByHapi = new InvalidRequestException(Msg.code(code) + message);
 	}
 
 	private IResourceLookup resolve(String path) {
+		return resolve("AuditEvent", path, null);
+	}
+
+	private IResourceLookup resolve(String source, String path, RequestDetails request) {
 		final PathAndRef pathAndRef = new PathAndRef("entity", path, new Reference("Patient/gone"), false);
-		return resolver.findTargetResource(RequestPartitionId.allPartitions(), "AuditEvent", pathAndRef, null, null);
+		return resolver.findTargetResource(RequestPartitionId.allPartitions(), source, pathAndRef, request, null);
 	}
 }

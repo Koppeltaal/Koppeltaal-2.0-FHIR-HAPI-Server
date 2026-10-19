@@ -1,5 +1,7 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.util;
 
+import org.hl7.fhir.instance.model.api.IBaseCoding;
+import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.r4.model.Task;
 
@@ -16,15 +18,19 @@ public class DeleteFlowTaskUtil {
 	public static final String DELETE_FLOW_LABEL = "kt2-delete-flow";
 	public static final String TASK_CODE_SYSTEM = "http://vzvz.nl/fhir/CodeSystem/koppeltaal-task-code";
 	public static final String DELETE_PENDING_CODE = "delete-pending";
+	/** The marker as a {@code _security} search value. */
+	public static final String DELETE_FLOW_SECURITY_TOKEN = SECURITY_SYSTEM + "|" + DELETE_FLOW_LABEL;
 
 	public static Coding deleteFlowLabel() {
 		return new Coding(SECURITY_SYSTEM, DELETE_FLOW_LABEL, "KT2 delete flow");
 	}
 
-	public static boolean hasDeleteFlowLabel(Task task) {
-		return task.getMeta().getSecurity().stream()
-				.anyMatch(coding -> SECURITY_SYSTEM.equals(coding.getSystem())
-						&& DELETE_FLOW_LABEL.equals(coding.getCode()));
+	public static boolean hasDeleteFlowLabel(IBaseResource resource) {
+		return resource.getMeta().getSecurity().stream().anyMatch(DeleteFlowTaskUtil::isDeleteFlowLabel);
+	}
+
+	public static boolean isDeleteFlowLabel(IBaseCoding coding) {
+		return SECURITY_SYSTEM.equals(coding.getSystem()) && DELETE_FLOW_LABEL.equals(coding.getCode());
 	}
 
 	/** KT2DeletePendingTask requires this code, so it identifies the Task on its own. */
