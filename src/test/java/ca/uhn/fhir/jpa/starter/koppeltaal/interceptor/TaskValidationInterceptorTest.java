@@ -359,6 +359,17 @@ class TaskValidationInterceptorTest {
     }
 
     @Test
+    void addingTheDeletePendingCodeToAnOrdinaryTaskIsForbidden() {
+        // Without the marker the code alone still enrols the Task in the patient's cleanup cycle.
+        Task stored = new Task();
+        stored.setStatus(Task.TaskStatus.REQUESTED);
+        Task incoming = deleteFlowTask(Task.TaskStatus.ONHOLD);
+        incoming.getMeta().getSecurity().clear();
+
+        assertThrows(ForbiddenOperationException.class, () -> update(stored, incoming));
+    }
+
+    @Test
     void creatingADeleteFlowTaskIsRejected() {
         UnprocessableEntityException exception = assertThrows(UnprocessableEntityException.class,
                 () -> interceptor.resourceCreating(deleteFlowTask(Task.TaskStatus.REQUESTED), requestDetails));

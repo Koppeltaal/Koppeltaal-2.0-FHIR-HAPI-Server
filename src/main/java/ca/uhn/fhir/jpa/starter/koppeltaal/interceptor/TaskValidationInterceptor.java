@@ -101,7 +101,7 @@ public class TaskValidationInterceptor {
 			return;
 
 		if (!DeleteFlowTaskUtil.isDeletePendingTask(stored)) {
-			requireDeleteFlowMarkerNotAdded(incoming);
+			requireNotMadeIntoADeleteFlowTask(incoming);
 			return;
 		}
 
@@ -199,13 +199,20 @@ public class TaskValidationInterceptor {
 		}
 	}
 
-	/** Adding the marker would forge a delete-pending Task out of an ordinary one. */
-	private void requireDeleteFlowMarkerNotAdded(Task incoming) {
+	/**
+	 * Adding the marker or the code would forge a delete-pending Task out of an ordinary one. The application writes
+	 * this payload, so neither half can be assumed, and the code alone enrols a Task in its patient's cleanup cycle.
+	 */
+	private void requireNotMadeIntoADeleteFlowTask(Task incoming) {
 
 		if (DeleteFlowTaskUtil.hasDeleteFlowLabel(incoming)) {
 			throw new ForbiddenOperationException(String.format(
 					"An update that adds the server-owned '%s' security label is refused",
 					DeleteFlowTaskUtil.DELETE_FLOW_LABEL));
+		}
+		if (DeleteFlowTaskUtil.isDeletePendingTask(incoming)) {
+			throw new ForbiddenOperationException(
+					"An update that turns a Task into a delete-pending Task is refused; the Koppeltaalvoorziening creates those");
 		}
 	}
 
