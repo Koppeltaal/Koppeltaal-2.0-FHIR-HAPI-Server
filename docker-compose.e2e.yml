@@ -1,0 +1,32 @@
+# Override for docker-compose.yml to run the e2e collections (e2e/) against the FHIR server of this checkout,
+# with security enabled and the tokens of the staging auth server. Run it with:
+#
+#   ./e2e/run-local.sh [collection]
+#
+# or manually, in its own project so it does not touch a running development environment:
+#
+#   docker compose -p kt2-e2e -f docker-compose.yml -f docker-compose.e2e.yml up --build
+services:
+  hapi-fhir-jpaserver-start:
+    container_name: kt2-e2e-hapi-fhir-jpaserver
+    # same as the image entrypoint, with a heap that fits a developer machine
+    entrypoint:
+      - java
+      - -Xms1g
+      - -Xmx${KT2_E2E_HEAP:-4g}
+      - -XX:+ExitOnOutOfMemoryError
+      - --class-path
+      - /app/main.war
+      - -Dloader.path=main.war!/WEB-INF/classes/,main.war!/WEB-INF/,/app/extra-classes
+      - org.springframework.boot.loader.PropertiesLauncher
+    environment:
+      FHIR_SERVER_SECURITY_ENABLED: "${KT2_E2E_SECURITY_ENABLED:-true}"
+      FHIR_SERVER_SECURITY_ISSUER: "${KT2_E2E_ISSUER:-https://staging-auth-service.koppeltaal.headease.nl}"
+      FHIR_SERVER_SECURITY_AUDIENCE: "${KT2_E2E_AUDIENCE:-fhir-server}"
+      # the server address must match the url the client uses, the search AuditEvent derives the resource type from it
+      SPRING_APPLICATION_JSON: '{"hapi":{"fhir":{"server_address":"http://localhost:${KT2_E2E_PORT:-8090}/fhir/DEFAULT/"}}}'
+    ports: !override
+      - "127.0.0.1:${KT2_E2E_PORT:-8090}:8080"
+  hapi-fhir-postgres:
+    container_name: kt2-e2e-hapi-fhir-postgres
+    ports: !reset []

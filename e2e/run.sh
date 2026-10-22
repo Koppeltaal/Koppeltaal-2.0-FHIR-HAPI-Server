@@ -37,11 +37,28 @@ REPORT_FILE="$REPORT_DIR/$COLLECTION-$ENV-report.html"
 echo "Running $COLLECTION against $ENV"
 echo ""
 
+# Pass the credentials in a temporary environment file instead of command line arguments, which other users of the
+# machine can see. KT2_E2E_BASE_URL optionally overrides the baseUrl of the environment.
+SECRET_ENV_FILE="$(mktemp)"
+trap 'rm -f "$SECRET_ENV_FILE"' EXIT
+chmod 600 "$SECRET_ENV_FILE"
+node -e '
+  const fs = require("fs");
+  const environment = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  const set = (key, value) => {
+    const variable = environment.values.find((v) => v.key === key);
+    if (variable) variable.value = value;
+    else environment.values.push({ key, value, type: "secret", enabled: true });
+  };
+  set("clientId", process.env.KT2_E2E_CLIENT_ID);
+  set("privateKeyPem", process.env.KT2_E2E_PRIVATE_KEY);
+  set("keyId", process.env.KT2_E2E_KEY_ID);
+  if (process.env.KT2_E2E_BASE_URL) set("baseUrl", process.env.KT2_E2E_BASE_URL);
+  fs.writeFileSync(process.argv[2], JSON.stringify(environment));
+' "$ENV_FILE" "$SECRET_ENV_FILE"
+
 newman run "$COLLECTION_FILE" \
-  -e "$ENV_FILE" \
-  --env-var "clientId=$KT2_E2E_CLIENT_ID" \
-  --env-var "privateKeyPem=$KT2_E2E_PRIVATE_KEY" \
-  --env-var "keyId=$KT2_E2E_KEY_ID" \
+  -e "$SECRET_ENV_FILE" \
   --timeout-request 60000 \
   --reporters cli,htmlextra \
   --reporter-htmlextra-export "$REPORT_FILE"

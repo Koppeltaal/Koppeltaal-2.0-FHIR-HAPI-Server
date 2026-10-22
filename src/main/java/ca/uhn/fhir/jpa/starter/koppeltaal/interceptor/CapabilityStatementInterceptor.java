@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -18,7 +19,9 @@ import java.util.stream.Collectors;
 
 /**
  * This interceptor customizes the generated {@link CapabilityStatement}. This is used to apply specific Koppeltaal-rules
- * like the `_revinclude` search parameter being forbidden.
+ * like the `_revinclude` search parameter being forbidden, and to only advertise the interactions and operations that
+ * the {@link ResourceOriginAuthorizationInterceptor} allows. The terminology operations require an ALL read
+ * permission on ValueSet or CodeSystem.
  */
 @Component
 @Interceptor
@@ -67,17 +70,36 @@ public class CapabilityStatementInterceptor {
 
     capabilityStatement.setContained(Collections.emptyList());
 
+    // only advertise what the ResourceOriginAuthorizationInterceptor allows
     List<CapabilityStatement.CapabilityStatementRestComponent> restComponents = capabilityStatement.getRest();
     for (CapabilityStatement.CapabilityStatementRestComponent restComponent : restComponents) {
+      // no system level interactions (transaction, batch, history, search) or operations, see TOP-KT-002a
+      restComponent.setInteraction(new ArrayList<>());
+      restComponent.setOperation(new ArrayList<>());
+
       List<CapabilityStatement.CapabilityStatementRestResourceComponent> resources = restComponent.getResource();
       for (CapabilityStatement.CapabilityStatementRestResourceComponent resource : resources) {
-        resource.setSearchInclude(Collections.emptyList());
+        // _include is supported, the response filter removes included resources of other resource-origins
         resource.setSearchRevInclude(Collections.emptyList());
+        resource.getInteraction().removeIf((interaction) -> interaction.getCode() == CapabilityStatement.TypeRestfulInteraction.PATCH);
+        resource.setConditionalCreate(false);
+        resource.getOperation().removeIf((operation) -> !isOfferedOperation(resource.getType(), operation.getName()));
       }
     }
 
     capabilityStatement.addImplementationGuide("http://koppeltaal.nl/fhir/ImplementationGuide");
 
     LOG.debug("Applied Koppeltaal-specific changes to the CapabilityStatement");
+  }
+
+  /**
+   * The operations that applications may use. The maintenance operations of the domain admin are not advertised.
+   */
+  private static boolean isOfferedOperation(String resourceType, String operationName) {
+    final String operation = "$" + operationName;
+
+    return ResourceOriginAuthorizationInterceptor.OPERATION_VALIDATE.equals(operation)
+      || (ResourceOriginAuthorizationInterceptor.TERMINOLOGY_RESOURCE_TYPES.contains(resourceType)
+        && ResourceOriginAuthorizationInterceptor.TERMINOLOGY_OPERATIONS.contains(operation));
   }
 }

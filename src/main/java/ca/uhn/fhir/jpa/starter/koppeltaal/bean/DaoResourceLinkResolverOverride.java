@@ -13,14 +13,15 @@ import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.Bundle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 /**
  * Class that overrides {@link DaoResourceLinkResolver} only to exclude Bundles from the referential integrity check.
  * When a user searched, we map the {@link org.hl7.fhir.r4.model.AuditEvent} to the {@link Bundle}, causing an error.
  * HAPI only allows FHIRPaths to be excluded for deletion, not creation.
+ *
+ * <p>Registered in place of HAPI's bean by the
+ * {@link ca.uhn.fhir.jpa.starter.koppeltaal.config.DaoResourceLinkResolverOverrideRegistrar}.</p>
  */
-@Component
 public class DaoResourceLinkResolverOverride<T extends IResourcePersistentId<?>> extends DaoResourceLinkResolver<T> {
 
   private static final Logger LOG = LoggerFactory.getLogger(DaoResourceLinkResolverOverride.class);

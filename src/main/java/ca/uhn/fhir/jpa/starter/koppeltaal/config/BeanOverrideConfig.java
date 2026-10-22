@@ -1,7 +1,5 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.config;
 
-import ca.uhn.fhir.jpa.dao.index.DaoResourceLinkResolver;
-import ca.uhn.fhir.jpa.starter.koppeltaal.bean.DaoResourceLinkResolverOverride;
 import ca.uhn.fhir.jpa.subscription.channel.impl.RetryPolicyProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,17 +15,7 @@ public class BeanOverrideConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(BeanOverrideConfig.class);
 
-  private final DaoResourceLinkResolverOverride daoResourceLinkResolverOverride;
-
-  public BeanOverrideConfig(DaoResourceLinkResolverOverride daoResourceLinkResolverOverride) {
-    this.daoResourceLinkResolverOverride = daoResourceLinkResolverOverride;
-  }
-
-  @Primary
-  @Bean
-  public DaoResourceLinkResolver daoResourceLinkResolver() {
-    return daoResourceLinkResolverOverride;
-  }
+  // The DaoResourceLinkResolver override is registered by the DaoResourceLinkResolverOverrideRegistrar
 
   @Primary
   @Bean

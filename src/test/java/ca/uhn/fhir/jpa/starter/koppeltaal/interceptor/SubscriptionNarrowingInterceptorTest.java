@@ -110,4 +110,23 @@ class SubscriptionNarrowingInterceptorTest {
       interceptor.subscriptionBeforeDelivery(resourceDeliveryMessage, canonicalSubscription)
     );
   }
+
+  @Test
+  public void shouldNotSendSubscriptionForDeviceThatOnlyContainsTheResourceOrigin() {
+    ResourceDeliveryMessage resourceDeliveryMessage = new ResourceDeliveryMessage();
+    CanonicalSubscription canonicalSubscription = new CanonicalSubscription();
+    canonicalSubscription.setIdElement(new IdType("sub-id"));
+
+    Task thePayload = new Task();
+    thePayload.setId(UUID.randomUUID().toString());
+    thePayload.addExtension(new Extension(ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM, new Reference("Device/456")));
+
+    resourceDeliveryMessage.setPayload(fhirContext, thePayload, EncodingEnum.JSON);
+
+    PermissionUtil.createOrUpdateScope("default-client-id", "system/Task.r?resource-origin=Device/4567,Device/1456");
+
+    assertFalse(
+      interceptor.subscriptionBeforeDelivery(resourceDeliveryMessage, canonicalSubscription)
+    );
+  }
 }
