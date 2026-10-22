@@ -242,3 +242,48 @@ hapi:
 #  protocol: 'http'
 #  schema_management_strategy: CREATE
 #  username: SomeUsername
+
+# Koppeltaal configuration, as in src/main/resources/application.yaml (security disabled)
+fhir:
+  server:
+    openapi:
+      enabled: false
+    security:
+      enabled: false
+      issuer: http://127.0.0.1:8083
+      audience: fhir-server
+      introspectEndpoint: ${fhir.server.security.issuer}/oauth2/introspect
+      authorizationEndpoint: ${fhir.server.security.issuer}/oauth2/authorize
+      tokenEndpoint: ${fhir.server.security.issuer}/oauth2/token
+      jwksEndpoint: ${fhir.server.security.issuer}/.well-known/jwks.json
+    subscription:
+      retry:
+        max-attempts: 1
+    auditlog:
+      enabled: true
+      site: "Koppeltaal domein VZVZ"
+      observer:
+        identifier:
+          system: "koppeltaal-fhir"
+          value: "koppeltaal-server-001"
+
+smart:
+  configuration:
+    issuer: ${fhir.server.security.issuer}
+    jwks_uri: ${fhir.server.security.issuer}/.well-known/jwks.json
+    authorization_endpoint: ${fhir.server.security.issuer}/oauth2/authorize
+    grant_types_supported:
+      - client_credentials
+    token_endpoint: ${fhir.server.security.issuer}/oauth2/token
+    token_endpoint_auth_methods_supported:
+      - private_key_jwt
+    scopes_supported:
+      - system/*.cruds
+      - system/*.cruds?resource-origin=
+    introspection_endpoint: ${fhir.server.security.issuer}/oauth2/introspect
+    management_endpoint: http://localhost:8085
+  backend:
+    service:
+      baseUrl: "http://127.0.0.1:8086"
+      authorizationToken: "test-authorization-token"
+      domainAdminClientId: "test-domain-admin-client"

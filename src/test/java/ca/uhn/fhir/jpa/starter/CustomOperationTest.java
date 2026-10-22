@@ -34,7 +34,7 @@ class CustomOperationTest {
 		ctx = FhirContext.forR4();
 		ctx.getRestfulClientFactory().setServerValidationMode(ServerValidationModeEnum.NEVER);
 		ctx.getRestfulClientFactory().setSocketTimeout(1200 * 1000);
-		String ourServerBase = "http://localhost:" + port + "/fhir/";
+		String ourServerBase = "http://localhost:" + port + "/fhir/DEFAULT/";
 		client = ctx.newRestfulGenericClient(ourServerBase);
 
 		// Properties props = new Properties();

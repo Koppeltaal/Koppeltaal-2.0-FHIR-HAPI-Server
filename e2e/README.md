@@ -112,6 +112,17 @@ Put the credentials in `e2e/.env.local`, together with:
 The server finds the Device of a client by the client id as logical id. The script first starts the server
 without security to create `Device/<client id>`, then restarts it with security enabled.
 
+### Smoke check (docker-compose)
+
+`smoke.sh` starts the server of this checkout in the same compose project on a fresh database, with security
+enabled, and checks that it starts: the CapabilityStatement, the SMART configuration, the installed Koppeltaal
+ImplementationGuide and a 401 without a token. It needs no credentials; the Smoke Tests workflow runs it on every
+push.
+
+```bash
+./e2e/smoke.sh
+```
+
 ### CI (GitHub Actions)
 
 Set these as repository secrets:

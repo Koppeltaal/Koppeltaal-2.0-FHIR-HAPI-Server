@@ -48,7 +48,6 @@ import ca.uhn.fhir.jpa.search.IStaleSearchDeletingSvc;
 import ca.uhn.fhir.jpa.search.StaleSearchDeletingSvcImpl;
 import ca.uhn.fhir.jpa.starter.AppProperties;
 import ca.uhn.fhir.jpa.starter.annotations.OnCorsPresent;
-import ca.uhn.fhir.jpa.starter.annotations.OnImplementationGuidesPresent;
 import ca.uhn.fhir.jpa.starter.common.validation.IRepositoryValidationInterceptorFactory;
 import ca.uhn.fhir.jpa.starter.koppeltaal.KoppeltaalRestfulServer;
 import ca.uhn.fhir.jpa.starter.ig.IImplementationGuideOperationProvider;
@@ -206,9 +205,10 @@ public class StarterJpaConfig {
 	}
 
 
+	/* CUSTOMIZATION - Not conditional on configured implementation guides: PackageInstallerWithExclusionSvcImpl is a
+	 * second IPackageInstallerSvc next to HAPI's npmInstallerSvc, so the context needs this primary bean to start */
 	@Bean("packageInstaller")
 	@Primary
-	@Conditional(OnImplementationGuidesPresent.class)
 	public IPackageInstallerSvc packageInstaller(
 			AppProperties appProperties,
 			PackageInstallerWithExclusionSvcImpl packageInstallerSvc,
