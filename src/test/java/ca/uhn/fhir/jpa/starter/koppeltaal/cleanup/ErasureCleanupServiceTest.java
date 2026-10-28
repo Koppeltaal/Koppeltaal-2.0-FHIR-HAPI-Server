@@ -1,12 +1,14 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.cleanup;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +34,8 @@ import java.util.Set;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.AuditEvent;
 import org.hl7.fhir.r4.model.CareTeam;
+import org.hl7.fhir.r4.model.CodeableConcept;
+import org.hl7.fhir.r4.model.Coding;
 import org.hl7.fhir.r4.model.Group;
 import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.Meta;
@@ -121,6 +125,31 @@ class ErasureCleanupServiceTest {
 		assertThat(outcomeOf(run())).isEqualTo("GRACE_RESET");
 		assertThat(statusWritten()).isEqualTo(Task.TaskStatus.REQUESTED);
 		verify(eraser, never()).erase(any(), any(), any());
+	}
+
+	/**
+	 * OPG-010 wipes the holds, not a given consent: an application that accepted is not asked again. The grace period
+	 * restarts for the patient as a whole, so every Task carries the new deadline.
+	 */
+	@Test
+	void aGraceResetWipesTheHoldsButKeepsWhatWasAccepted() {
+
+		final Task held = task("t1", Task.TaskStatus.ONHOLD, PASSED);
+		held.setStatusReason(new CodeableConcept().addCoding(
+				new Coding("http://vzvz.nl/fhir/CodeSystem/koppeltaal-delete-hold-reason", "data-export-pending", null)));
+		cycle(held, task("t2", Task.TaskStatus.ACCEPTED, PASSED), task("t3", Task.TaskStatus.REQUESTED, PASSED));
+
+		assertThat(outcomeOf(run())).isEqualTo("GRACE_RESET");
+		final ArgumentCaptor<Task> written = ArgumentCaptor.forClass(Task.class);
+		verify(taskDao, times(3)).update(written.capture(), any(RequestDetails.class));
+		final Instant restarted = NOW.plus(30, ChronoUnit.DAYS);
+		assertThat(written.getAllValues())
+				.extracting(task -> task.getIdElement().getIdPart(), Task::getStatus, Task::hasStatusReason,
+						task -> task.getRestriction().getPeriod().getEnd().toInstant())
+				.containsExactlyInAnyOrder(
+						tuple("t1", Task.TaskStatus.REQUESTED, false, restarted),
+						tuple("t2", Task.TaskStatus.ACCEPTED, false, restarted),
+						tuple("t3", Task.TaskStatus.REQUESTED, false, restarted));
 	}
 
 	@Test
