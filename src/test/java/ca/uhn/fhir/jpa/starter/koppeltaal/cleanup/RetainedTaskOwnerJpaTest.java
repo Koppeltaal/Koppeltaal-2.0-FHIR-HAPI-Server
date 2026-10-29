@@ -22,6 +22,25 @@ import org.junit.jupiter.api.Test;
 class RetainedTaskOwnerJpaTest extends BaseJpaR4Test {
 	private static final Instant LAST_ACTIVITY = Instant.parse("2024-09-25T10:00:00Z");
 
+	/** The server configuration keeps $expunge and multiple deletes off; the erase is an internal step (TOP-KT-028). */
+	@Test
+	void erasesWithExpungeAndMultipleDeletesDisabled() {
+		Fixture fixture = fixture(false);
+		boolean expungeEnabled = myStorageSettings.isExpungeEnabled();
+		boolean multipleDeleteAllowed = myStorageSettings.isAllowMultipleDelete();
+		myStorageSettings.setExpungeEnabled(false);
+		myStorageSettings.setAllowMultipleDelete(false);
+		try {
+			transact(() -> eraser().erase(List.of(fixture.owner()), List.of(fixture.retainedOwner()), List.of()));
+		} finally {
+			myStorageSettings.setExpungeEnabled(expungeEnabled);
+			myStorageSettings.setAllowMultipleDelete(multipleDeleteAllowed);
+		}
+
+		assertThatThrownBy(() -> myPatientDao.read(fixture.owner(), new SystemRequestDetails()))
+				.isInstanceOf(ResourceNotFoundException.class);
+	}
+
 	@Test
 	void erasesTheOwnerAndTagsTheRetainedTaskWithoutRenewingItsActivity() {
 		Fixture fixture = fixture(false);

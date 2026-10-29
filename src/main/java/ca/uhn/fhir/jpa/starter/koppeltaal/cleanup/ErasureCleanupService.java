@@ -235,15 +235,20 @@ public class ErasureCleanupService implements CleanupService {
 		return erase(patientId, cycle, dryRun, affected);
 	}
 
-	/** OPG-010: a hold that outlives the deadline wipes every hold and restarts the grace period. */
+	/**
+	 * OPG-010: a hold that outlives the deadline wipes every hold and restarts the grace period. Only the holds are
+	 * wiped: an application that accepted is not asked again. The new deadline goes on every Task of the cycle.
+	 */
 	private Outcome graceReset(IIdType patientId, List<Task> cycle, boolean dryRun, Clock clock) {
 
 		if (!dryRun) {
 			final Date deadline = Date.from(clock.instant().plus(properties.getGraceDays(), ChronoUnit.DAYS));
 			for (Task task : cycle) {
 				final Task reset = task.copy();
-				reset.setStatus(Task.TaskStatus.REQUESTED);
-				reset.setStatusReason(null); // OPG-009
+				if (reset.getStatus() == Task.TaskStatus.ONHOLD) {
+					reset.setStatus(Task.TaskStatus.REQUESTED);
+					reset.setStatusReason(null); // OPG-009
+				}
 				reset.setRestriction(new Task.TaskRestrictionComponent().setPeriod(new Period().setEnd(deadline)));
 				store(reset);
 			}
@@ -291,7 +296,7 @@ public class ErasureCleanupService implements CleanupService {
 					CareTeamParticipantRemover.remove(careTeamDao.read(removal.careTeamId(), new SystemRequestDetails()),
 							removal.references())).toList();
 			for (CareTeam retainedTeam : retainedTeams) {
-				careTeamDao.update(retainedTeam, new SystemRequestDetails());
+				careTeamDao.update(retainedTeam, new ErasureRequestDetails());
 			}
 			for (TaskOwnerTagging.TagAddition update : retainedTasks) {
 				taskDao.metaAddOperation(update.taskId(), update.meta(), new SystemRequestDetails());

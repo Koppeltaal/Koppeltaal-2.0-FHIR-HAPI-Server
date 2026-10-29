@@ -4,6 +4,7 @@ import ca.uhn.fhir.interceptor.model.RequestPartitionId;
 import ca.uhn.fhir.jpa.dao.index.DaoResourceLinkResolver;
 import ca.uhn.fhir.jpa.model.cross.IResourceLookup;
 import ca.uhn.fhir.jpa.searchparam.extractor.PathAndRef;
+import ca.uhn.fhir.jpa.starter.koppeltaal.cleanup.ErasureRequestDetails;
 import ca.uhn.fhir.i18n.Msg;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
@@ -33,6 +34,11 @@ import org.slf4j.LoggerFactory;
  * type-specific {@code AuditEvent.entity.what.where(resolve() is Patient)}. The extractor answers {@code resolve()}
  * from a stub built out of the reference string rather than from the database, so the type-specific path goes on
  * matching after the target is erased and has to be exempted as well.
+ * </p>
+ * <p>
+ * The erase run's own write to a CareTeam it keeps ({@link ErasureRequestDetails}) gets the same treatment. Removing a
+ * participant rewrites the whole CareTeam, which can still name what an earlier erase removed: a blocked resource
+ * keeps its references. Refusing the write over that would roll back an unrelated patient's erase.
  * </p>
  *
  * <p>Registered in place of HAPI's bean by the
@@ -75,7 +81,13 @@ public class DaoResourceLinkResolverOverride<T extends IResourcePersistentId<?>>
     }
 
     if (isAuditedEntityPath(sourcePath)) {
-      return findAuditedResource(theRequestPartitionId, theSourceResourceName, thePathAndRef, theRequest, theTransactionDetails);
+      return findUnlessMissing(theRequestPartitionId, theSourceResourceName, thePathAndRef, theRequest, theTransactionDetails,
+        "Recording an AuditEvent for [{}], which does not resolve - custom KT2 addition!");
+    }
+
+    if (theRequest instanceof ErasureRequestDetails && StringUtils.equals("CareTeam", theSourceResourceName)) {
+      return findUnlessMissing(theRequestPartitionId, theSourceResourceName, thePathAndRef, theRequest, theTransactionDetails,
+        "Detaching a kept CareTeam that still names [{}], which does not resolve - custom KT2 addition!");
     }
 
     return findTargetResourceInHapi(theRequestPartitionId, theSourceResourceName, thePathAndRef, theRequest, theTransactionDetails);
@@ -87,17 +99,18 @@ public class DaoResourceLinkResolverOverride<T extends IResourcePersistentId<?>>
   }
 
   /**
-   * The audited resource, or {@code null} when it is not there to be found. With referential integrity on write
-   * enabled HAPI reports that as {@link InvalidRequestException} HAPI-1094 for a target that does not exist and
-   * HAPI-1096 for one that was deleted; here both mean the event is written without an indexed link. Anything else
-   * is a different complaint and still stands.
+   * The target, or {@code null} when it is not there to be found. With referential integrity on write enabled HAPI
+   * reports that as {@link InvalidRequestException} HAPI-1094 for a target that does not exist and HAPI-1096 for one
+   * that was deleted; here both mean the resource is written without an indexed link. Anything else is a different
+   * complaint and still stands.
    */
-  private IResourceLookup findAuditedResource(
+  private IResourceLookup findUnlessMissing(
     RequestPartitionId theRequestPartitionId,
     String theSourceResourceName,
     PathAndRef thePathAndRef,
     RequestDetails theRequest,
-    TransactionDetails theTransactionDetails) {
+    TransactionDetails theTransactionDetails,
+    String theLogMessage) {
 
     try {
       return findTargetResourceInHapi(theRequestPartitionId, theSourceResourceName, thePathAndRef, theRequest, theTransactionDetails);
@@ -105,8 +118,7 @@ public class DaoResourceLinkResolverOverride<T extends IResourcePersistentId<?>>
       if (!isMissingTarget(e)) {
         throw e;
       }
-      LOG.info("Recording an AuditEvent for [{}], which does not resolve - custom KT2 addition!",
-        thePathAndRef.getRef().getReferenceElement().getValue());
+      LOG.info(theLogMessage, thePathAndRef.getRef().getReferenceElement().getValue());
       return null;
     }
   }
