@@ -4,6 +4,7 @@ import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
+import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 import com.auth0.jwt.JWT;
@@ -58,6 +59,7 @@ public class BaseResourceOriginTest {
     ServletRequestDetails requestDetails = new ServletRequestDetails();
     requestDetails.setResourceName(resourceType.name());
     requestDetails.setRequestType(requestType);
+    requestDetails.setRestOperationType(getDefaultRestOperationType(requestType, resourceId));
     requestDetails.setId(resourceId);
 
     final IFhirResourceDao resourceDaoMock = mock(IFhirResourceDao.class);
@@ -107,16 +109,51 @@ public class BaseResourceOriginTest {
     }
 
     //surround the "actual" permission with 2 gibberish permissions
+    return setScope(requestDetails, String.format("system/Unused.cru?resource-origin=Device/123 %s system/Unused2.cd?resource-origin=Device/456", permission));
+  }
+
+  /**
+   * Replaces the access token on the request with one containing exactly the given scope.
+   */
+  static ServletRequestDetails setScope(RequestDetails requestDetails, String scope) {
     String jwtWithScope = JWT.create()
-      .withClaim("scope", String.format("system/Unused.cru?resource-origin=Device/123 %s system/Unused2.cd?resource-origin=Device/456", permission))
+      .withClaim("scope", scope)
       .sign(Algorithm.HMAC256("super-secret"));
 
     MockHttpServletRequest request = new MockHttpServletRequest();
     request.addHeader("Authorization", "Bearer " + jwtWithScope);
+    // as done by the JwtSecurityInterceptor after validating the token
+    request.setAttribute(JwtSecurityInterceptor.VALIDATED_ACCESS_TOKEN_ATTRIBUTE, jwtWithScope);
 
-    requestDetails.setServletRequest(request);
+    ServletRequestDetails servletRequestDetails = (ServletRequestDetails) requestDetails;
+    servletRequestDetails.setServletRequest(request);
 
-    return requestDetails;
+    return servletRequestDetails;
+  }
+
+  /**
+   * Creates a system-level request (no resource type), like <code>GET /_history</code> or a transaction Bundle.
+   */
+  static ServletRequestDetails getSystemRequestDetails(RestOperationTypeEnum operationType, RequestTypeEnum requestType, String operation) {
+    ServletRequestDetails requestDetails = new ServletRequestDetails();
+    requestDetails.setRequestType(requestType);
+    requestDetails.setRestOperationType(operationType);
+    requestDetails.setOperation(operation);
+
+    return setScope(requestDetails, "system/*.cruds");
+  }
+
+  /**
+   * HAPI determines the {@link RestOperationTypeEnum} before the authorization hooks fire, mimic the most common ones.
+   */
+  private static RestOperationTypeEnum getDefaultRestOperationType(RequestTypeEnum requestType, IdType resourceId) {
+    switch (requestType) {
+      case GET: return resourceId == null ? RestOperationTypeEnum.SEARCH_TYPE : RestOperationTypeEnum.READ;
+      case POST: return RestOperationTypeEnum.CREATE;
+      case PUT: return RestOperationTypeEnum.UPDATE;
+      case DELETE: return RestOperationTypeEnum.DELETE;
+      default: return null;
+    }
   }
 
 }

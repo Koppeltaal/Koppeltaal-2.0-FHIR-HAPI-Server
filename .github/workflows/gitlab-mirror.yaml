@@ -11,6 +11,8 @@ on:
 
 jobs:
   mirror:
+    # only the public repository is mirrored, not copies of it
+    if: github.repository == 'Koppeltaal/Koppeltaal-2.0-FHIR-HAPI-Server'
     runs-on: ubuntu-latest
     env:
       GITLAB_REMOTE: git@gitlab.com:headease/koppeltaal/kt2-hapi-server.git

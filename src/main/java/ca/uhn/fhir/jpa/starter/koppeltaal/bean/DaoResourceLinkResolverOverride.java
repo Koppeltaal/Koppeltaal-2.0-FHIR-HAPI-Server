@@ -15,7 +15,6 @@ import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.Bundle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 /**
  * Class that overrides {@link DaoResourceLinkResolver} to relax the referential integrity check on
@@ -35,8 +34,10 @@ import org.springframework.stereotype.Component;
  * from a stub built out of the reference string rather than from the database, so the type-specific path goes on
  * matching after the target is erased and has to be exempted as well.
  * </p>
+ *
+ * <p>Registered in place of HAPI's bean by the
+ * {@link ca.uhn.fhir.jpa.starter.koppeltaal.config.DaoResourceLinkResolverOverrideRegistrar}.</p>
  */
-@Component
 public class DaoResourceLinkResolverOverride<T extends IResourcePersistentId<?>> extends DaoResourceLinkResolver<T> {
 
   private static final Logger LOG = LoggerFactory.getLogger(DaoResourceLinkResolverOverride.class);

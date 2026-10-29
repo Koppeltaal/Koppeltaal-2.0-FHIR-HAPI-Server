@@ -10,27 +10,52 @@ Automated end-to-end tests for the Koppeltaal 2.0 FHIR HAPI Server using [Newman
 
 ## One-time setup
 
-### 1. Generate RSA key pair
+### 1. Generate a key pair and register the client
+
+The client is a SMART Backend Service in the domain admin of the environment (for staging
+`https://staging-domain-admin.koppeltaal.headease.nl`). The auth server can get its public key in two ways: from a
+JWKS URL or from an uploaded public key. Choose one of the two paths below.
+
+The client needs permissions to read/write Task resources and read AuditEvents.
+
+#### Path A: JWKS URL
 
 ```bash
-./e2e/generate-keys.sh
+./e2e/generate-keys.sh --jwks
 ```
 
 This creates:
-- `e2e/private.pem` (gitignored, keep secret)
-- `e2e/jwks.json` (public key, commit this)
+- `e2e/private.pem`: the private key (gitignored, keep it secret)
+- `e2e/public.pem`: the public key (gitignored, not used in this path)
+- `e2e/jwks.json`: the public key as JWKS (commit this)
 
-### 2. Register SMART Backend Service client
-
-Register a client with the Koppeltaal auth server using the JWKS URL:
+Commit `e2e/jwks.json` and, once it is on `master`, create a SMART service with this URL in the **JWKS URL** tab:
 
 ```
 https://raw.githubusercontent.com/Koppeltaal/Koppeltaal-2.0-FHIR-HAPI-Server/master/e2e/jwks.json
 ```
 
-The client needs permissions to read/write Task resources and read AuditEvents.
+`KT2_E2E_KEY_ID` must be the `kid` from `jwks.json`. A new key only needs a new `jwks.json` commit, the
+registration in the domain admin stays the same.
 
-### 3. Configure secrets
+The repository already contains a `jwks.json` of an existing e2e client. Generating a new one replaces it, and a
+client registered with the old key then stops working.
+
+#### Path B: upload the public key
+
+```bash
+./e2e/generate-keys.sh
+```
+
+This creates two files, both gitignored, so nothing needs to be committed:
+- `e2e/private.pem`: the private key, keep it secret
+- `e2e/public.pem`: the public key for the client registration
+
+Create a SMART service, open the **Public Key** tab and paste the content of `e2e/public.pem` (an RSA key of at least
+2048 bits, starting with `-----BEGIN PUBLIC KEY-----`). With an uploaded public key the auth server does not check the
+`kid`, but the client assertion still sends the key ID that the script prints.
+
+### 2. Configure secrets
 
 ```bash
 cp e2e/.env.example e2e/.env.staging
@@ -41,9 +66,9 @@ The runner loads `e2e/.env.<env>`, falling back to `e2e/.env`:
 
 | Variable | Description |
 |----------|-------------|
-| `KT2_E2E_CLIENT_ID` | Client ID from step 2 |
-| `KT2_E2E_KEY_ID` | Key ID printed by generate-keys.sh |
-| `KT2_E2E_PRIVATE_KEY` | PEM content with newlines as `\n` |
+| `KT2_E2E_CLIENT_ID` | Client ID from step 1 |
+| `KT2_E2E_KEY_ID` | Key ID printed by generate-keys.sh, sent as `kid` in the client assertion. Path A: must match the `kid` in `jwks.json`; path B: not checked |
+| `KT2_E2E_PRIVATE_KEY` | PEM content with newlines as `\n`, in double quotes |
 
 To convert PEM to single-line format:
 
@@ -59,6 +84,43 @@ awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}' e2e/private.pem
 ./e2e/run.sh                          # runs top-kt-011 against staging (default)
 ./e2e/run.sh top-kt-011 prd           # runs top-kt-011 against production
 ./e2e/run.sh top-kt-012 staging       # runs a different topic (when available)
+```
+
+### Against this checkout (docker-compose)
+
+`run-local.sh` builds and starts the FHIR server of this checkout with `docker-compose.yml` and the
+`docker-compose.e2e.yml` override, and runs a collection against it. The server has security enabled and
+trusts the tokens of the staging auth server, so the staging e2e client is used.
+
+```bash
+./e2e/run-local.sh                    # runs top-kt-011 against http://localhost:8090/fhir/DEFAULT
+KT2_E2E_KEEP=true ./e2e/run-local.sh  # keeps the containers running afterwards
+```
+
+The containers run in their own compose project (`kt2-e2e`, containers `kt2-e2e-*`), so a running development
+environment from `docker-compose.yml` is not touched. The containers are always removed when the run stops before
+security is enabled.
+
+Put the credentials in `e2e/.env.local`, together with:
+
+| Variable | Description |
+|----------|-------------|
+| `KT2_E2E_AUDIENCE` | The `aud` claim of the access tokens of the staging auth server |
+| `KT2_E2E_PORT` | Optional, host port of the FHIR server (default `8090`) |
+| `KT2_E2E_HEAP` | Optional, maximum heap of the FHIR server (default `4g`) |
+
+The server finds the Device of a client by the client id as logical id. The script first starts the server
+without security to create `Device/<client id>`, then restarts it with security enabled.
+
+### Smoke check (docker-compose)
+
+`smoke.sh` starts the server of this checkout in the same compose project on a fresh database, with security
+enabled, and checks that it starts: the CapabilityStatement, the SMART configuration, the installed Koppeltaal
+ImplementationGuide and a 401 without a token. It needs no credentials; the Smoke Tests workflow runs it on every
+push.
+
+```bash
+./e2e/smoke.sh
 ```
 
 ### CI (GitHub Actions)

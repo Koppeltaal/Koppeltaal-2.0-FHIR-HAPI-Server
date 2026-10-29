@@ -4,6 +4,7 @@ import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
+import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import org.hl7.fhir.r4.model.Device;
 import org.hl7.fhir.r4.model.IdType;
@@ -17,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -75,6 +77,38 @@ class ResourceOriginSearchNarrowingInterceptorTest extends BaseResourceOriginTes
 		final Map<String, String[]> parameters = requestDetails.getParameters();
 		final String[] resourceOrigins = parameters.get("resource-origin");
 		assertNull(resourceOrigins,  "Should not narrow an ALL permission");
+	}
+
+	@Test
+	public void shouldNarrowPostSearch() {
+
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.POST, ResourceType.Task, null, "rs", "Device/123");
+    requestDetails.setRestOperationType(RestOperationTypeEnum.SEARCH_TYPE);
+
+		interceptor.narrowSearch(requestDetails);
+
+		assertArrayEquals(new String[] { "Device/123" }, requestDetails.getParameters().get("resource-origin"), "Should narrow a POST search to OWN");
+	}
+
+	@Test
+	public void shouldNotLetTheRequestOverrideTheNarrowedResourceOrigin() {
+
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.GET, ResourceType.Task, null, "rs", "Device/123");
+    requestDetails.setParameters(Map.of("resource-origin", new String[] { "Device/456" }));
+
+		interceptor.narrowSearch(requestDetails);
+
+		assertArrayEquals(new String[] { "Device/123" }, requestDetails.getParameters().get("resource-origin"));
+	}
+
+	@Test
+	public void shouldNotNarrowConformanceResourceSearch() {
+
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.GET, ResourceType.ValueSet, null, "rs", "Device/123");
+
+		interceptor.narrowSearch(requestDetails);
+
+		assertNull(requestDetails.getParameters().get("resource-origin"), "Conformance resources are readable for every client");
 	}
 
 }

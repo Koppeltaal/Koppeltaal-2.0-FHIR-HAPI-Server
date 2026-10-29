@@ -10,6 +10,7 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.api.server.SystemRequestDetails;
+import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
 import ca.uhn.fhir.rest.server.exceptions.UnprocessableEntityException;
 
@@ -29,6 +30,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -70,16 +72,21 @@ class TaskValidationInterceptorTest {
         return task;
     }
 
-    private static String bearerTokenFor(String clientId) {
+    private static String accessTokenFor(String clientId) {
         Base64.Encoder encoder = Base64.getUrlEncoder().withoutPadding();
         String header = encoder.encodeToString("{\"alg\":\"none\"}".getBytes(StandardCharsets.UTF_8));
         String payload = encoder.encodeToString(
                 ("{\"azp\":\"" + clientId + "\"}").getBytes(StandardCharsets.UTF_8));
-        return "Bearer " + header + "." + payload + ".";
+        return header + "." + payload + ".";
     }
 
+    /** The request as the JwtSecurityInterceptor leaves it, having validated the caller's access token. */
     private void callerIs(String clientId) {
-        when(requestDetails.getHeader("Authorization")).thenReturn(bearerTokenFor(clientId));
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setAttribute(JwtSecurityInterceptor.VALIDATED_ACCESS_TOKEN_ATTRIBUTE, accessTokenFor(clientId));
+        ServletRequestDetails servletRequestDetails = new ServletRequestDetails();
+        servletRequestDetails.setServletRequest(request);
+        requestDetails = servletRequestDetails;
     }
 
     /** A legitimate response by the owning application: only the status moves. */
@@ -176,10 +183,9 @@ class TaskValidationInterceptorTest {
                 exception.getMessage());
     }
 
+    /** With security disabled there is no validated access token, and so no owner to compare with. */
     @Test
-    void ownerIsNotCheckedWithoutBearerToken() {
-        when(requestDetails.getHeader("Authorization")).thenReturn(null);
-
+    void ownerIsNotCheckedWithoutAValidatedAccessToken() {
         assertDoesNotThrow(() -> update(deleteFlowTask(Task.TaskStatus.REQUESTED),
                 respondWith(Task.TaskStatus.ONHOLD)));
     }

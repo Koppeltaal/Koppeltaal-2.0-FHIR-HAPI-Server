@@ -88,7 +88,7 @@ public class SubscriptionNarrowingInterceptor {
 				final ResourceType resourceType = ((DomainResource) payload).getResourceType();
 
         LOG.info("Device [{}] found for [{}], determine if it has permission next", payloadDeviceId.getIdPart(), payload.getIdElement().getValue());
-        return PermissionUtil.hasPermission(CrudOperation.READ, resourceType, payloadDeviceId.getIdPart(), scope.get());
+        return PermissionUtil.hasPermission(CrudOperation.READ, resourceType, payloadDeviceId.getValue(), scope.get());
 			}
 		} catch (Exception e) {
 			LOG.error(String.format("Failed to execute Notification Narrowing. Non-breaking, might have notified for inaccessible resources! Still sending notification.\n\nMessage: %s", message), e);
