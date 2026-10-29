@@ -50,7 +50,12 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
   }
 
   @Hook(value = Pointcut.SERVER_PRE_PROCESS_OUTGOING_EXCEPTION, order = 100)
-  public void preOutgoingException(ServletRequestDetails servletRequestDetails, Throwable throwable) {
+  public void preOutgoingException(ServletRequestDetails servletRequestDetails, Throwable originalThrowable) {
+
+    // the requester can read this AuditEvent, so it must not contain more than the response
+    final BaseServerResponseException withoutDetails =
+      ResourceOriginAuthorizationInterceptor.deleteConflictWithoutDetails(servletRequestDetails, originalThrowable);
+    final Throwable throwable = withoutDetails != null ? withoutDetails : originalThrowable;
 
     try {
       if(throwable instanceof BaseServerResponseException) {

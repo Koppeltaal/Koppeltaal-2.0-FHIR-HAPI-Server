@@ -5,15 +5,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
+import ca.uhn.fhir.rest.server.exceptions.ResourceGoneException;
+import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
@@ -40,6 +45,7 @@ class DeleteFlowAuthorizationTest {
 
 	private static final String MARKER = "http://vzvz.nl/fhir/CodeSystem/koppeltaal-security-label|kt2-delete-flow";
 	private static final String NO_TASK_OR_AUDIT_RIGHTS = "system/Patient.rs";
+	private String scope = NO_TASK_OR_AUDIT_RIGHTS;
 
 	private final DaoRegistry daoRegistry = mock(DaoRegistry.class);
 	@SuppressWarnings("unchecked")
@@ -88,11 +94,15 @@ class DeleteFlowAuthorizationTest {
 		assertThat(search.getParameters().get("owner")).containsExactly("Device/other", "Device/me");
 	}
 
+	/** The ResourceOriginResponseFilterInterceptor judges every included resource on its own. */
 	@Test
-	void includesAreRefusedOnASearchOnlyTheMarkerAllows() {
+	void anIncludeOnASearchOnlyTheMarkerAllowsIsNarrowedLikeTheSearch() {
 		RequestDetails search = search("Task", Map.of("_include", new String[] {"Task:patient"}));
 
-		assertThatThrownBy(() -> interceptor.authorizeRequest(search)).isInstanceOf(ForbiddenOperationException.class);
+		interceptor.authorizeRequest(search);
+
+		assertThat(search.getParameters()).containsOnlyKeys("_include", "_security", "owner");
+		assertThat(search.getParameters().get("owner")).containsExactly("Device/me");
 	}
 
 	@Test
@@ -148,6 +158,57 @@ class DeleteFlowAuthorizationTest {
 		interceptor.authorizeRequest(byId(RequestTypeEnum.PUT, RestOperationTypeEnum.UPDATE, "Task/dp"));
 	}
 
+	/** Where only the marker could grant access, what does not exist must look like what may not be read. */
+	@Test
+	void aMissingTaskLooksForbiddenToACallerWithoutTaskRights() {
+		when(resourceDao.read(any(IIdType.class), any(RequestDetails.class), anyBoolean()))
+				.thenThrow(new ResourceNotFoundException("Task/missing"));
+
+		assertThatThrownBy(() -> interceptor.authorizeRequest(byId(RequestTypeEnum.GET, RestOperationTypeEnum.READ,
+				"Task/missing"))).isInstanceOf(ForbiddenOperationException.class);
+	}
+
+	@Test
+	void aDeletedTaskLooksForbiddenToACallerWithoutTaskRights() {
+		when(resourceDao.read(any(IIdType.class), any(RequestDetails.class), anyBoolean()))
+				.thenThrow(new ResourceGoneException("Task/deleted"));
+
+		assertThatThrownBy(() -> interceptor.authorizeRequest(byId(RequestTypeEnum.GET, RestOperationTypeEnum.READ,
+				"Task/deleted"))).isInstanceOf(ForbiddenOperationException.class);
+	}
+
+	/** The marker adds to an OWN scope that does not cover the server's own Device. */
+	@Test
+	void theOwnerReadsItsDeletePendingTaskNextToAnOwnScope() {
+		scope = "system/Task.rs?resource-origin=Device/me";
+		Task task = deletePendingTask("me");
+		task.addExtension(ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM, new Reference("Device/server"));
+		stored(task);
+
+		interceptor.authorizeRequest(byId(RequestTypeEnum.GET, RestOperationTypeEnum.READ, "Task/dp"));
+	}
+
+	@Test
+	void anInactiveCallerWithoutTaskRightsIsRefusedBeforeTheStoreIsRead() {
+		caller.setStatus(Device.FHIRDeviceStatus.INACTIVE);
+		stored(deletePendingTask("me"));
+
+		assertThatThrownBy(() -> interceptor.authorizeRequest(byId(RequestTypeEnum.GET, RestOperationTypeEnum.READ,
+				"Task/dp"))).isInstanceOf(ForbiddenOperationException.class);
+		verify(resourceDao, never()).read(any(IIdType.class), any(RequestDetails.class), anyBoolean());
+	}
+
+	@Test
+	void theMarkerNeverGrantsAnAuditEventUpdate() {
+		AuditEvent event = new AuditEvent();
+		event.getMeta().addSecurity("http://vzvz.nl/fhir/CodeSystem/koppeltaal-security-label", "kt2-delete-flow", null);
+		stored(event);
+
+		assertThatThrownBy(() -> interceptor.authorizeRequest(byId(RequestTypeEnum.PUT, RestOperationTypeEnum.UPDATE,
+				"AuditEvent/archive"))).isInstanceOf(ForbiddenOperationException.class);
+		verify(resourceDao, never()).read(any(IIdType.class), any(RequestDetails.class), anyBoolean());
+	}
+
 	@Test
 	void theMarkerNeverGrantsADelete() {
 		stored(deletePendingTask("me"));
@@ -179,17 +240,20 @@ class DeleteFlowAuthorizationTest {
 		return request;
 	}
 
-	private static ServletRequestDetails request(RequestTypeEnum requestType, RestOperationTypeEnum operation,
+	private ServletRequestDetails request(RequestTypeEnum requestType, RestOperationTypeEnum operation,
 			String resourceName) {
 		ServletRequestDetails request = new ServletRequestDetails();
 		request.setResourceName(resourceName);
 		request.setRequestType(requestType);
 		request.setRestOperationType(operation);
-		MockHttpServletRequest servletRequest = new MockHttpServletRequest();
-		servletRequest.addHeader("Authorization", "Bearer " + JWT.create()
-				.withClaim("scope", NO_TASK_OR_AUDIT_RIGHTS)
+		String token = JWT.create()
+				.withClaim("scope", scope)
 				.withClaim("azp", "me")
-				.sign(Algorithm.HMAC256("test-secret")));
+				.sign(Algorithm.HMAC256("test-secret"));
+		MockHttpServletRequest servletRequest = new MockHttpServletRequest();
+		servletRequest.addHeader("Authorization", "Bearer " + token);
+		// as the JwtSecurityInterceptor leaves it after validating the token
+		servletRequest.setAttribute(JwtSecurityInterceptor.VALIDATED_ACCESS_TOKEN_ATTRIBUTE, token);
 		request.setServletRequest(servletRequest);
 		return request;
 	}

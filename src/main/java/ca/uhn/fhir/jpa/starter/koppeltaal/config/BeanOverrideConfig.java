@@ -5,12 +5,10 @@ import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
 import ca.uhn.fhir.jpa.api.svc.IIdHelperService;
 import ca.uhn.fhir.jpa.dao.data.IResourceLinkDao;
 import ca.uhn.fhir.jpa.dao.expunge.ResourceTableFKProvider;
-import ca.uhn.fhir.jpa.dao.index.DaoResourceLinkResolver;
 import ca.uhn.fhir.jpa.delete.batch2.DeleteExpungeSqlBuilder;
 import ca.uhn.fhir.jpa.model.config.PartitionSettings;
 import ca.uhn.fhir.jpa.model.dao.JpaPid;
 import ca.uhn.fhir.jpa.starter.koppeltaal.bean.DeleteExpungeSqlBuilderOverride;
-import ca.uhn.fhir.jpa.starter.koppeltaal.bean.DaoResourceLinkResolverOverride;
 import ca.uhn.fhir.jpa.starter.koppeltaal.bean.ErasureAwareMemoryCacheService;
 import ca.uhn.fhir.jpa.subscription.channel.impl.RetryPolicyProvider;
 import ca.uhn.fhir.jpa.util.MemoryCacheService;
@@ -19,7 +17,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.retry.RetryPolicy;
 import org.springframework.retry.policy.NeverRetryPolicy;
 import org.springframework.retry.policy.SimpleRetryPolicy;
@@ -29,24 +26,7 @@ public class BeanOverrideConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(BeanOverrideConfig.class);
 
-  private final DaoResourceLinkResolverOverride daoResourceLinkResolverOverride;
-
-  public BeanOverrideConfig(DaoResourceLinkResolverOverride daoResourceLinkResolverOverride) {
-    this.daoResourceLinkResolverOverride = daoResourceLinkResolverOverride;
-  }
-
-  @Primary
-  @Bean
-  public DaoResourceLinkResolver koppeltaalDaoResourceLinkResolver() {
-    return daoResourceLinkResolverOverride;
-  }
-
-  @Bean
-  public static BeanFactoryPostProcessor selectKoppeltaalResourceLinkResolver() {
-    // HAPI also marks its resolver @Primary. Change that definition after all
-    // configurations have registered, without depending on registration order.
-    return beans -> beans.getBeanDefinition("daoResourceLinkResolver").setPrimary(false);
-  }
+  // The DaoResourceLinkResolver override is registered by the DaoResourceLinkResolverOverrideRegistrar
 
   @Bean
   @Primary

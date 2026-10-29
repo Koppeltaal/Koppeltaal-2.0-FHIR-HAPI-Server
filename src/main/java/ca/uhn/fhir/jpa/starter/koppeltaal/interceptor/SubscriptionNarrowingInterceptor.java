@@ -94,7 +94,7 @@ public class SubscriptionNarrowingInterceptor {
 				final ResourceType resourceType = ((DomainResource) payload).getResourceType();
 
         LOG.info("Device [{}] found for [{}], determine if it has permission next", payloadDeviceId.getIdPart(), payload.getIdElement().getValue());
-        return PermissionUtil.hasPermission(CrudOperation.READ, resourceType, payloadDeviceId.getIdPart(), scope.get());
+        return PermissionUtil.hasPermission(CrudOperation.READ, resourceType, payloadDeviceId.getValue(), scope.get());
 			}
 		} catch (Exception e) {
 			LOG.error(String.format("Failed to execute Notification Narrowing. Non-breaking, might have notified for inaccessible resources! Still sending notification.\n\nMessage: %s", message), e);
@@ -136,7 +136,7 @@ public class SubscriptionNarrowingInterceptor {
 					.findAny()
 					.flatMap(identifier -> PermissionUtil.getScope(identifier.getValue()));
 			return Optional.of(payloadOrigin.isPresent() && scope.isPresent() && PermissionUtil.hasPermission(CrudOperation.READ,
-					((DomainResource) payload).getResourceType(), payloadOrigin.get().getIdPart(), scope.get()));
+					((DomainResource) payload).getResourceType(), payloadOrigin.get().getValue(), scope.get()));
 		} catch (Exception e) {
 			LOG.error("Could not decide on delivering delete-flow resource {}; withholding it", payload.getIdElement(), e);
 			return Optional.of(false);

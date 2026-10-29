@@ -36,6 +36,7 @@ class ResourceOriginSearchNarrowingInterceptorTest extends BaseResourceOriginTes
 	private ResourceOriginSearchNarrowingInterceptor interceptor;
 	private final JpaStorageSettings storageSettings = new JpaStorageSettings();
 	private Optional<IIdType> serverDevice = Optional.of(new IdType("Device", "server"));
+	private final Device device = new Device();
 
 	@BeforeEach
 	void init(@Mock DaoRegistry daoRegistry, @Mock IFhirResourceDao<Device> deviceDao) {
@@ -45,8 +46,8 @@ class ResourceOriginSearchNarrowingInterceptorTest extends BaseResourceOriginTes
 		interceptor = new ResourceOriginSearchNarrowingInterceptor(daoRegistry, deviceDao, storageSettings,
 				() -> serverDevice);
 
-		final Device device = new Device();
 		device.setIdElement(new IdType("Device", 123L));
+		device.setStatus(Device.FHIRDeviceStatus.ACTIVE);
 
 		resourceOriginUtil.when(() -> ResourceOriginUtil.getDevice(any(RequestDetails.class), any()))
 			.thenReturn(Optional.of(device));
@@ -122,6 +123,30 @@ class ResourceOriginSearchNarrowingInterceptorTest extends BaseResourceOriginTes
 		assertArrayEquals(new String[] {"Device/1,Device/server"}, requestDetails.getParameters().get("resource-origin"));
 	}
 
+	/** The marker grants nothing to an application that no longer takes part, so its search must not count it. */
+	@Test
+	void anInactiveApplicationsTaskSearchKeepsToTheOrigins() {
+
+		device.setStatus(Device.FHIRDeviceStatus.INACTIVE);
+		RequestDetails requestDetails = search(ResourceType.Task, "Device/1");
+
+		interceptor.narrowSearch(requestDetails);
+
+		assertArrayEquals(new String[] {"Device/1"}, requestDetails.getParameters().get("resource-origin"));
+		assertNull(requestDetails.getParameters().get("_filter"));
+	}
+
+	@Test
+	void anInactiveApplicationsAuditEventSearchKeepsToTheOrigins() {
+
+		device.setStatus(Device.FHIRDeviceStatus.INACTIVE);
+		RequestDetails requestDetails = search(ResourceType.AuditEvent, "Device/1");
+
+		interceptor.narrowSearch(requestDetails);
+
+		assertArrayEquals(new String[] {"Device/1"}, requestDetails.getParameters().get("resource-origin"));
+	}
+
 	@Test
 	void withoutAKnownServerDeviceAnAuditEventSearchKeepsToTheOrigins() {
 
@@ -143,7 +168,7 @@ class ResourceOriginSearchNarrowingInterceptorTest extends BaseResourceOriginTes
 	@Test
 	public void shouldNarrowOwnPermission() {
 
-    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.GET, ResourceType.Task, null, "r", "Device/123");
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.GET, ResourceType.Patient, null, "r", "Device/123");
 
 		interceptor.narrowSearch(requestDetails);
 
@@ -156,7 +181,7 @@ class ResourceOriginSearchNarrowingInterceptorTest extends BaseResourceOriginTes
 	@Test
 	public void shouldNarrowGrantedPermission() {
 
-    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.GET, ResourceType.Task, null, "r", "Device/2,Device/1");
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.GET, ResourceType.Patient, null, "r", "Device/2,Device/1");
 
     interceptor.narrowSearch(requestDetails);
 
@@ -176,6 +201,38 @@ class ResourceOriginSearchNarrowingInterceptorTest extends BaseResourceOriginTes
 		final Map<String, String[]> parameters = requestDetails.getParameters();
 		final String[] resourceOrigins = parameters.get("resource-origin");
 		assertNull(resourceOrigins,  "Should not narrow an ALL permission");
+	}
+
+	@Test
+	public void shouldNarrowPostSearch() {
+
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.POST, ResourceType.Patient, null, "rs", "Device/123");
+    requestDetails.setRestOperationType(RestOperationTypeEnum.SEARCH_TYPE);
+
+		interceptor.narrowSearch(requestDetails);
+
+		assertArrayEquals(new String[] { "Device/123" }, requestDetails.getParameters().get("resource-origin"), "Should narrow a POST search to OWN");
+	}
+
+	@Test
+	public void shouldNotLetTheRequestOverrideTheNarrowedResourceOrigin() {
+
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.GET, ResourceType.Patient, null, "rs", "Device/123");
+    requestDetails.setParameters(Map.of("resource-origin", new String[] { "Device/456" }));
+
+		interceptor.narrowSearch(requestDetails);
+
+		assertArrayEquals(new String[] { "Device/123" }, requestDetails.getParameters().get("resource-origin"));
+	}
+
+	@Test
+	public void shouldNotNarrowConformanceResourceSearch() {
+
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.GET, ResourceType.ValueSet, null, "rs", "Device/123");
+
+		interceptor.narrowSearch(requestDetails);
+
+		assertNull(requestDetails.getParameters().get("resource-origin"), "Conformance resources are readable for every client");
 	}
 
 }

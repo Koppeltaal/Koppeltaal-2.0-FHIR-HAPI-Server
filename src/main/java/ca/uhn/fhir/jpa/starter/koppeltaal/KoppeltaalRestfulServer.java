@@ -108,6 +108,7 @@ public class KoppeltaalRestfulServer extends RestfulServer {
       registerInterceptor(new ResourceOriginAuthorizationInterceptor(daoRegistry, deviceDao, smartBackendServiceConfiguration));
       registerInterceptor(new ResourceOriginSearchNarrowingInterceptor(daoRegistry, deviceDao, jpaStorageSettings,
           serverDeviceId));
+      registerInterceptor(new ResourceOriginResponseFilterInterceptor(daoRegistry, smartBackendServiceConfiguration));
 
     }
     //The SubscriptionInterceptor is somehow not properly registered with `registerInterceptor`, but does work via the `interceptorService`

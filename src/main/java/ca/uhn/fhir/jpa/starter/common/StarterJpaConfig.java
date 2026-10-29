@@ -25,6 +25,8 @@ import ca.uhn.fhir.jpa.dao.search.IHSearchSortHelper;
 import ca.uhn.fhir.jpa.delete.ThreadSafeResourceDeleterSvc;
 import ca.uhn.fhir.jpa.graphql.GraphQLProvider;
 import ca.uhn.fhir.jpa.interceptor.CascadingDeleteInterceptor;
+import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration;
+import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.ResourceOriginCascadingDeleteInterceptor;
 import ca.uhn.fhir.jpa.interceptor.UserRequestRetryVersionConflictsInterceptor;
 import ca.uhn.fhir.jpa.interceptor.validation.RepositoryValidatingInterceptor;
 import ca.uhn.fhir.jpa.ips.provider.IpsOperationProvider;
@@ -46,7 +48,6 @@ import ca.uhn.fhir.jpa.search.IStaleSearchDeletingSvc;
 import ca.uhn.fhir.jpa.search.StaleSearchDeletingSvcImpl;
 import ca.uhn.fhir.jpa.starter.AppProperties;
 import ca.uhn.fhir.jpa.starter.annotations.OnCorsPresent;
-import ca.uhn.fhir.jpa.starter.annotations.OnImplementationGuidesPresent;
 import ca.uhn.fhir.jpa.starter.common.validation.IRepositoryValidationInterceptorFactory;
 import ca.uhn.fhir.jpa.starter.koppeltaal.KoppeltaalRestfulServer;
 import ca.uhn.fhir.jpa.starter.ig.IImplementationGuideOperationProvider;
@@ -204,9 +205,10 @@ public class StarterJpaConfig {
 	}
 
 
+	/* CUSTOMIZATION - Not conditional on configured implementation guides: PackageInstallerWithExclusionSvcImpl is a
+	 * second IPackageInstallerSvc next to HAPI's npmInstallerSvc, so the context needs this primary bean to start */
 	@Bean("packageInstaller")
 	@Primary
-	@Conditional(OnImplementationGuidesPresent.class)
 	public IPackageInstallerSvc packageInstaller(
 			AppProperties appProperties,
 			PackageInstallerWithExclusionSvcImpl packageInstallerSvc,
@@ -306,7 +308,8 @@ public class StarterJpaConfig {
 			ApplicationContext appContext,
 			Optional<IpsOperationProvider> theIpsOperationProvider,
 			Optional<IImplementationGuideOperationProvider> implementationGuideOperationProvider,
-			DiffProvider diffProvider) {
+			DiffProvider diffProvider,
+			FhirServerSecurityConfiguration fhirServerSecurityConfiguration) {
 //		RestfulServer fhirServer = new RestfulServer(fhirSystemDao.getContext());
     RestfulServer fhirServer = new KoppeltaalRestfulServer(fhirSystemDao.getContext());
 
@@ -424,8 +427,10 @@ public class StarterJpaConfig {
 		}
 
 		if (appProperties.getAllow_cascading_deletes()) {
-			CascadingDeleteInterceptor cascadingDeleteInterceptor = new CascadingDeleteInterceptor(
-					fhirSystemDao.getContext(), daoRegistry, interceptorBroadcaster, theThreadSafeResourceDeleterSvc);
+			// Koppeltaal: authorizes every cascaded delete against the resource-origin permissions of the requester
+			CascadingDeleteInterceptor cascadingDeleteInterceptor = new ResourceOriginCascadingDeleteInterceptor(
+					fhirSystemDao.getContext(), daoRegistry, interceptorBroadcaster, theThreadSafeResourceDeleterSvc,
+					fhirServerSecurityConfiguration.isEnabled());
 			fhirServer.registerInterceptor(cascadingDeleteInterceptor);
 		}
 

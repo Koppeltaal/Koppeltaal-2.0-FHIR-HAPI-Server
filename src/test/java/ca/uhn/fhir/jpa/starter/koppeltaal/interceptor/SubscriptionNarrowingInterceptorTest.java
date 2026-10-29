@@ -136,6 +136,14 @@ class SubscriptionNarrowingInterceptorTest {
     assertTrue(deliver(deletePendingTask("Device/other", "Device/server")));
   }
 
+  /** The matrix compares resource-origins as full Device references. */
+  @Test
+  public void theMatrixNotifiesAnApplicationGrantedTheServersResourceOrigin() {
+    PermissionUtil.createOrUpdateScope("default-client-id", "system/Task.r?resource-origin=Device/server");
+
+    assertTrue(deliver(deletePendingTask("Device/other", "Device/server")));
+  }
+
   @Test
   public void everyParticipantIsNotifiedOfADeleteFlowAuditEvent() {
     PermissionUtil.createOrUpdateScope("default-client-id", "system/AuditEvent.r?resource-origin=Device/123");
@@ -176,5 +184,24 @@ class SubscriptionNarrowingInterceptorTest {
     event.getMeta().addSecurity("http://vzvz.nl/fhir/CodeSystem/koppeltaal-security-label", "kt2-delete-flow", null);
     event.addExtension(new Extension(ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM, new Reference("Device/server")));
     return event;
+  }
+
+  @Test
+  public void shouldNotSendSubscriptionForDeviceThatOnlyContainsTheResourceOrigin() {
+    ResourceDeliveryMessage resourceDeliveryMessage = new ResourceDeliveryMessage();
+    CanonicalSubscription canonicalSubscription = new CanonicalSubscription();
+    canonicalSubscription.setIdElement(new IdType("sub-id"));
+
+    Task thePayload = new Task();
+    thePayload.setId(UUID.randomUUID().toString());
+    thePayload.addExtension(new Extension(ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM, new Reference("Device/456")));
+
+    resourceDeliveryMessage.setPayload(fhirContext, thePayload, EncodingEnum.JSON);
+
+    PermissionUtil.createOrUpdateScope("default-client-id", "system/Task.r?resource-origin=Device/4567,Device/1456");
+
+    assertFalse(
+      interceptor.subscriptionBeforeDelivery(resourceDeliveryMessage, canonicalSubscription)
+    );
   }
 }

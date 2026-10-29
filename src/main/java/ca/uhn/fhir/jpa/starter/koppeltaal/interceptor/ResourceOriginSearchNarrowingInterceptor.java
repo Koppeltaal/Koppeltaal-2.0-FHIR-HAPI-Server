@@ -7,11 +7,11 @@ import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.dao.predicate.SearchFilterParser;
+import ca.uhn.fhir.jpa.starter.koppeltaal.dto.CrudOperation;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.DeleteFlowTaskUtil;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.PermissionUtil;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.Constants;
-import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
@@ -56,18 +56,22 @@ public class ResourceOriginSearchNarrowingInterceptor extends BaseAuthorizationI
 		this.serverDeviceId = serverDeviceId;
 	}
 
+	/**
+	 * Narrows every type level search, both <code>GET [type]?</code> and <code>POST [type]/_search</code>. Other
+	 * interactions that return multiple resources (type level history) do not apply search parameters, those are
+	 * filtered by the {@link ResourceOriginResponseFilterInterceptor}.
+	 */
 	@Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)
 	protected void narrowSearch(RequestDetails requestDetails) {
 
 		final String resourceName = requestDetails.getResourceName();
 
-		if (requestDetails.getRequestType() != RequestTypeEnum.GET || StringUtils.isBlank(resourceName))
+		if (requestDetails.getRestOperationType() != RestOperationTypeEnum.SEARCH_TYPE || StringUtils.isBlank(resourceName))
 			return;
-		else if (requestDetails.getRequestType() == RequestTypeEnum.GET
-				&& "ImplementationGuide".equals(requestDetails.getResourceName()))
-			return;
+		else if ("ImplementationGuide".equals(resourceName) || PermissionUtil.isConformanceResourceType(resourceName))
+			return; // readable for every client, resources with a resource-origin are filtered from the response
 
-		List<String> relevantScopes = PermissionUtil.getScopesForRequest(requestDetails);
+		List<String> relevantScopes = PermissionUtil.getScopesForRequest(requestDetails, CrudOperation.READ);
 
 		if (relevantScopes.isEmpty())
 			return; // no permission, not handled by this interceptor
@@ -81,7 +85,8 @@ public class ResourceOriginSearchNarrowingInterceptor extends BaseAuthorizationI
 		final HashMap<String, String[]> narrowedSearchParameters = new HashMap<>(originalParameters);
 
 		// If resource-origins are found, this means the permission is either OWN or
-		// GRANTED
+		// GRANTED. The delete flow widens this narrowing; the
+		// ResourceOriginResponseFilterInterceptor lets the same resources through.
 		final Optional<String> ownDeletePendingTasks = ownDeletePendingTasks(requestDetails);
 		if (ownDeletePendingTasks.isPresent()) {
 			narrowedSearchParameters.remove("resource-origin");
@@ -90,7 +95,7 @@ public class ResourceOriginSearchNarrowingInterceptor extends BaseAuthorizationI
 					originFilter(resourceOrigins) + " or " + ownDeletePendingTasks.get())});
 		} else {
 			narrowedSearchParameters.put("resource-origin",
-					new String[] { String.join(",", withDeleteFlowEvents(resourceName, resourceOrigins)) });
+					new String[] { String.join(",", withDeleteFlowEvents(requestDetails, resourceName, resourceOrigins)) });
 		}
 
 		requestDetails.setParameters(narrowedSearchParameters);
@@ -99,7 +104,8 @@ public class ResourceOriginSearchNarrowingInterceptor extends BaseAuthorizationI
 	private Optional<String> ownDeletePendingTasks(RequestDetails requestDetails) {
 		if (!"Task".equals(requestDetails.getResourceName())
 				|| requestDetails.getRestOperationType() != RestOperationTypeEnum.SEARCH_TYPE
-				|| !storageSettings.isFilterParameterEnabled()) {
+				|| !storageSettings.isFilterParameterEnabled()
+				|| !takesPartInTheDeleteFlow(requestDetails)) {
 			return Optional.empty();
 		}
 		return ResourceOriginUtil.getRequesterClientId(requestDetails).map(clientId -> String.format(
@@ -134,11 +140,20 @@ public class ResourceOriginSearchNarrowingInterceptor extends BaseAuthorizationI
 	}
 
 	/** Only the delete-flow events have the server's own Device as resource-origin. */
-	private Set<String> withDeleteFlowEvents(String resourceName, Set<String> resourceOrigins) {
+	private Set<String> withDeleteFlowEvents(RequestDetails requestDetails, String resourceName,
+			Set<String> resourceOrigins) {
 		final Set<String> origins = new LinkedHashSet<>(resourceOrigins);
-		if ("AuditEvent".equals(resourceName)) {
+		if ("AuditEvent".equals(resourceName) && takesPartInTheDeleteFlow(requestDetails)) {
 			serverDeviceId.get().ifPresent(server -> origins.add("Device/" + server.getIdPart()));
 		}
 		return origins;
+	}
+
+	/**
+	 * The marker grants an application that no longer takes part nothing, so its search must not match more either:
+	 * the response filter would remove those entries, but the total would still count them.
+	 */
+	private boolean takesPartInTheDeleteFlow(RequestDetails requestDetails) {
+		return DeleteFlowAccess.isParticipant(ResourceOriginUtil.getDevice(requestDetails, deviceDao).orElse(null));
 	}
 }

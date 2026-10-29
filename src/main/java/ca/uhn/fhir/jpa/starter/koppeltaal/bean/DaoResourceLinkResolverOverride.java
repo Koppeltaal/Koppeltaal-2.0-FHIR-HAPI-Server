@@ -16,7 +16,6 @@ import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.Bundle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 /**
  * Class that overrides {@link DaoResourceLinkResolver} to relax the referential integrity check on
@@ -41,8 +40,10 @@ import org.springframework.stereotype.Component;
  * participant rewrites the whole CareTeam, which can still name what an earlier erase removed: a blocked resource
  * keeps its references. Refusing the write over that would roll back an unrelated patient's erase.
  * </p>
+ *
+ * <p>Registered in place of HAPI's bean by the
+ * {@link ca.uhn.fhir.jpa.starter.koppeltaal.config.DaoResourceLinkResolverOverrideRegistrar}.</p>
  */
-@Component
 public class DaoResourceLinkResolverOverride<T extends IResourcePersistentId<?>> extends DaoResourceLinkResolver<T> {
 
   private static final Logger LOG = LoggerFactory.getLogger(DaoResourceLinkResolverOverride.class);

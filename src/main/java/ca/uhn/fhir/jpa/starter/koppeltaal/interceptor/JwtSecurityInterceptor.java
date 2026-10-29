@@ -27,6 +27,14 @@ import org.springframework.http.HttpStatus;
 public class JwtSecurityInterceptor {
 
 	private static final Logger LOG = LoggerFactory.getLogger(JwtSecurityInterceptor.class);
+
+	/**
+	 * Request attribute with the access token once it passed the validation. Authorization decisions only use this
+	 * token: a token in the header of a request on a public path (e.g. <code>/metadata</code>) is otherwise not
+	 * validated and could be forged.
+	 */
+	public static final String VALIDATED_ACCESS_TOKEN_ATTRIBUTE = JwtSecurityInterceptor.class.getName() + ".validatedAccessToken";
+
 	private final Oauth2AccessTokenService oauth2AccessTokenService;
 
 	public JwtSecurityInterceptor(Oauth2AccessTokenService oauth2AccessTokenService) {
@@ -37,10 +45,10 @@ public class JwtSecurityInterceptor {
 	public void incomingRequestPreProcessed(HttpServletRequest request) {
 
 		final String requestURI = request.getRequestURI();
+		final String token = StringUtils.trim(StringUtils.removeStartIgnoreCase(request.getHeader("Authorization"), "Bearer"));
+
 		if (requiresBearerToken(request)) {
 			try {
-				String authorization = request.getHeader("Authorization");
-				String token = StringUtils.trim(StringUtils.removeStartIgnoreCase(authorization, "Bearer"));
 				if (StringUtils.isEmpty(token)) {
 					LOG.warn("No access token found on URI {}.", requestURI);
 					throw new AuthenticationException(HttpStatus.UNAUTHORIZED.getReasonPhrase());
@@ -53,6 +61,18 @@ public class JwtSecurityInterceptor {
 				LOG.warn(String.format("JWTVerificationException on URI %s.", requestURI), e);
 				throw new AuthenticationException(HttpStatus.UNAUTHORIZED.getReasonPhrase());
 			}
+			request.setAttribute(VALIDATED_ACCESS_TOKEN_ATTRIBUTE, token);
+		} else if (StringUtils.isNotEmpty(token) && isValid(token)) {
+			// a public path needs no token, but a valid one still identifies the requester, e.g. in the AuditEvent
+			request.setAttribute(VALIDATED_ACCESS_TOKEN_ATTRIBUTE, token);
+		}
+	}
+
+	private boolean isValid(String token) {
+		try {
+			return oauth2AccessTokenService.validateToken(token);
+		} catch (JWTVerificationException e) {
+			return false;
 		}
 	}
 

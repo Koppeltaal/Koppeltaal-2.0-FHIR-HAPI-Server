@@ -6,6 +6,7 @@ import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
+import ca.uhn.fhir.jpa.starter.koppeltaal.dto.CrudOperation;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.DeleteFlowTaskUtil;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.PermissionUtil;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
@@ -14,8 +15,12 @@ import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
+import ca.uhn.fhir.rest.server.exceptions.BaseServerResponseException;
 import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
+import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceGoneException;
+import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
+import ca.uhn.fhir.rest.server.exceptions.ResourceVersionConflictException;
 import ca.uhn.fhir.rest.server.interceptor.auth.AuthorizationInterceptor;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -31,19 +36,58 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Not using the {@link AuthorizationInterceptor} as custom
  * {@link org.hl7.fhir.CompartmentDefinition} objects are not allowed.
- * <p>
- * Where the matrix refuses, the kt2-delete-flow marker may still grant access to the delete flow; see
- * {@link DeleteFlowAccess}.
- * </p>
+ *
+ * <p>Denies by default: only the interactions of TOP-KT-002a are allowed, see
+ * {@link #isSupportedInteraction(RequestDetails)}. Everything else (system level history, search, transaction and
+ * batch Bundles, PATCH, conditional create and the other operations) is denied, as these would bypass the
+ * resource-origin checks below. Allowed operations: type level <code>$validate</code>, the terminology operations on
+ * ValueSet and CodeSystem, and the maintenance operations of the domain admin.</p>
+ *
+ * <p><code>$expunge</code> and deleting multiple resources at once are disabled in the server configuration
+ * (<code>expunge_enabled</code> and <code>allow_multiple_delete</code>). Cascading deletes are authorized per resource
+ * by the {@link ResourceOriginCascadingDeleteInterceptor}.</p>
+ *
+ * <p>Where the matrix refuses, the kt2-delete-flow marker may still grant access to the delete flow; see
+ * {@link DeleteFlowAccess}.</p>
  */
 @Interceptor
 public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInterceptor {
 
   private static final Logger LOG = LoggerFactory.getLogger(ResourceOriginAuthorizationInterceptor.class);
+
+  /**
+   * The only operation that is offered to applications (TOP-KT-010), on type level only. On instance level, the
+   * <code>mode=delete</code> outcome reveals the resources that reference the instance.
+   */
+  static final String OPERATION_VALIDATE = "$validate";
+
+  /**
+   * Read only operations on terminology. They resolve any ValueSet or CodeSystem by its canonical url, including the
+   * resources an expansion depends on, so they require an ALL read permission on the type (or the domain admin).
+   */
+  static final Set<String> TERMINOLOGY_OPERATIONS = Set.of("$expand", "$lookup", "$validate-code");
+  static final Set<String> TERMINOLOGY_RESOURCE_TYPES = Set.of("ValueSet", "CodeSystem");
+
+  /**
+   * Maintenance operations, only for the domain admin.
+   */
+  private static final Set<String> MAINTENANCE_OPERATIONS = Set.of("$reindex", "$trigger-subscription");
+
+  /**
+   * Not supported within Koppeltaal (TOP-KT-002b). Matched as prefix, as HAPI reads both a ":" and a "." as qualifier
+   * separator. <code>_include</code> is supported: included resources of other resource-origins are removed by the
+   * {@link ResourceOriginResponseFilterInterceptor}.
+   */
+  private static final List<String> UNSUPPORTED_SEARCH_PARAMETER_PREFIXES = List.of("_revinclude", "_contained");
+
+  /** The resource types the kt2-delete-flow marker can grant access to, see {@link DeleteFlowAccess}. */
+  private static final Set<String> DELETE_FLOW_TYPES = Set.of("Task", "AuditEvent");
+
   private final SmartBackendServiceConfiguration smartBackendServiceConfiguration;
 
   public ResourceOriginAuthorizationInterceptor(DaoRegistry daoRegistry,
@@ -59,15 +103,49 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 
     LOG.debug("=== ResourceOriginAuthorizationInterceptor.authorizeRequest() CALLED ===");
     LOG.debug("Request: {} {}", requestDetails.getRequestType(), requestDetails.getCompleteUrl());
+    LOG.debug("Operation: {}", requestDetails.getRestOperationType());
     LOG.debug("Resource Name: {}", requestDetails.getResourceName());
     LOG.debug("Resource ID: {}", requestDetails.getId());
     LOG.debug("Request Headers: Authorization={}", requestDetails.getHeader("Authorization") != null ? "Present" : "Missing");
 
+    final RestOperationTypeEnum operationType = requestDetails.getRestOperationType();
     final String resourceName = requestDetails.getResourceName();
 
-    if (StringUtils.isBlank(resourceName)) {
+    PermissionUtil.refreshScopeCache(requestDetails);
+
+    if (operationType == RestOperationTypeEnum.METADATA) {
       LOG.debug("Skipping authorization - capabilities service");
-      return; // capabilities service
+      return;
+    }
+
+    if (operationType == RestOperationTypeEnum.GET_PAGE) {
+      // the search itself was authorized and narrowed, the returned page is filtered by the
+      // ResourceOriginResponseFilterInterceptor
+      LOG.debug("Skipping authorization - page of an earlier search");
+      return;
+    }
+
+    if (isMaintenanceOperation(requestDetails)) {
+      if (!isDomainAdmin(requestDetails)) {
+        deny(requestDetails);
+      }
+      LOG.info("Maintenance operation [{}] authorized for the domain admin", requestDetails.getOperation());
+      return;
+    }
+
+    if (!isSupportedInteraction(requestDetails)) {
+      LOG.warn("Denied unsupported interaction [{}] on [{}]", operationType, requestDetails.getRequestPath());
+      throw new ForbiddenOperationException("Unauthorized");
+    }
+
+    if (operationType == RestOperationTypeEnum.SEARCH_TYPE) {
+      ensureSupportedSearchParameters(requestDetails);
+    }
+
+    if (operationType == RestOperationTypeEnum.CREATE
+        && StringUtils.isNotBlank(requestDetails.getHeader(Constants.HEADER_IF_NONE_EXIST))) {
+      // not supported within Koppeltaal (TOP-KT-002a), a match returns the existing resource of any resource-origin
+      throw new InvalidRequestException("Conditional create (If-None-Exist) is not supported");
     }
 
     if ("ImplementationGuide".equals(resourceName) && requestDetails.getRequestType() == RequestTypeEnum.GET) {
@@ -91,82 +169,318 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     validate(requestDetails);
   }
 
+  /**
+   * Only type and instance level interactions are supported. System level interactions (capabilities and paging
+   * excluded) have no resource name and are never supported within Koppeltaal.
+   */
+  static boolean isSupportedInteraction(RequestDetails requestDetails) {
+    final RestOperationTypeEnum operationType = requestDetails.getRestOperationType();
+
+    if (operationType == null || StringUtils.isBlank(requestDetails.getResourceName())) {
+      return false;
+    }
+
+    switch (operationType) {
+      case READ:
+      case VREAD:
+      case HISTORY_INSTANCE:
+      case HISTORY_TYPE:
+      case SEARCH_TYPE:
+      case CREATE:
+      case UPDATE:
+      case DELETE:
+        return true;
+      case EXTENDED_OPERATION_TYPE:
+        return OPERATION_VALIDATE.equals(requestDetails.getOperation()) || isTerminologyOperation(requestDetails);
+      case EXTENDED_OPERATION_INSTANCE:
+        return isTerminologyOperation(requestDetails);
+      default:
+        return false;
+    }
+  }
+
+  private static boolean isTerminologyOperation(RequestDetails requestDetails) {
+    return TERMINOLOGY_RESOURCE_TYPES.contains(requestDetails.getResourceName())
+        && TERMINOLOGY_OPERATIONS.contains(requestDetails.getOperation());
+  }
+
+  private static boolean isMaintenanceOperation(RequestDetails requestDetails) {
+    final RestOperationTypeEnum operationType = requestDetails.getRestOperationType();
+
+    return (operationType == RestOperationTypeEnum.EXTENDED_OPERATION_SERVER
+        || operationType == RestOperationTypeEnum.EXTENDED_OPERATION_TYPE
+        || operationType == RestOperationTypeEnum.EXTENDED_OPERATION_INSTANCE)
+        && MAINTENANCE_OPERATIONS.contains(requestDetails.getOperation());
+  }
+
+  private boolean isDomainAdmin(RequestDetails requestDetails) {
+    return ResourceOriginUtil.getRequesterClientId(requestDetails)
+        .map((clientId) -> StringUtils.equals(smartBackendServiceConfiguration.getDomainAdminClientId(), clientId))
+        .orElse(false);
+  }
+
+  private void ensureSupportedSearchParameters(RequestDetails requestDetails) {
+    final Map<String, String[]> parameters = requestDetails.getParameters();
+    if (parameters == null) return;
+
+    for (String parameterName : parameters.keySet()) {
+      if (UNSUPPORTED_SEARCH_PARAMETER_PREFIXES.stream().anyMatch(parameterName::startsWith)) {
+        throw new InvalidRequestException(String.format("Search parameter [%s] is not supported", parameterName));
+      }
+    }
+  }
+
   private void validate(RequestDetails requestDetails) {
-    List<String> relevantPermissions = PermissionUtil.getScopesForRequest(requestDetails);
-    RequestTypeEnum requestType = requestDetails.getRequestType();
+    final RestOperationTypeEnum operationType = requestDetails.getRestOperationType();
 
-    LOG.debug("Relevant permissions found: {}", relevantPermissions);
-    LOG.debug("Full scope available: {}", PermissionUtil.getFullScope(requestDetails));
+    LOG.debug("Full scope available: {}", PermissionUtil.findFullScope(requestDetails).orElse(null));
 
-    if (requestType == RequestTypeEnum.POST) {
-
-      if (relevantPermissions.isEmpty()) {
-        LOG.warn("No permission found, user tried to [{}] a [{}], but the found scopes are [{}]",
-            requestType, requestDetails.getResourceName(), PermissionUtil.getFullScope(requestDetails));
-        throw new ForbiddenOperationException("Unauthorized");
-      }
-      LOG.debug("POST request authorized for {}", requestDetails.getResourceName());
-      return;
+    // The kt2-delete-flow marker grants access on another basis than the resource-origin scopes: per interaction
+    // here, and for the returned resources in the ResourceOriginResponseFilterInterceptor.
+    switch (operationType) {
+      case SEARCH_TYPE:
+      case HISTORY_TYPE:
+        // read all, the resource-origin is enforced by the search narrowing and the response filter
+        if (PermissionUtil.isConformanceResourceType(requestDetails.getResourceName())) {
+          LOG.debug("Read all of conformance resource {} authorized", requestDetails.getResourceName());
+          return;
+        }
+        if (!hasPermission(requestDetails, CrudOperation.READ) && !narrowedToDeleteFlow(requestDetails)) {
+          deny(requestDetails);
+        }
+        break;
+      case CREATE:
+        // the resource-origin of a new resource is always the requester, see InjectResourceOriginInterceptor
+        requirePermission(requestDetails, CrudOperation.CREATE);
+        break;
+      case EXTENDED_OPERATION_TYPE:
+        if (isTerminologyOperation(requestDetails)) {
+          requireTerminologyAccess(requestDetails);
+          break;
+        }
+        // $validate of the resource in the request body, does not involve stored resources
+        if (!hasPermission(requestDetails, CrudOperation.CREATE) && !hasPermission(requestDetails, CrudOperation.UPDATE)) {
+          deny(requestDetails);
+        }
+        break;
+      case EXTENDED_OPERATION_INSTANCE: // terminology operation on a stored ValueSet or CodeSystem
+        requireTerminologyAccess(requestDetails);
+        break;
+      case READ:
+      case VREAD:
+      case HISTORY_INSTANCE:
+        requireInstancePermission(requestDetails, CrudOperation.READ);
+        break;
+      case UPDATE:
+        requireInstancePermission(requestDetails, CrudOperation.UPDATE);
+        break;
+      case DELETE:
+        requireInstancePermission(requestDetails, CrudOperation.DELETE);
+        break;
+      default:
+        deny(requestDetails);
     }
 
-    // non-create request, always involves existing entities
-    String crudsRegex = PermissionUtil.getCrudsRegex(requestType);
+    LOG.debug("{} request authorized for {}", operationType, requestDetails.getResourceName());
+  }
 
-    boolean hasPermission;
+  private boolean hasPermission(RequestDetails requestDetails, CrudOperation crudOperation) {
+    return !PermissionUtil.getScopesForRequest(requestDetails, crudOperation).isEmpty();
+  }
 
-    if (requestDetails.getRequestType() == RequestTypeEnum.GET && requestDetails.getId() == null) { // read all
-      LOG.debug("GET request for multiple resources (read all) - checking permissions");
-      hasPermission = relevantPermissions.stream()
-          .map((permission) -> StringUtils.substringAfter(permission, "."))
-          .anyMatch((permission) -> permission.matches(crudsRegex + ".*"));
-      LOG.debug("Read-all permission check result: {}", hasPermission);
-      if (!hasPermission && narrowedToDeleteFlow(requestDetails)) {
+  private void requirePermission(RequestDetails requestDetails, CrudOperation crudOperation) {
+    if (!hasPermission(requestDetails, crudOperation)) {
+      deny(requestDetails);
+    }
+  }
+
+  private void requireTerminologyAccess(RequestDetails requestDetails) {
+    final boolean unrestrictedRead = PermissionUtil.permitsResourceOrigin(
+        PermissionUtil.getScopesForRequest(requestDetails, CrudOperation.READ), null);
+
+    if (!unrestrictedRead && !isDomainAdmin(requestDetails)) {
+      deny(requestDetails);
+    }
+  }
+
+  /**
+   * Checks the permission against the resource-origin of the existing entity.
+   */
+  private void requireInstancePermission(RequestDetails requestDetails, CrudOperation crudOperation) {
+    final List<String> scopes = PermissionUtil.getScopesForRequest(requestDetails, crudOperation);
+    final boolean conformanceRead = crudOperation == CrudOperation.READ
+        && PermissionUtil.isConformanceResourceType(requestDetails.getResourceName());
+    // without a scope for the interaction, only the kt2-delete-flow marker can still grant it
+    final boolean markerOnly = scopes.isEmpty() && !conformanceRead;
+
+    if (markerOnly && !mayBeGrantedByTheMarker(requestDetails, crudOperation)) {
+      deny(requestDetails);
+    }
+
+    // a conditional update or delete has no id, only an ALL permission allows these
+    String resourceOrigin = null;
+
+    if (requestDetails.getId() != null) {
+      final IBaseResource existingResource = markerOnly
+          ? readExistingResourceOrDeny(requestDetails)
+          : readExistingResource(requestDetails);
+
+      if (deleteFlowGrants(existingResource, crudOperation, requestDetails)) {
+        LOG.debug("{} of {} authorized by the kt2-delete-flow marker", crudOperation, existingResource.getIdElement());
         return;
       }
-    } else {
-      LOG.debug("Checking permission for specific resource operation");
-      final IBaseResource existingResource = readExistingResource(requestDetails);
-      if (deleteFlowGrants(requestDetails, existingResource)) {
-        return;
+      if (markerOnly) {
+        deny(requestDetails);
       }
-      String existingEntityResourceOrigin = existingResource == null
-          ? null // no entity id - read all - will be managed by search narrowing
-          : getResourceOriginDeviceReference(existingResource, requestDetails);
 
-      LOG.debug("Checking permission for {}/{} with resource-origin: {}",
-          requestDetails.getResourceName(), requestDetails.getId(), existingEntityResourceOrigin);
+      final Optional<IIdType> resourceOriginOptional = readResourceOrigin(existingResource, requestDetails);
 
-//      system/Practitioner.crus?resource-origin=Device/b4decd94-15c0-43c1-8200-f8e5f04cf90b
-      hasPermission = relevantPermissions.stream(
-        )
-          .map((permission) -> {
-            String afterDot = StringUtils.substringAfter(permission, ".");
-            String pattern = crudsRegex + "(?:\\?resource-origin=.*" + existingEntityResourceOrigin + "(,.*|$))?";
-            boolean matches = afterDot.matches(pattern);
-            LOG.debug("Checking permission '{}' against pattern '{}': {}", afterDot, pattern, matches);
-            return matches;
-          })
-          .anyMatch(Boolean::booleanValue);
+      if (resourceOriginOptional.isEmpty() && conformanceRead) {
+        LOG.debug("Read of conformance resource {} without resource-origin authorized", existingResource.getIdElement());
+        return; // managed by the domain, readable for every client
+      }
 
-      LOG.debug("Final authorization result: {}", hasPermission);
+      resourceOrigin = getResourceOriginDeviceReference(existingResource, requestDetails);
     }
 
-    if (!hasPermission) {
-      LOG.warn("No permission found, user tried to [{}] a [{}], but the found scopes are [{}]",
-          requestType, requestDetails.getResourceName(), PermissionUtil.getFullScope(requestDetails));
-      throw new ForbiddenOperationException("Unauthorized");
-    } else {
-      LOG.debug("Request authorized successfully for {} on {}", requestType, requestDetails.getResourceName());
+    LOG.debug("Checking permission for {}/{} with resource-origin: {}",
+        requestDetails.getResourceName(), requestDetails.getId(), resourceOrigin);
+
+    if (!PermissionUtil.permitsResourceOrigin(scopes, resourceOrigin)) {
+      deny(requestDetails);
+    }
+  }
+
+  /**
+   * The kt2-delete-flow marker only grants reading a Task or AuditEvent, or updating a Task, by its id and to an
+   * active participant. Checked before the resource is read, so that nothing else learns whether it exists.
+   */
+  private boolean mayBeGrantedByTheMarker(RequestDetails requestDetails, CrudOperation crudOperation) {
+    final String resourceName = requestDetails.getResourceName();
+    final boolean grantable = crudOperation == CrudOperation.READ
+        ? DELETE_FLOW_TYPES.contains(resourceName)
+        : crudOperation == CrudOperation.UPDATE && "Task".equals(resourceName);
+    return grantable && requestDetails.getId() != null
+        && DeleteFlowAccess.isParticipant(ResourceOriginUtil.getDevice(requestDetails, deviceDao).orElse(null));
+  }
+
+  /** The kt2-delete-flow marker adds to the matrix; it never takes anything away, and it never grants a delete. */
+  private boolean deleteFlowGrants(IBaseResource existingResource, CrudOperation crudOperation,
+      RequestDetails requestDetails) {
+    if (crudOperation == CrudOperation.DELETE || !DeleteFlowAccess.isDeleteFlowResource(existingResource)) {
+      return false;
+    }
+    final Device caller = ResourceOriginUtil.getDevice(requestDetails, deviceDao).orElse(null);
+    return crudOperation == CrudOperation.READ
+        ? DeleteFlowAccess.mayRead(existingResource, caller)
+        : DeleteFlowAccess.mayUpdate(existingResource, caller);
+  }
+
+  /** Where only the marker could grant access, what does not exist must look like what may not be read. */
+  private IBaseResource readExistingResourceOrDeny(RequestDetails requestDetails) {
+    try {
+      return readExistingResource(requestDetails);
+    } catch (ResourceNotFoundException | ResourceGoneException notReadable) {
+      deny(requestDetails);
+      return null; // not reached, deny throws
+    }
+  }
+
+  /**
+   * Without matrix read on Task or AuditEvent, the marker still lets a participant search the delete flow: its own
+   * delete-pending Tasks and every delete-flow AuditEvent. Whatever else the search returns, included resources too,
+   * still has to pass the {@link ResourceOriginResponseFilterInterceptor}.
+   */
+  private boolean narrowedToDeleteFlow(RequestDetails requestDetails) {
+    final String resourceName = requestDetails.getResourceName();
+    if (requestDetails.getRestOperationType() != RestOperationTypeEnum.SEARCH_TYPE
+        || !DELETE_FLOW_TYPES.contains(resourceName)) {
+      return false;
+    }
+    final Device caller = ResourceOriginUtil.getDevice(requestDetails, deviceDao).orElse(null);
+    if (!DeleteFlowAccess.isParticipant(caller)) {
+      return false;
+    }
+    final Map<String, String[]> narrowed = new HashMap<>(requestDetails.getParameters());
+    addValue(narrowed, Constants.PARAM_SECURITY, DeleteFlowTaskUtil.DELETE_FLOW_SECURITY_TOKEN);
+    if ("Task".equals(resourceName)) {
+      addValue(narrowed, "owner", "Device/" + caller.getIdElement().getIdPart());
+    }
+    requestDetails.setParameters(narrowed);
+    return true;
+  }
+
+  /** A repeated search parameter is an AND, so an application's own value narrows further, never wider. */
+  private static void addValue(Map<String, String[]> parameters, String name, String value) {
+    parameters.merge(name, new String[] {value}, ArrayUtils::addAll);
+  }
+
+  /**
+   * A resource-origin that can not be read (e.g. two resource-origin extensions) denies access to the resource.
+   */
+  private Optional<IIdType> readResourceOrigin(IBaseResource resource, RequestDetails requestDetails) {
+    try {
+      return ResourceOriginUtil.getResourceOriginDeviceId(resource);
+    } catch (RuntimeException e) {
+      LOG.warn("Can not read the resource-origin of [{}]: {}", resource.getIdElement().getValue(), e.getMessage());
+      deny(requestDetails);
+      return Optional.empty();
+    }
+  }
+
+  /**
+   * A delete conflict (409) names the first resource that references the deleted resource, which can be a resource of
+   * another resource-origin. The response only contains those details for a requester with an ALL delete permission
+   * on every resource type. The AuditEventInterceptor (order 100) applies the same to the AuditEvent, which the
+   * requester can read; the details are logged here.
+   */
+  @Hook(value = Pointcut.SERVER_PRE_PROCESS_OUTGOING_EXCEPTION, order = 200)
+  public BaseServerResponseException hideDeleteConflictDetails(RequestDetails requestDetails, Throwable throwable) {
+    final BaseServerResponseException withoutDetails = deleteConflictWithoutDetails(requestDetails, throwable);
+
+    if (withoutDetails != null) {
+      LOG.info("Delete conflict for [{}]: {}", requestDetails.getRequestPath(), throwable.getMessage());
     }
 
-    LOG.debug("{} request authorized for {}", requestType, requestDetails.getResourceName());
+    return withoutDetails;
+  }
+
+  /**
+   * @return the delete conflict without the referencing resource, or <code>null</code> when the exception is no delete
+   * conflict or the requester may see the details.
+   */
+  static BaseServerResponseException deleteConflictWithoutDetails(RequestDetails requestDetails, Throwable throwable) {
+    if (requestDetails == null
+        || requestDetails.getRestOperationType() != RestOperationTypeEnum.DELETE
+        || !(throwable instanceof ResourceVersionConflictException)) {
+      return null;
+    }
+
+    final boolean unrestrictedDelete = PermissionUtil.findFullScope(requestDetails)
+        .map((scope) -> PermissionUtil.permitsResourceOrigin(PermissionUtil.getScopes(scope, "*", CrudOperation.DELETE), null))
+        .orElse(false);
+
+    if (unrestrictedDelete) {
+      return null;
+    }
+
+    final String deletedResource = requestDetails.getId() != null
+        ? requestDetails.getId().toUnqualifiedVersionless().getValue()
+        : requestDetails.getResourceName();
+
+    return new ResourceVersionConflictException(String.format(
+        "Unable to delete %s because at least one resource has a reference to this resource", deletedResource));
+  }
+
+  private void deny(RequestDetails requestDetails) {
+    LOG.warn("No permission found, user tried to [{}] a [{}], but the found scopes are [{}]",
+        requestDetails.getRestOperationType(), requestDetails.getResourceName(),
+        PermissionUtil.findFullScope(requestDetails).orElse(null));
+    throw new ForbiddenOperationException("Unauthorized");
   }
 
   private IBaseResource readExistingResource(RequestDetails requestDetails) {
     final IIdType resourceId = requestDetails.getId();
-    if (resourceId == null) {
-      return null;
-    }
     try {
       final IFhirResourceDao<?> resourceDao = daoRegistry.getResourceDao(requestDetails.getResourceName());
 
@@ -186,53 +500,10 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     }
   }
 
-  /** The kt2-delete-flow marker adds to the matrix; it never takes anything away, and it never grants a delete. */
-  private boolean deleteFlowGrants(RequestDetails requestDetails, IBaseResource existingResource) {
-    if (!DeleteFlowAccess.isDeleteFlowResource(existingResource)) {
-      return false;
-    }
-    final Device caller = ResourceOriginUtil.getDevice(requestDetails, deviceDao).orElse(null);
-    if (requestDetails.getRequestType() == RequestTypeEnum.GET) {
-      return DeleteFlowAccess.mayRead(existingResource, caller);
-    }
-    return requestDetails.getRequestType() == RequestTypeEnum.PUT && DeleteFlowAccess.mayUpdate(existingResource, caller);
-  }
-
   /**
-   * Without matrix read on Task or AuditEvent, the marker still lets a participant search the delete flow: its
-   * own delete-pending Tasks and every delete-flow AuditEvent. Including other resources would reach past what
-   * the marker grants, so that is refused.
+   * @return the resource-origin Device reference of the resource, or <code>null</code> for resources that are allowed
+   * to exist without a resource-origin. Only an ALL permission gives access to the latter.
    */
-  private boolean narrowedToDeleteFlow(RequestDetails requestDetails) {
-    final String resourceName = requestDetails.getResourceName();
-    if (requestDetails.getRestOperationType() != RestOperationTypeEnum.SEARCH_TYPE
-        || !("Task".equals(resourceName) || "AuditEvent".equals(resourceName))) {
-      return false;
-    }
-    final Device caller = ResourceOriginUtil.getDevice(requestDetails, deviceDao).orElse(null);
-    if (!DeleteFlowAccess.isParticipant(caller)) {
-      return false;
-    }
-    final Map<String, String[]> narrowed = new HashMap<>(requestDetails.getParameters());
-    if (narrowed.keySet().stream().anyMatch(name ->
-        name.startsWith(Constants.PARAM_INCLUDE) || name.startsWith(Constants.PARAM_REVINCLUDE))) {
-      throw new ForbiddenOperationException(
-          "_include and _revinclude are not allowed on a search that only the kt2-delete-flow marker permits");
-    }
-    addValue(narrowed, Constants.PARAM_SECURITY, DeleteFlowTaskUtil.DELETE_FLOW_SECURITY_TOKEN);
-    if ("Task".equals(resourceName)) {
-      addValue(narrowed, "owner", "Device/" + caller.getIdElement().getIdPart());
-    }
-    requestDetails.setParameters(narrowed);
-    return true;
-  }
-
-  /** A repeated search parameter is an AND, so an application's own value narrows further, never wider. */
-  private static void addValue(Map<String, String[]> parameters, String name, String value) {
-    parameters.merge(name, new String[] {value}, ArrayUtils::addAll);
-  }
-
-
   String getResourceOriginDeviceReference(IBaseResource requestDetailsResource, RequestDetails requestDetails) {
     Optional<IIdType> resourceOriginOptional = ResourceOriginUtil.getResourceOriginDeviceId(requestDetailsResource);
 
@@ -245,7 +516,7 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
         // It is important that we can update these if the user has permission.
         // Devices are currently created without resource-origin by domain admin, will
         // be resolved in the future.
-        return "no-resource-origin-on-search-parameter";
+        return null;
       }
 
       // Check if this is a deleted resource for a full history request

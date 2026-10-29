@@ -66,7 +66,7 @@ WHERE u.res_id IS NULL
   AND r.res_type IN ('ValueSet', 'CodeSystem', 'StructureDefinition');
 ```
 
-**Solution**: Trigger HAPI's `$reindex` operation or use removal scripts to clean and reinstall
+**Solution**: Trigger HAPI's `$reindex` operation or use removal scripts to clean and reinstall. With security enabled, `$reindex` (and `$trigger-subscription`) require an access token of the domain admin client (`smart.backend.service.domainAdminClientId`); all other operations except `$validate` and the terminology operations are denied.
 
 ### 3. Circular Foreign Key Dependencies
 
