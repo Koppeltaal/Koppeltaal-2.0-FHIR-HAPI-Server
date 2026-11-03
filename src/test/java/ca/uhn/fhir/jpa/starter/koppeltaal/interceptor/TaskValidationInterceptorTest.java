@@ -148,6 +148,46 @@ class TaskValidationInterceptorTest {
                 exception.getMessage());
     }
 
+    @Test
+    void acceptingWithoutAHoldIsAllowed() {
+        assertDoesNotThrow(() -> update(deleteFlowTask(Task.TaskStatus.REQUESTED),
+                respondWith(Task.TaskStatus.ACCEPTED)));
+    }
+
+    @Test
+    void renewingAHoldIsAllowed() {
+        assertDoesNotThrow(() -> update(deleteFlowTask(Task.TaskStatus.ONHOLD),
+                respondWith(Task.TaskStatus.ONHOLD)));
+    }
+
+    /** Cancelled means the patient is engaged again; an accept would enrol the patient in a cycle again. */
+    @Test
+    void aCancelledTaskCannotBeAccepted() {
+        UnprocessableEntityException exception = assertThrows(UnprocessableEntityException.class,
+                () -> update(deleteFlowTask(Task.TaskStatus.CANCELLED), respondWith(Task.TaskStatus.ACCEPTED)));
+        assertEquals(
+                "A Task with the 'kt2-delete-flow' security label can only be updated while its status is 'requested' or 'on-hold', but it is 'cancelled'",
+                exception.getMessage());
+    }
+
+    @Test
+    void aCancelledTaskCannotBePutOnHold() {
+        assertThrows(UnprocessableEntityException.class,
+                () -> update(deleteFlowTask(Task.TaskStatus.CANCELLED), respondWith(Task.TaskStatus.ONHOLD)));
+    }
+
+    @Test
+    void anAcceptedTaskCannotBePutOnHold() {
+        assertThrows(UnprocessableEntityException.class,
+                () -> update(deleteFlowTask(Task.TaskStatus.ACCEPTED), respondWith(Task.TaskStatus.ONHOLD)));
+    }
+
+    @Test
+    void anAcceptedTaskCannotBeAcceptedAgain() {
+        assertThrows(UnprocessableEntityException.class,
+                () -> update(deleteFlowTask(Task.TaskStatus.ACCEPTED), respondWith(Task.TaskStatus.ACCEPTED)));
+    }
+
     // -------------------------------------------------------------- ownership
 
     @Test
@@ -181,6 +221,15 @@ class TaskValidationInterceptorTest {
                 () -> update(deleteFlowTask(Task.TaskStatus.REQUESTED), incoming));
         assertEquals("A Task with the 'kt2-delete-flow' security label can only be updated by the application that owns it",
                 exception.getMessage());
+    }
+
+    /** Another application's Task stays forbidden whatever its status, so the refusal does not reveal that status. */
+    @Test
+    void anotherApplicationsCancelledTaskIsForbidden() {
+        callerIs("another-app-device");
+
+        assertThrows(ForbiddenOperationException.class,
+                () -> update(deleteFlowTask(Task.TaskStatus.CANCELLED), respondWith(Task.TaskStatus.ACCEPTED)));
     }
 
     /** With security disabled there is no validated access token, and so no owner to compare with. */

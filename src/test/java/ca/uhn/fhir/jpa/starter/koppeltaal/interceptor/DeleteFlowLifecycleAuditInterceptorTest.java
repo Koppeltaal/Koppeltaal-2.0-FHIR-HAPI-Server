@@ -211,15 +211,6 @@ class DeleteFlowLifecycleAuditInterceptorTest {
     }
 
     @Test
-    void renewedHandbrakeAfterAcceptedRecordsHold() {
-        withSiblings(deleteFlowTask("task-2", Task.TaskStatus.REQUESTED));
-
-        statusChange(Task.TaskStatus.ACCEPTED, Task.TaskStatus.ONHOLD);
-
-        assertEquals("hold", capturedEvent().getType().getCode());
-    }
-
-    @Test
     void unchangedStatusRecordsNothing() {
         withSiblings(deleteFlowTask("task-2", Task.TaskStatus.REQUESTED));
 
