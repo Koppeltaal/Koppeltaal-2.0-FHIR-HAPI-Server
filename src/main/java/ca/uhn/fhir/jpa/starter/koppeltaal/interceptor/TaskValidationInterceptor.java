@@ -31,8 +31,8 @@ import static ca.uhn.fhir.rest.api.RestOperationTypeEnum.UPDATE;
  * <li>the `Task.partOf` is filled when the `Task.code` indicates it being a
  * subtask</li>
  * <li>a delete-pending Task is server-owned, so an application may only update
- * the Task it owns, only its status, and only while that is 'requested' or
- * 'on-hold'</li>
+ * the Task it owns, only its status, and only while that is 'requested',
+ * 'on-hold' or 'accepted'</li>
  * </ul>
  * <p>
  * The IG grants a status write and nothing else, so the stored Task with that
@@ -57,7 +57,7 @@ public class TaskValidationInterceptor {
 	private static final Set<Task.TaskStatus> CLIENT_WRITABLE_STATUSES = EnumSet.of(Task.TaskStatus.ONHOLD,
 			Task.TaskStatus.ACCEPTED);
 	private static final Set<Task.TaskStatus> CLIENT_UPDATABLE_STATUSES = EnumSet.of(Task.TaskStatus.REQUESTED,
-			Task.TaskStatus.ONHOLD);
+			Task.TaskStatus.ONHOLD, Task.TaskStatus.ACCEPTED);
 
 	private final FhirContext fhirContext;
 
@@ -221,14 +221,15 @@ public class TaskValidationInterceptor {
 	}
 
 	/**
-	 * TOP-KT-028 only lets an application move its Task on from 'requested' or 'on-hold'. A cancelled Task records
-	 * renewed engagement; accepting it would enrol the patient in a cycle again.
+	 * An application answers for as long as its Task takes part in the cycle, so a green light is not final: until
+	 * the erase it may still pull the handbrake. A cancelled Task records renewed engagement; accepting it would
+	 * enrol the patient in a cycle again.
 	 */
 	private void requireClientUpdatableStatus(Task stored) {
 
 		if (!CLIENT_UPDATABLE_STATUSES.contains(stored.getStatus())) {
 			throw new UnprocessableEntityException(String.format(
-					"A Task with the '%s' security label can only be updated while its status is 'requested' or 'on-hold', but it is '%s'",
+					"A Task with the '%s' security label can only be updated while its status is 'requested', 'on-hold' or 'accepted', but it is '%s'",
 					DeleteFlowTaskUtil.DELETE_FLOW_LABEL, statusCode(stored)));
 		}
 	}

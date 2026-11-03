@@ -166,7 +166,7 @@ class TaskValidationInterceptorTest {
         UnprocessableEntityException exception = assertThrows(UnprocessableEntityException.class,
                 () -> update(deleteFlowTask(Task.TaskStatus.CANCELLED), respondWith(Task.TaskStatus.ACCEPTED)));
         assertEquals(
-                "A Task with the 'kt2-delete-flow' security label can only be updated while its status is 'requested' or 'on-hold', but it is 'cancelled'",
+                "A Task with the 'kt2-delete-flow' security label can only be updated while its status is 'requested', 'on-hold' or 'accepted', but it is 'cancelled'",
                 exception.getMessage());
     }
 
@@ -177,15 +177,28 @@ class TaskValidationInterceptorTest {
     }
 
     @Test
-    void anAcceptedTaskCannotBePutOnHold() {
+    void aCompletedTaskCannotBePutOnHold() {
         assertThrows(UnprocessableEntityException.class,
-                () -> update(deleteFlowTask(Task.TaskStatus.ACCEPTED), respondWith(Task.TaskStatus.ONHOLD)));
+                () -> update(deleteFlowTask(Task.TaskStatus.COMPLETED), respondWith(Task.TaskStatus.ONHOLD)));
     }
 
     @Test
-    void anAcceptedTaskCannotBeAcceptedAgain() {
+    void aCompletedTaskCannotBeAccepted() {
         assertThrows(UnprocessableEntityException.class,
-                () -> update(deleteFlowTask(Task.TaskStatus.ACCEPTED), respondWith(Task.TaskStatus.ACCEPTED)));
+                () -> update(deleteFlowTask(Task.TaskStatus.COMPLETED), respondWith(Task.TaskStatus.ACCEPTED)));
+    }
+
+    /** A green light is not final: until the erase, the application may still pull the handbrake. */
+    @Test
+    void anAcceptedTaskCanStillBePutOnHold() {
+        assertDoesNotThrow(() -> update(deleteFlowTask(Task.TaskStatus.ACCEPTED),
+                respondWith(Task.TaskStatus.ONHOLD)));
+    }
+
+    @Test
+    void acceptingAgainIsAllowed() {
+        assertDoesNotThrow(() -> update(deleteFlowTask(Task.TaskStatus.ACCEPTED),
+                respondWith(Task.TaskStatus.ACCEPTED)));
     }
 
     // -------------------------------------------------------------- ownership

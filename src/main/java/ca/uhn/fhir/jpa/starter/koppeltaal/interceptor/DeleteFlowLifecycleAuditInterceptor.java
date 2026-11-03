@@ -41,8 +41,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <ul>
  * <li>the first handbrake blocks the process, which is recorded as `hold`</li>
  * <li>the last handbrake released unblocks it, recorded as `unhold` - unless
- * that leaves every Task accepted, because then the early completion is reached
- * and the `destroy` of the erase itself is the next event</li>
+ * that leaves every Task accepted: the early completion is then reached, and
+ * the next event is the `destroy` of the erase, or a `hold` should an
+ * application pull the handbrake again before it</li>
  * </ul>
  * <p>
  * Judging the aggregate means reading the sibling Tasks, so concurrent status
