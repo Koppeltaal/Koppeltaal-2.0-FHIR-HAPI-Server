@@ -13,6 +13,7 @@ import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -86,6 +87,17 @@ public class CleanupConfig {
 				patientDeletionScope, participatingApps, deleteFlowAggregateLock, resourceEraser, deleteFlowInventory, transactionManager,
 				SharedEntityManagerCreator.createSharedEntityManager(entityManagerFactory),
 				auditLogConfiguration.getSite());
+	}
+
+	@Bean
+	public CleanupRunLock cleanupRunLock(DataSource dataSource) {
+		return new AdvisoryCleanupRunLock(dataSource);
+	}
+
+	@Bean
+	public NightlyCleanup nightlyCleanup(ErasureCleanupService erasureCleanupService,
+			@Qualifier("cleanupService") CleanupService announcementService, CleanupRunLock cleanupRunLock) {
+		return new NightlyCleanup(erasureCleanupService, announcementService, cleanupRunLock);
 	}
 
 	@Bean
