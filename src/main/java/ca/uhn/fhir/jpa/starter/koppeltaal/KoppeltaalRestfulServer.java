@@ -7,12 +7,14 @@ import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.interceptor.OverridePathBasedReferentialIntegrityForDeletesInterceptor;
 import ca.uhn.fhir.jpa.starter.AppProperties;
+import ca.uhn.fhir.jpa.starter.koppeltaal.cleanup.ParticipatingApps;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerAuditLogConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.OpenApiConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.*;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.Oauth2AccessTokenService;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.ServerDeviceId;
 import ca.uhn.fhir.rest.openapi.OpenApiInterceptor;
 import ca.uhn.fhir.rest.server.RestfulServer;
 import ca.uhn.fhir.rest.server.interceptor.CaptureResourceSourceFromHeaderInterceptor;
@@ -27,6 +29,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.util.UUID;
 
 import static ca.uhn.fhir.rest.server.ServletRequestTracing.ATTRIBUTE_REQUEST_ID;
+import java.util.Optional;
 
 @WebServlet(urlPatterns = {"/fhir/*"}, displayName = "Koppeltaal Resource Service")
 public class KoppeltaalRestfulServer extends RestfulServer {
@@ -80,6 +83,9 @@ public class KoppeltaalRestfulServer extends RestfulServer {
   @Autowired
   private EnforceHttpsSubscriptionEndpointInterceptor enforceHttpsSubscriptionEndpointInterceptor;
 
+  @Autowired
+  private Optional<DeleteFlowLifecycleAuditInterceptor> deleteFlowLifecycleAuditInterceptor;
+
   public KoppeltaalRestfulServer(FhirContext context) {
     super(context);
   }
@@ -92,12 +98,16 @@ public class KoppeltaalRestfulServer extends RestfulServer {
     registerInterceptor(jsonSyntaxExceptionInterceptor);
 
     IFhirResourceDao<Device> deviceDao = daoRegistry.getResourceDao(Device.class);
+    FhirServerAuditLogConfiguration.Identifier observer = fhirServerAuditLogConfiguration.getObserver().getIdentifier();
+    ServerDeviceId serverDeviceId = new ServerDeviceId(
+        new ParticipatingApps(daoRegistry, observer.getSystem(), observer.getValue()));
     if (fhirServerSecurityConfiguration.isEnabled()) {
       registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
 
       registerInterceptor(new InjectResourceOriginInterceptor(daoRegistry, deviceDao, smartBackendServiceConfiguration)); // can only determine this from the Bearer token
       registerInterceptor(new ResourceOriginAuthorizationInterceptor(daoRegistry, deviceDao, smartBackendServiceConfiguration));
-      registerInterceptor(new ResourceOriginSearchNarrowingInterceptor(daoRegistry, deviceDao));
+      registerInterceptor(new ResourceOriginSearchNarrowingInterceptor(daoRegistry, deviceDao, jpaStorageSettings,
+          serverDeviceId));
       registerInterceptor(new ResourceOriginResponseFilterInterceptor(daoRegistry, smartBackendServiceConfiguration));
 
     }
@@ -144,9 +154,15 @@ public class KoppeltaalRestfulServer extends RestfulServer {
 
     registerInterceptor(new DefaultDescendingSortInterceptor());
 
-    registerInterceptor(new ValidSubTaskInterceptor());
+    registerInterceptor(new TaskValidationInterceptor(getFhirContext()));
+    registerInterceptor(new DeleteFlowMarkerInterceptor());
 
     registerInterceptor(enforceHttpsSubscriptionEndpointInterceptor);
+
+    // Storage pointcuts reach BOTH interceptor services: the DAO combines its own
+    // broadcaster with the one carried by the RequestDetails. Register on one of
+    // them only, or every lifecycle event is written twice.
+    deleteFlowLifecycleAuditInterceptor.ifPresent(myInterceptorRegistry::registerInterceptor);
 
     jpaStorageSettings.setResourceServerIdStrategy(JpaStorageSettings.IdStrategyEnum.UUID);
   }

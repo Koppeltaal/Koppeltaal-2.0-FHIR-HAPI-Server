@@ -446,6 +446,16 @@ smart:
       authorizationToken: "c1317ea3-de40-4a1e-be3f-3994fb79f759"
       domainAdminClientId: "5ad7cf6a-9556-4d23-91ca-250dafa1df09"
 
+# Patient data cleanup (TOP-KT-028): AVG policy, so on by default.
+cleanup:
+  enabled: true
+  # The nightly run in Dutch time (second minute hour day month weekday); "-" turns it off.
+  cron: "0 0 2 * * *"
+  grace-days: 30
+  min-patient-age-days: 730
+  # The transition date C: until C + 2 years recent Task activity also counts as engagement, next to logins.
+  transition-date: 2026-11-05
+
 logging:
   level:
     ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.ResourceOriginAuthorizationInterceptor: DEBUG

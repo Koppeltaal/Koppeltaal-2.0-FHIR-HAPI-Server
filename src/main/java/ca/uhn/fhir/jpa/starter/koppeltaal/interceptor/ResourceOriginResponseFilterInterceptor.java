@@ -37,6 +37,9 @@ import java.util.Set;
  * <p>Hooks into {@link Pointcut#SERVER_OUTGOING_RESPONSE} instead of {@link Pointcut#STORAGE_PRESHOW_RESOURCES}, as
  * other interceptors perform internal lookups (e.g. the Device of the requester) with the {@link RequestDetails} of
  * the client. Those lookups must not be filtered, only the response to the client.</p>
+ *
+ * <p>What the kt2-delete-flow marker grants on top of the resource-origin scopes passes as well, see
+ * {@link DeleteFlowAccess}.</p>
  */
 @Interceptor
 public class ResourceOriginResponseFilterInterceptor {
@@ -75,9 +78,14 @@ public class ResourceOriginResponseFilterInterceptor {
       .map((clientId) -> StringUtils.equals(smartBackendServiceConfiguration.getDomainAdminClientId(), clientId))
       .orElse(false);
     final Map<String, List<String>> readScopesPerResourceType = new HashMap<>();
+    // only looked up when the response holds delete-flow resources
+    final Device caller = bundle.getEntry().stream().map(Bundle.BundleEntryComponent::getResource)
+      .anyMatch(DeleteFlowAccess::isDeleteFlowResource)
+      ? ResourceOriginUtil.getDevice(requestDetails, daoRegistry.getResourceDao(Device.class)).orElse(null)
+      : null;
 
     final int originalSize = bundle.getEntry().size();
-    bundle.getEntry().removeIf((entry) -> !isPermitted(entry, requestDetails, scope, domainAdmin, readScopesPerResourceType));
+    bundle.getEntry().removeIf((entry) -> !isPermitted(entry, requestDetails, scope, domainAdmin, caller, readScopesPerResourceType));
 
     if (bundle.getEntry().size() != originalSize) {
       LOG.info("Removed {} of {} entries from the {} response of [{}], resource-origin not permitted",
@@ -86,12 +94,9 @@ public class ResourceOriginResponseFilterInterceptor {
   }
 
   private boolean isPermitted(Bundle.BundleEntryComponent entry, RequestDetails requestDetails, String scope,
-      boolean domainAdmin, Map<String, List<String>> readScopesPerResourceType) {
+      boolean domainAdmin, Device caller, Map<String, List<String>> readScopesPerResourceType) {
 
     final Resource resource = entry.getResource();
-
-    // Access granted on another basis than the resource-origin scopes (e.g. the delete flow) must be applied here as
-    // well, otherwise those resources are removed from the response.
 
     if (resource == null) {
       // the history entry of a deletion has no resource, the version before the deletion holds the resource-origin
@@ -116,6 +121,9 @@ public class ResourceOriginResponseFilterInterceptor {
 
     // the domain admin can access Device resources, see ResourceOriginAuthorizationInterceptor
     if (domainAdmin && resource instanceof Device) return true;
+
+    // the kt2-delete-flow marker adds to what the resource-origin scopes permit
+    if (DeleteFlowAccess.mayRead(resource, caller)) return true;
 
     final String resourceOrigin;
     try {
