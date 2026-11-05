@@ -7,13 +7,8 @@ import ca.uhn.fhir.rest.api.server.SystemRequestDetails;
 import ca.uhn.fhir.rest.param.ReferenceParam;
 import ca.uhn.fhir.rest.param.TokenParam;
 import ca.uhn.fhir.rest.server.exceptions.ResourceGoneException;
-import ca.uhn.fhir.util.JsonUtil;
 import jakarta.persistence.EntityManager;
 
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -24,6 +19,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
@@ -54,7 +51,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * or goes ahead</li>
  * </ul>
  * <p>
- * A dry run evaluates all of that and lists what it would remove, without
+ * A dry run evaluates all of that and counts what it would remove, without
  * writing anything.
  * </p>
  */
@@ -62,6 +59,7 @@ public class ErasureCleanupService implements CleanupService {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ErasureCleanupService.class);
 	private static final int PAGE_SIZE = 500;
+	private static final Pattern QUOTED_URL = Pattern.compile("[a-zA-Z][a-zA-Z0-9+.-]*://[^\\s,]+");
 
 	public enum Outcome {
 		/** Blocked by a handbrake, or the grace period is still running. */
@@ -128,7 +126,6 @@ public class ErasureCleanupService implements CleanupService {
 		final Instant startedAt = Instant.now();
 		final Map<Outcome, Integer> outcomes = new EnumMap<>(Outcome.class);
 		final List<String> errors = new ArrayList<>();
-		final List<String> affected = new ArrayList<>();
 		final Map<String, Integer> dispositions = new LinkedHashMap<>();
 
 		final List<String> patients = inventory.patientsWithARunningCycle();
@@ -141,8 +138,11 @@ public class ErasureCleanupService implements CleanupService {
 			try {
 				final Affected patientResources = new Affected();
 				final Outcome outcome = handle(patientIdPart, dryRun, clock, patientResources);
-				affected.addAll(patientResources.lines);
 				patientResources.dispositions.forEach((disposition, count) -> dispositions.merge(disposition, count, Integer::sum));
+				// The tag makes a kept resource findable; only this log says why it was kept.
+				patientResources.kept.forEach(blocker -> LOG.warn("{} {} for manual review while erasing Patient/{}: {}",
+						dryRun ? "Would keep" : "Kept", blocker.resourceId().getValue(), patientIdPart,
+						loggable(blocker.blockReason())));
 				outcomes.merge(outcome, 1, Integer::sum);
 			} catch (Exception e) {
 				errors.add(String.format("Patient/%s: %s", patientIdPart, e.getMessage()));
@@ -155,34 +155,8 @@ public class ErasureCleanupService implements CleanupService {
 			}
 		}
 
-		final CleanupRunReport finished = report(CleanupRunReport.RunStatus.COMPLETED, startedAt, Instant.now(),
+		return report(CleanupRunReport.RunStatus.COMPLETED, startedAt, Instant.now(),
 				evaluated, patients.size(), outcomes, dispositions, errors, dryRun);
-		finished.setDetailsFile(writeDetails(affected, dryRun, startedAt));
-		return finished;
-	}
-
-	/**
-	 * The list runs to tens of thousands of lines, which does not belong in an HTTP
-	 * response; it is written where it can be kept and compared between runs.
-	 */
-	private String writeDetails(List<String> affected, boolean dryRun, Instant startedAt) {
-
-		if (affected.isEmpty()) {
-			return null;
-		}
-		final Path file = Path.of(System.getProperty("java.io.tmpdir"),
-				String.format("kt2-erasure-%s-%d.ndjson", dryRun ? "dryrun" : "run", startedAt.toEpochMilli()));
-		try (BufferedWriter writer = Files.newBufferedWriter(file)) {
-			for (String line : affected) {
-				writer.write(line);
-				writer.newLine();
-			}
-		} catch (IOException e) {
-			LOG.error("Could not write the affected-resource list to {}", file, e);
-			return null;
-		}
-		LOG.info("Wrote {} affected resources to {}", affected.size(), file);
-		return file.toString();
 	}
 
 	private Outcome handle(String patientIdPart, boolean dryRun, Clock clock, Affected affected) {
@@ -280,10 +254,10 @@ public class ErasureCleanupService implements CleanupService {
 		final List<IIdType> resources = plan.resources();
 		final List<IIdType> blocked = plan.blockers().stream().map(PatientDeletionScope.Blocker::resourceId).toList();
 
-		plan.blockers().forEach(blocker -> affected.add(row(patientId, blocker.resourceId(), "blocked", blocker.blockReason())));
-		resources.forEach(id -> affected.add(row(patientId, id, "erase", null)));
-		plan.detachments().forEach(removal -> affected.add(detachmentRow(patientId, removal)));
-		plan.retainedTaskOwners().forEach(owner -> affected.add(retainedTaskOwnerRow(patientId, owner)));
+		affected.keep(plan.blockers());
+		affected.add("erase", resources.size());
+		affected.add("detach", plan.detachments().size());
+		affected.add("tag-deleted-owner", plan.retainedTaskOwners().size());
 
 		if (!dryRun) {
 			final var taskDao = daoRegistry.getResourceDao(Task.class);
@@ -321,10 +295,17 @@ public class ErasureCleanupService implements CleanupService {
 			record(DeleteFlowLifecycleEvent.DESTROYED, patientId);
 		}
 		LOG.info("{} {} resources for {}", dryRun ? "Would remove" : "Removed", resources.size(), patientId);
-		if (!blocked.isEmpty()) {
-			LOG.warn("{} blocked resources kept for manual review while erasing {}", blocked.size(), patientId);
-		}
 		return Outcome.ERASED;
+	}
+
+	/**
+	 * A reason can quote a stored reference verbatim. It must not be able to start a log line of its own, and a URL in
+	 * it goes without credentials, query or fragment: the kept resource's history still holds it whole.
+	 */
+	private static String loggable(String reason) {
+		final String withoutUrlSecrets = QUOTED_URL.matcher(reason).replaceAll(url -> Matcher.quoteReplacement(
+				url.group().replaceFirst("://[^/@]*@", "://").replaceFirst("[?#].*", "")));
+		return withoutUrlSecrets.replaceAll("[\\p{Cntrl}\\u0085\\u2028\\u2029]", " ");
 	}
 
 	/** A deleted resource needs no tag: searches no longer find it and it has no index rows left. */
@@ -337,44 +318,24 @@ public class ErasureCleanupService implements CleanupService {
 		}
 	}
 
-	private static Map<String, Object> detachmentRow(IIdType patientId, PatientDeletionScope.ParticipantRemoval removal) {
-		final Map<String, Object> row = new LinkedHashMap<>();
-		row.put("patient", patientId.getIdPart());
-		row.put("resourceType", "CareTeam");
-		row.put("id", removal.careTeamId().getIdPart());
-		row.put("disposition", "detach");
-		row.put("removedReferences", removal.references().stream().sorted().toList());
-		return row;
-	}
-
-	private static Map<String, Object> retainedTaskOwnerRow(IIdType patientId, PatientDeletionScope.RetainedTaskOwner owner) {
-		final Map<String, Object> row = new LinkedHashMap<>();
-		row.put("patient", patientId.getIdPart());
-		row.put("resourceType", "Task");
-		row.put("id", owner.taskId().getIdPart());
-		row.put("disposition", "tag-deleted-owner");
-		row.put("reason", "Task belongs to another patient. Add issue-type#deleted to meta.tag; preserve Task content, status, version and lastUpdated.");
-		return row;
-	}
-
-	private static Map<String, Object> row(IIdType patientId, IIdType resourceId, String disposition, String blockReason) {
-		final Map<String, Object> row = new LinkedHashMap<>();
-		row.put("patient", patientId.getIdPart());
-		row.put("resourceType", resourceId.getResourceType());
-		row.put("id", resourceId.getIdPart());
-		row.put("disposition", disposition);
-		if (blockReason != null) row.put("blockReason", blockReason);
-		return row;
-	}
-
-	/** One patient's lines for the details file, counted per disposition for the report. */
+	/**
+	 * One patient's resources counted per disposition, and the ones kept for review. Only a patient whose transaction
+	 * committed adds them to the report and the log, so a rolled-back erase is never reported as done. No list of what
+	 * was erased is kept anywhere: the destroy AuditEvent is the record of the erasure.
+	 */
 	private static final class Affected {
-		private final List<String> lines = new ArrayList<>();
 		private final Map<String, Integer> dispositions = new LinkedHashMap<>();
+		private final List<PatientDeletionScope.Blocker> kept = new ArrayList<>();
 
-		private void add(Map<String, Object> row) {
-			lines.add(JsonUtil.serialize(row, false));
-			dispositions.merge((String) row.get("disposition"), 1, Integer::sum);
+		private void add(String disposition, int count) {
+			if (count > 0) {
+				dispositions.merge(disposition, count, Integer::sum);
+			}
+		}
+
+		private void keep(List<PatientDeletionScope.Blocker> blockers) {
+			kept.addAll(blockers);
+			add("blocked", blockers.size());
 		}
 	}
 

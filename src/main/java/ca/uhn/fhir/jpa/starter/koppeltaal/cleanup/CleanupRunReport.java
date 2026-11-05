@@ -30,8 +30,6 @@ public class CleanupRunReport {
 	private final int patientsTotal;
 	/** Per-outcome counts; empty for runs that only report the fixed fields. */
 	private final Map<String, Integer> counts;
-	/** Where the full list of affected resources was written, if anywhere. */
-	private String detailsFile;
 
 	public CleanupRunReport(RunStatus status, Instant startedAt, Instant finishedAt, int patientsEvaluated,
 			int patientsEligible, int tasksCreated, int auditEventsCreated, List<String> errors, boolean dryRun) {
@@ -105,14 +103,6 @@ public class CleanupRunReport {
 
 	public Map<String, Integer> getCounts() {
 		return counts;
-	}
-
-	public String getDetailsFile() {
-		return detailsFile;
-	}
-
-	public void setDetailsFile(String detailsFile) {
-		this.detailsFile = detailsFile;
 	}
 
 	public int getPatientsTotal() {

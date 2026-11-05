@@ -12,6 +12,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
@@ -19,10 +23,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.util.DeleteFlowTaskUtil;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.SimpleBundleProvider;
 import ca.uhn.fhir.rest.server.exceptions.ResourceGoneException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -42,6 +43,7 @@ import org.hl7.fhir.r4.model.Meta;
 import org.hl7.fhir.r4.model.Period;
 import org.hl7.fhir.r4.model.Reference;
 import org.hl7.fhir.r4.model.Task;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,6 +54,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
@@ -85,6 +88,18 @@ class ErasureCleanupServiceTest {
 	@Mock private org.hibernate.Session session;
 
 	private ErasureCleanupService service;
+	private final ListAppender<ILoggingEvent> log = new ListAppender<>();
+
+	@BeforeEach
+	void captureLog() {
+		log.start();
+		serviceLogger().addAppender(log);
+	}
+
+	@AfterEach
+	void releaseLog() {
+		serviceLogger().detachAppender(log);
+	}
 
 	@BeforeEach
 	void setUp() {
@@ -187,7 +202,7 @@ class ErasureCleanupServiceTest {
 
 	/** Contradictory ownership stays behind for manual review; everything that is only this patient's goes. */
 	@Test
-	void aSharedResourceStaysBehindWhileThePatientIsErased() throws Exception {
+	void aSharedResourceStaysBehindWhileThePatientIsErased() {
 
 		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
 		blocked(new PatientDeletionScope.Blocker(new IdType("Task", "shared"), "References another patient as well."));
@@ -196,9 +211,6 @@ class ErasureCleanupServiceTest {
 
 		assertThat(outcomeOf(report)).isEqualTo("ERASED");
 		assertThat(report.getCounts()).containsEntry("RESOURCES", 2).containsEntry("BLOCKED_RESOURCES", 1);
-		final var exported = new ObjectMapper().readTree(Files.readAllLines(Path.of(report.getDetailsFile())).get(0));
-		assertThat(exported.path("disposition").asText()).isEqualTo("blocked");
-		assertThat(exported.path("blockReason").asText()).contains("another patient");
 		final var tag = ArgumentCaptor.forClass(Meta.class);
 		verify(taskDao).metaAddOperation(eq(new IdType("Task", "shared")), tag.capture(), any(RequestDetails.class));
 		assertThat(tag.getValue().getTag()).singleElement().satisfies(coding -> {
@@ -209,21 +221,20 @@ class ErasureCleanupServiceTest {
 	}
 
 	@Test
-	void anUnclassifiedInboundReferenceStaysBehindTagged() throws Exception {
+	void anUnclassifiedInboundReferenceStaysBehindTagged() {
 		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
 		blocked(new PatientDeletionScope.Blocker(new IdType("Group", "outside"),
 				"Outside the deletion scope: Group.member.entity references Patient/p1."));
 
 		final CleanupRunReport report = run();
 		assertThat(outcomeOf(report)).isEqualTo("ERASED");
-		final var exported = new ObjectMapper().readTree(Files.readAllLines(Path.of(report.getDetailsFile())).get(0));
-		assertThat(exported.path("blockReason").asText()).contains("Group.member.entity", "Patient/p1");
+		assertThat(report.getCounts()).containsEntry("BLOCKED_RESOURCES", 1);
 		verify(groupDao).metaAddOperation(eq(new IdType("Group", "outside")), any(Meta.class), any(RequestDetails.class));
 		verify(eraser).erase(List.of(new IdType("Task", "t1"), PATIENT), List.of(), List.of(new IdType("Group", "outside")));
 	}
 
 	@Test
-	void aDeletedBlockedResourceIsReportedButNotTagged() throws Exception {
+	void aDeletedBlockedResourceIsReportedButNotTagged() {
 		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
 		blocked(new PatientDeletionScope.Blocker(new IdType("Task", "gone"), "Version 1 names another patient."));
 		when(taskDao.read(eq(new IdType("Task", "gone")), any(RequestDetails.class))).thenThrow(new ResourceGoneException("gone"));
@@ -238,21 +249,13 @@ class ErasureCleanupServiceTest {
 
 	@ParameterizedTest
 	@ValueSource(booleans = { true, false })
-	void blockReasonsRemainValidSingleLineJsonInDryAndRealRuns(boolean dryRun) throws Exception {
+	void aBlockedResourceIsCountedInDryAndRealRuns(boolean dryRun) {
 		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
-		final String reason = "Reference path \"Task.owner\" blocks erasure.\nTarget: CareTeam/team-1.";
-		blocked(new PatientDeletionScope.Blocker(new IdType("Task", "outside"), reason));
+		blocked(new PatientDeletionScope.Blocker(new IdType("Task", "outside"), "Reference path Task.owner blocks erasure."));
 
 		final CleanupRunReport report = service.run(dryRun, Clock.fixed(NOW, ZoneOffset.UTC), r -> { });
-		final List<String> lines = Files.readAllLines(Path.of(report.getDetailsFile()));
 
-		assertThat(lines).hasSize(3);
-		final var exported = new ObjectMapper().readTree(lines.get(0));
-		assertThat(exported.path("patient").asText()).isEqualTo("p1");
-		assertThat(exported.path("resourceType").asText()).isEqualTo("Task");
-		assertThat(exported.path("id").asText()).isEqualTo("outside");
-		assertThat(exported.path("disposition").asText()).isEqualTo("blocked");
-		assertThat(exported.path("blockReason").asText()).isEqualTo(reason);
+		assertThat(report.getCounts()).containsEntry("RESOURCES", 2).containsEntry("BLOCKED_RESOURCES", 1);
 		if (dryRun) verify(eraser, never()).erase(any(), any(), any());
 	}
 
@@ -271,16 +274,13 @@ class ErasureCleanupServiceTest {
 	}
 
 	@Test
-	void aDryRunListsTheWorkAndWritesNothing() throws Exception {
+	void aDryRunCountsTheWorkAndWritesNothing() {
 
 		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
 
 		final CleanupRunReport report = service.run(true, Clock.fixed(NOW, ZoneOffset.UTC), r -> { });
 
 		assertThat(report.getCounts()).containsEntry("ERASED", 1).containsEntry("RESOURCES", 2);
-		for (String line : Files.readAllLines(Path.of(report.getDetailsFile()))) {
-			assertThat(new ObjectMapper().readTree(line).has("blockReason")).isFalse();
-		}
 		verify(eraser, never()).erase(any(), any(), any());
 		verify(taskDao, never()).update(any(Task.class), any(RequestDetails.class));
 		verify(auditEventDao, never()).create(any(AuditEvent.class), any(RequestDetails.class));
@@ -289,7 +289,7 @@ class ErasureCleanupServiceTest {
 
 	@ParameterizedTest
 	@ValueSource(booleans = { true, false })
-	void retainedCareTeamUpdatesAreExportedAndAppliedBeforeErasure(boolean dryRun) throws Exception {
+	void retainedCareTeamUpdatesAreCountedAndAppliedBeforeErasure(boolean dryRun) {
 		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
 		var team = new CareTeam().setSubject(new Reference("Patient/p2"));
 		team.setId("CareTeam/retained/_history/3");
@@ -303,11 +303,6 @@ class ErasureCleanupServiceTest {
 		var report = service.run(dryRun, Clock.fixed(NOW, ZoneOffset.UTC), r -> { });
 		assertThat(outcomeOf(report)).isEqualTo("ERASED");
 		assertThat(report.getCounts()).containsEntry("RESOURCES", 2).containsEntry("DETACHED", 1);
-		var lines = Files.readAllLines(Path.of(report.getDetailsFile()));
-		assertThat(lines).hasSize(3);
-		var detached = new ObjectMapper().readTree(lines.get(2));
-		assertThat(detached.path("disposition").asText()).isEqualTo("detach");
-		assertThat(detached.path("removedReferences").get(0).asText()).isEqualTo("Patient/p1");
 		if (dryRun) {
 			verify(careTeamDao, never()).update(any(CareTeam.class), any(RequestDetails.class));
 		} else {
@@ -333,7 +328,7 @@ class ErasureCleanupServiceTest {
 						new IdType("CareTeam/retained"), Set.of("Patient/p1"))), List.of(), List.of()));
 		var report = run();
 		assertThat(report.getErrors()).singleElement().asString().contains("participant indexes");
-		assertThat(report.getDetailsFile()).isNull();
+		assertThat(report.getCounts()).containsEntry("RESOURCES", 0).containsEntry("DETACHED", 0);
 		verify(taskDao, never()).update(any(Task.class), any(RequestDetails.class));
 		verify(eraser, never()).erase(any(), any(), any());
 		verify(transactionManager).rollback(any());
@@ -341,7 +336,7 @@ class ErasureCleanupServiceTest {
 
 	@ParameterizedTest
 	@ValueSource(booleans = { true, false })
-	void tagsTheRetainedTaskWithoutAContentUpdate(boolean dryRun) throws Exception {
+	void tagsTheRetainedTaskWithoutAContentUpdate(boolean dryRun) {
 		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
 		Task retained = new Task().setFor(new Reference("Patient/p2")).setOwner(new Reference("Patient/p1"))
 				.setStatus(Task.TaskStatus.READY).setIntent(Task.TaskIntent.ORDER);
@@ -357,9 +352,6 @@ class ErasureCleanupServiceTest {
 
 		assertThat(outcomeOf(report)).isEqualTo("ERASED");
 		assertThat(report.getCounts()).containsEntry("RESOURCES", 2).containsEntry("RETAINED", 1);
-		var lines = Files.readAllLines(Path.of(report.getDetailsFile()));
-		assertThat(lines).hasSize(3);
-		assertThat(new ObjectMapper().readTree(lines.get(2)).path("disposition").asText()).isEqualTo("tag-deleted-owner");
 		if (dryRun) {
 			verify(taskDao, never()).update(any(Task.class), any(RequestDetails.class));
 			verify(taskDao, never()).metaAddOperation(any(), any(Meta.class), any());
@@ -391,7 +383,6 @@ class ErasureCleanupServiceTest {
 
 		assertThat(report.getErrors()).hasSize(1);
 		assertThat(report.getCounts()).containsEntry("ERASED", 0).containsEntry("RESOURCES", 0);
-		assertThat(report.getDetailsFile()).isNull();
 		verify(transactionManager).rollback(any());
 	}
 
@@ -404,7 +395,78 @@ class ErasureCleanupServiceTest {
 
 		assertThat(report.getErrors()).hasSize(1);
 		assertThat(report.getCounts()).containsEntry("ERASED", 0).containsEntry("RESOURCES", 0);
-		assertThat(report.getDetailsFile()).isNull();
+	}
+
+	/** The tag makes a kept resource findable for its review; the log is the one place that says why it was kept. */
+	@Test
+	void aKeptResourceIsLoggedWithItsReasonOnceTheEraseCommitted() {
+		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
+		blocked(new PatientDeletionScope.Blocker(new IdType("Task", "shared"), "References another patient as well."));
+
+		run();
+
+		assertThat(warnings()).containsExactly(
+				"Kept Task/shared for manual review while erasing Patient/p1: References another patient as well.");
+	}
+
+	@Test
+	void aRolledBackEraseLogsNothingAsKept() {
+		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
+		blocked(new PatientDeletionScope.Blocker(new IdType("Task", "shared"), "References another patient as well."));
+		doThrow(new IllegalStateException("Commit failure")).when(transactionManager).commit(any());
+
+		run();
+
+		assertThat(warnings()).noneMatch(message -> message.contains("Task/shared"));
+	}
+
+	@Test
+	void aDryRunLogsWhatItWouldKeep() {
+		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
+		blocked(new PatientDeletionScope.Blocker(new IdType("Task", "shared"), "References another patient as well."));
+
+		service.run(true, Clock.fixed(NOW, ZoneOffset.UTC), r -> { });
+
+		assertThat(warnings()).containsExactly(
+				"Would keep Task/shared for manual review while erasing Patient/p1: References another patient as well.");
+	}
+
+	/** A reason can quote a reference from stored content verbatim; it must not start a log line of its own. */
+	@Test
+	void aBlockReasonCannotForgeALogLine() {
+		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
+		blocked(new PatientDeletionScope.Blocker(new IdType("Task", "shared"),
+				"Version 1 has patient ownership reference Patient/x\r\n2026-11-05 ERROR forged\u2028line, outside Patient/p1."));
+
+		run();
+
+		assertThat(warnings()).singleElement().asString()
+				.doesNotContain("\n", "\r", "\u2028")
+				.contains("Patient/x  2026-11-05 ERROR forged line, outside Patient/p1.");
+	}
+
+	/** The kept resource's history still holds the whole reference; the central log gets it without secrets. */
+	@Test
+	void aQuotedUrlLosesItsCredentialsAndQueryInTheLog() {
+		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
+		blocked(new PatientDeletionScope.Blocker(new IdType("Task", "shared"),
+				"Version 1 has patient ownership reference https://user:secret@external.example/fhir/Patient/x?_token=abc#part,"
+						+ " outside Patient/p1."));
+
+		run();
+
+		assertThat(warnings()).singleElement().asString()
+				.contains("reference https://external.example/fhir/Patient/x, outside Patient/p1.")
+				.doesNotContain("user", "secret", "_token", "#part");
+	}
+
+	private List<String> warnings() {
+		return log.list.stream().filter(event -> event.getLevel() == Level.WARN)
+				.map(ILoggingEvent::getFormattedMessage).toList();
+	}
+
+	private static Logger serviceLogger() {
+		return (Logger) LoggerFactory.getLogger(ErasureCleanupService.class);
 	}
 
 	private void blocked(PatientDeletionScope.Blocker blocker) {

@@ -41,9 +41,9 @@ public class NightlyCleanup {
 		try {
 			final CleanupRunReport report = cleanupRun.get();
 			LOG.info("Nightly {} run {}: {} of {} patients evaluated, {} eligible, {} Tasks created, outcomes {}, "
-							+ "{} errors, details {}", name, report.getStatus(), report.getPatientsEvaluated(),
+							+ "{} errors", name, report.getStatus(), report.getPatientsEvaluated(),
 					report.getPatientsTotal(), report.getPatientsEligible(), report.getTasksCreated(),
-					report.getCounts(), report.getErrors().size(), report.getDetailsFile());
+					report.getCounts(), report.getErrors().size());
 		} catch (RuntimeException e) {
 			LOG.error("Nightly {} run failed", name, e);
 		}
