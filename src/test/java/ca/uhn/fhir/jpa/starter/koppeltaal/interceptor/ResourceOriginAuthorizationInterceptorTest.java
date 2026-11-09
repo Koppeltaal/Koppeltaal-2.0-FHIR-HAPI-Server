@@ -777,17 +777,30 @@ class ResourceOriginAuthorizationInterceptorTest extends BaseResourceOriginTest 
   }
 
   @Test
-  public void shouldAllowTypeLevelHistoryWithReadPermission() {
-    // the response filter removes entries of other resource-origins
-    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.GET, ResourceType.Task, null, "rs", defaultDeviceRef.getValue());
-    requestDetails.setRestOperationType(RestOperationTypeEnum.HISTORY_TYPE);
+  public void shouldNotAllowTypeLevelHistory() {
+    // not supported within Koppeltaal, not even with an ALL read permission: the Bundle.total and the pages reveal the
+    // versions of other resource-origins
+    RequestDetails ownRequestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.GET, ResourceType.Task, null, "cruds", defaultDeviceRef.getValue());
+    ownRequestDetails.setRestOperationType(RestOperationTypeEnum.HISTORY_TYPE);
+    assertThrows(ForbiddenOperationException.class, () -> interceptor.authorizeRequest(ownRequestDetails));
 
-    interceptor.authorizeRequest(requestDetails);
+    RequestDetails allRequestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.GET, ResourceType.Task, null, "cruds");
+    allRequestDetails.setRestOperationType(RestOperationTypeEnum.HISTORY_TYPE);
+    assertThrows(ForbiddenOperationException.class, () -> interceptor.authorizeRequest(allRequestDetails));
   }
 
   @Test
-  public void shouldNotAllowTypeLevelHistoryWithoutReadPermission() {
-    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.GET, ResourceType.Task, null, "cud", defaultDeviceRef.getValue());
+  public void shouldNotAllowTypeLevelHistoryForTheDomainAdmin() {
+    requestedBy(DOMAIN_ADMIN_CLIENT_ID);
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.GET, ResourceType.Device, null, "cruds");
+    requestDetails.setRestOperationType(RestOperationTypeEnum.HISTORY_TYPE);
+
+    assertThrows(ForbiddenOperationException.class, () -> interceptor.authorizeRequest(requestDetails));
+  }
+
+  @Test
+  public void shouldNotAllowTypeLevelHistoryOfConformanceResources() {
+    RequestDetails requestDetails = getRequestDetailsAndConfigurePermission(RequestTypeEnum.GET, ResourceType.ValueSet, null, "rs");
     requestDetails.setRestOperationType(RestOperationTypeEnum.HISTORY_TYPE);
 
     assertThrows(ForbiddenOperationException.class, () -> interceptor.authorizeRequest(requestDetails));

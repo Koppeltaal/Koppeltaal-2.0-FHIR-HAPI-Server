@@ -31,8 +31,9 @@ import java.util.Set;
 
 /**
  * Removes the entries from search and history Bundles that the requester is not allowed to read based on the
- * resource-origin. The {@link ResourceOriginSearchNarrowingInterceptor} only narrows searches, type level history and
- * the pages of an earlier search do not apply search parameters. This filter is the safety net for those.
+ * resource-origin. The {@link ResourceOriginSearchNarrowingInterceptor} only narrows searches, history and the pages of
+ * an earlier search do not apply search parameters. This filter is the safety net for those. Type level history is
+ * denied by the {@link ResourceOriginAuthorizationInterceptor}, it is filtered here as a second line of defence.
  *
  * <p>Hooks into {@link Pointcut#SERVER_OUTGOING_RESPONSE} instead of {@link Pointcut#STORAGE_PRESHOW_RESOURCES}, as
  * other interceptors perform internal lookups (e.g. the Device of the requester) with the {@link RequestDetails} of

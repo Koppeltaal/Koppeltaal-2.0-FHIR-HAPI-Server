@@ -39,8 +39,8 @@ import java.util.Set;
  * {@link org.hl7.fhir.CompartmentDefinition} objects are not allowed.
  *
  * <p>Denies by default: only the interactions of TOP-KT-002a are allowed, see
- * {@link #isSupportedInteraction(RequestDetails)}. Everything else (system level history, search, transaction and
- * batch Bundles, PATCH, conditional create and the other operations) is denied, as these would bypass the
+ * {@link #isSupportedInteraction(RequestDetails)}. Everything else (system and type level history, system level search,
+ * transaction and batch Bundles, PATCH, conditional create and the other operations) is denied, as these would bypass the
  * resource-origin checks below. Allowed operations: type level <code>$validate</code>, the terminology operations on
  * ValueSet and CodeSystem, and the maintenance operations of the domain admin.</p>
  *
@@ -161,7 +161,8 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
 
   /**
    * Only type and instance level interactions are supported. System level interactions (capabilities and paging
-   * excluded) have no resource name and are never supported within Koppeltaal.
+   * excluded) have no resource name and are never supported within Koppeltaal. Type level history is not supported
+   * either, not even with an ALL permission: its Bundle.total and pages reveal the versions of other resource-origins.
    */
   static boolean isSupportedInteraction(RequestDetails requestDetails) {
     final RestOperationTypeEnum operationType = requestDetails.getRestOperationType();
@@ -174,7 +175,6 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
       case READ:
       case VREAD:
       case HISTORY_INSTANCE:
-      case HISTORY_TYPE:
       case SEARCH_TYPE:
       case CREATE:
       case UPDATE:
@@ -229,7 +229,6 @@ public class ResourceOriginAuthorizationInterceptor extends BaseAuthorizationInt
     // interaction here, and for the returned resources in the ResourceOriginResponseFilterInterceptor as well.
     switch (operationType) {
       case SEARCH_TYPE:
-      case HISTORY_TYPE:
         // read all, the resource-origin is enforced by the search narrowing and the response filter
         if (PermissionUtil.isConformanceResourceType(requestDetails.getResourceName())) {
           LOG.debug("Read all of conformance resource {} authorized", requestDetails.getResourceName());

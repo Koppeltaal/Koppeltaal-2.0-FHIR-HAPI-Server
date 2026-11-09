@@ -27,6 +27,7 @@ class CapabilityStatementInterceptorTest {
 
     CapabilityStatementRestResourceComponent patient = rest.addResource().setType("Patient");
     patient.addInteraction().setCode(TypeRestfulInteraction.READ);
+    patient.addInteraction().setCode(TypeRestfulInteraction.HISTORYINSTANCE);
     patient.addInteraction().setCode(TypeRestfulInteraction.HISTORYTYPE);
     patient.addInteraction().setCode(TypeRestfulInteraction.PATCH);
     patient.setConditionalCreate(true);
@@ -46,7 +47,7 @@ class CapabilityStatementInterceptorTest {
     assertTrue(rest.getInteraction().isEmpty(), "No system level interactions are supported");
     assertTrue(rest.getOperation().isEmpty(), "No system level operations are offered");
 
-    assertEquals(List.of(TypeRestfulInteraction.READ, TypeRestfulInteraction.HISTORYTYPE),
+    assertEquals(List.of(TypeRestfulInteraction.READ, TypeRestfulInteraction.HISTORYINSTANCE),
       patient.getInteraction().stream().map(ResourceInteractionComponent::getCode).collect(Collectors.toList()));
     assertFalse(patient.getConditionalCreate());
     assertEquals(List.of("validate"), operationNames(patient));

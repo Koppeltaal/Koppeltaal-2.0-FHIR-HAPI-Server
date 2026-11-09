@@ -81,7 +81,8 @@ public class CapabilityStatementInterceptor {
       for (CapabilityStatement.CapabilityStatementRestResourceComponent resource : resources) {
         // _include is supported, the response filter removes included resources of other resource-origins
         resource.setSearchRevInclude(Collections.emptyList());
-        resource.getInteraction().removeIf((interaction) -> interaction.getCode() == CapabilityStatement.TypeRestfulInteraction.PATCH);
+        resource.getInteraction().removeIf((interaction) -> interaction.getCode() == CapabilityStatement.TypeRestfulInteraction.PATCH
+          || interaction.getCode() == CapabilityStatement.TypeRestfulInteraction.HISTORYTYPE);
         resource.setConditionalCreate(false);
         resource.getOperation().removeIf((operation) -> !isOfferedOperation(resource.getType(), operation.getName()));
       }
