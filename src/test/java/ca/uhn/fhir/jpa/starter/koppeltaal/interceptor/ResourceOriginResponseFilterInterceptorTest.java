@@ -11,6 +11,7 @@ import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import org.hl7.fhir.instance.model.api.IIdType;
+import org.hl7.fhir.r4.model.AuditEvent;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Device;
 import org.hl7.fhir.r4.model.DomainResource;
@@ -49,6 +50,9 @@ class ResourceOriginResponseFilterInterceptorTest {
 
   private IFhirResourceDao<ValueSet> valueSetDao;
 
+  /** The Device of the requesting client, which the kt2-delete-flow marker judges. */
+  private Device caller;
+
   @BeforeEach
   @SuppressWarnings("unchecked")
   void init() {
@@ -58,8 +62,12 @@ class ResourceOriginResponseFilterInterceptorTest {
     DaoRegistry daoRegistry = mock(DaoRegistry.class);
     taskDao = mock(IFhirResourceDao.class);
     valueSetDao = mock(IFhirResourceDao.class);
+    IFhirResourceDao<Device> deviceDao = mock(IFhirResourceDao.class);
     when(daoRegistry.getResourceDao("Task")).thenReturn((IFhirResourceDao) taskDao);
     when(daoRegistry.getResourceDao("ValueSet")).thenReturn((IFhirResourceDao) valueSetDao);
+    when(daoRegistry.getResourceDao(Device.class)).thenReturn(deviceDao);
+    caller = device("client", null).setStatus(Device.FHIRDeviceStatus.ACTIVE);
+    when(deviceDao.read(any(IIdType.class), any(RequestDetails.class))).thenAnswer((call) -> caller);
 
     interceptor = new ResourceOriginResponseFilterInterceptor(daoRegistry, smartBackendServiceConfiguration);
   }
@@ -71,6 +79,36 @@ class ResourceOriginResponseFilterInterceptorTest {
     Task previousVersion = task(new IdType(versionedId).getIdPart(), resourceOrigin);
     when(taskDao.read(argThat((IIdType id) -> id != null && versionedId.equals(id.getValue())), any(RequestDetails.class), eq(true)))
       .thenReturn(previousVersion);
+  }
+
+  @Test
+  void theMarkerKeepsTheCallersOwnDeletePendingTaskWithoutTaskReadRight() {
+    Bundle bundle = bundle(Bundle.BundleType.SEARCHSET, deletePendingTask("own", "Device/client"),
+      deletePendingTask("other", "Device/other"), task("ordinary", "Device/1"));
+
+    filter(bundle, "system/Patient.rs");
+
+    assertEquals(List.of("Task/own"), ids(bundle));
+  }
+
+  @Test
+  void theMarkerKeepsEveryDeleteFlowAuditEventForAParticipant() {
+    Bundle bundle = bundle(Bundle.BundleType.SEARCHSET, deleteFlowAuditEvent("archive"));
+
+    filter(bundle, "system/Patient.rs");
+
+    assertEquals(List.of("AuditEvent/archive"), ids(bundle));
+  }
+
+  @Test
+  void theMarkerGrantsNothingToAnInactiveCaller() {
+    caller.setStatus(Device.FHIRDeviceStatus.INACTIVE);
+    Bundle bundle = bundle(Bundle.BundleType.SEARCHSET, deletePendingTask("own", "Device/client"),
+      deleteFlowAuditEvent("archive"));
+
+    filter(bundle, "system/Patient.rs");
+
+    assertEquals(List.of(), ids(bundle));
   }
 
   @Test
@@ -394,6 +432,20 @@ class ResourceOriginResponseFilterInterceptorTest {
 
   private static Device device(String id, String resourceOrigin) {
     return withResourceOrigin(new Device(), "Device/" + id, resourceOrigin);
+  }
+
+  /** As the Koppeltaalvoorziening announces it: its own Device as resource-origin, the application as owner. */
+  private static Task deletePendingTask(String id, String owner) {
+    Task task = task(id, "Device/server");
+    task.getMeta().addSecurity("http://vzvz.nl/fhir/CodeSystem/koppeltaal-security-label", "kt2-delete-flow", null);
+    task.setOwner(new Reference(owner));
+    return task;
+  }
+
+  private static AuditEvent deleteFlowAuditEvent(String id) {
+    AuditEvent event = withResourceOrigin(new AuditEvent(), "AuditEvent/" + id, "Device/server");
+    event.getMeta().addSecurity("http://vzvz.nl/fhir/CodeSystem/koppeltaal-security-label", "kt2-delete-flow", null);
+    return event;
   }
 
   private static <T extends DomainResource> T withVersion(T resource, String version) {
