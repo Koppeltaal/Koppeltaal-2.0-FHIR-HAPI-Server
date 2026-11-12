@@ -6,6 +6,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuditEventDto;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventBuilder;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.TraceHeaders;
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
@@ -67,9 +68,10 @@ public abstract class AbstractAuditEventInterceptor {
   }
 
   protected void setInteraction(ServletRequestDetails requestDetails, AuditEventDto dto) {
-    dto.setRequestId(requestDetails.getRequestId());
-    dto.setTraceId(requestDetails.getTransactionGuid());
-    dto.setCorrelationId((String) requestDetails.getUserData().get("correlationId"));
+    final TraceHeaders trace = TraceHeaders.fromRequest(requestDetails);
+    dto.setRequestId(trace.requestId());
+    dto.setTraceId(trace.traceId());
+    dto.setCorrelationId(trace.correlationId());
   }
 
   protected boolean setRequestType(ServletRequestDetails requestDetails, AuditEventDto dto) {

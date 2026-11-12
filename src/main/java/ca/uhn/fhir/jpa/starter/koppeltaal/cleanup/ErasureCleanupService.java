@@ -3,6 +3,7 @@ package ca.uhn.fhir.jpa.starter.koppeltaal.cleanup;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.searchparam.SearchParameterMap;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.DeleteFlowTaskUtil;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.TraceHeaders;
 import ca.uhn.fhir.rest.api.server.SystemRequestDetails;
 import ca.uhn.fhir.rest.param.ReferenceParam;
 import ca.uhn.fhir.rest.param.TokenParam;
@@ -129,7 +130,9 @@ public class ErasureCleanupService implements CleanupService {
 		final Map<String, Integer> dispositions = new LinkedHashMap<>();
 
 		final List<String> patients = inventory.patientsWithARunningCycle();
-		LOG.info("Erasure run starting (dryRun={}, patients with a running cycle={})", dryRun, patients.size());
+		final TraceHeaders trace = TraceHeaders.newTrace();
+		LOG.info("Erasure run starting (dryRun={}, patients with a running cycle={}, traceId={})", dryRun,
+				patients.size(), trace.traceId());
 		progressListener.accept(report(CleanupRunReport.RunStatus.RUNNING, startedAt, null, 0,
 				patients.size(), outcomes, dispositions, errors, dryRun));
 
@@ -137,7 +140,7 @@ public class ErasureCleanupService implements CleanupService {
 		for (String patientIdPart : patients) {
 			try {
 				final Affected patientResources = new Affected();
-				final Outcome outcome = handle(patientIdPart, dryRun, clock, patientResources);
+				final Outcome outcome = handle(patientIdPart, dryRun, clock, patientResources, trace);
 				patientResources.dispositions.forEach((disposition, count) -> dispositions.merge(disposition, count, Integer::sum));
 				// The tag makes a kept resource findable; only this log says why it was kept.
 				patientResources.kept.forEach(blocker -> LOG.warn("{} {} for manual review while erasing Patient/{}: {}",
@@ -159,11 +162,11 @@ public class ErasureCleanupService implements CleanupService {
 				evaluated, patients.size(), outcomes, dispositions, errors, dryRun);
 	}
 
-	private Outcome handle(String patientIdPart, boolean dryRun, Clock clock, Affected affected) {
+	private Outcome handle(String patientIdPart, boolean dryRun, Clock clock, Affected affected, TraceHeaders trace) {
 
 		if (dryRun) {
 			final List<Task> cycle = cycleFor(patientIdPart);
-			return cycle.isEmpty() ? Outcome.WAITING : decide(patientIdPart, cycle, true, clock, affected);
+			return cycle.isEmpty() ? Outcome.WAITING : decide(patientIdPart, cycle, true, clock, affected, trace);
 		}
 
 		// OPG-011: the lock keeps the window between the auth check and the erase
@@ -182,12 +185,12 @@ public class ErasureCleanupService implements CleanupService {
 			});
 			aggregateLock.lockPatient(patientIdPart);
 			final List<Task> current = cycleFor(patientIdPart);
-			return current.isEmpty() ? Outcome.WAITING : decide(patientIdPart, current, false, clock, affected);
+			return current.isEmpty() ? Outcome.WAITING : decide(patientIdPart, current, false, clock, affected, trace);
 		});
 	}
 
 	private Outcome decide(String patientIdPart, List<Task> cycle, boolean dryRun, Clock clock,
-			Affected affected) {
+			Affected affected, TraceHeaders trace) {
 
 		final IIdType patientId = new IdType("Patient", patientIdPart);
 		final boolean held = cycle.stream().anyMatch(task -> task.getStatus() == Task.TaskStatus.ONHOLD);
@@ -195,7 +198,7 @@ public class ErasureCleanupService implements CleanupService {
 		final boolean deadlinePassed = clock.instant().isAfter(graceDeadline(cycle));
 
 		if (held) {
-			return deadlinePassed ? graceReset(patientId, cycle, dryRun, clock) : Outcome.WAITING;
+			return deadlinePassed ? graceReset(patientId, cycle, dryRun, clock, trace) : Outcome.WAITING;
 		}
 
 		if (!deadlinePassed && !allAccepted) {
@@ -203,17 +206,17 @@ public class ErasureCleanupService implements CleanupService {
 		}
 
 		if (eligibilityService.hasRenewedEngagement(patientId, clock.instant())) {
-			return abort(patientId, cycle, dryRun);
+			return abort(patientId, cycle, dryRun, trace);
 		}
 
-		return erase(patientId, cycle, dryRun, affected);
+		return erase(patientId, cycle, dryRun, affected, trace);
 	}
 
 	/**
 	 * OPG-010: a hold that outlives the deadline wipes every hold and restarts the grace period. Only the holds are
 	 * wiped: an application that accepted is not asked again. The new deadline goes on every Task of the cycle.
 	 */
-	private Outcome graceReset(IIdType patientId, List<Task> cycle, boolean dryRun, Clock clock) {
+	private Outcome graceReset(IIdType patientId, List<Task> cycle, boolean dryRun, Clock clock, TraceHeaders trace) {
 
 		if (!dryRun) {
 			final Date deadline = Date.from(clock.instant().plus(properties.getGraceDays(), ChronoUnit.DAYS));
@@ -224,31 +227,31 @@ public class ErasureCleanupService implements CleanupService {
 					reset.setStatusReason(null); // OPG-009
 				}
 				reset.setRestriction(new Task.TaskRestrictionComponent().setPeriod(new Period().setEnd(deadline)));
-				store(reset);
+				store(reset, trace);
 			}
-			record(DeleteFlowLifecycleEvent.GRACE_RESET, patientId);
+			record(DeleteFlowLifecycleEvent.GRACE_RESET, patientId, trace);
 		}
 		LOG.info("Grace period restarted for {}; every hold was wiped", patientId);
 		return Outcome.GRACE_RESET;
 	}
 
 	/** OPG-011: renewed engagement stops the deletion and the retention clock restarts. */
-	private Outcome abort(IIdType patientId, List<Task> cycle, boolean dryRun) {
+	private Outcome abort(IIdType patientId, List<Task> cycle, boolean dryRun, TraceHeaders trace) {
 
 		if (!dryRun) {
 			for (Task task : cycle) {
 				final Task cancelled = task.copy();
 				cancelled.setStatus(Task.TaskStatus.CANCELLED);
 				cancelled.setStatusReason(null);
-				store(cancelled);
+				store(cancelled, trace);
 			}
-			record(DeleteFlowLifecycleEvent.REACTIVATED, patientId);
+			record(DeleteFlowLifecycleEvent.REACTIVATED, patientId, trace);
 		}
 		LOG.info("Deletion aborted for {}: the patient is engaged again", patientId);
 		return Outcome.ABORTED;
 	}
 
-	private Outcome erase(IIdType patientId, List<Task> cycle, boolean dryRun, Affected affected) {
+	private Outcome erase(IIdType patientId, List<Task> cycle, boolean dryRun, Affected affected, TraceHeaders trace) {
 
 		final PatientDeletionScope.Plan plan = deletionScope.planFor(patientId);
 		final List<IIdType> resources = plan.resources();
@@ -270,15 +273,15 @@ public class ErasureCleanupService implements CleanupService {
 					CareTeamParticipantRemover.remove(careTeamDao.read(removal.careTeamId(), new SystemRequestDetails()),
 							removal.references())).toList();
 			for (CareTeam retainedTeam : retainedTeams) {
-				careTeamDao.update(retainedTeam, new ErasureRequestDetails());
+				careTeamDao.update(retainedTeam, trace.applyTraceIdTo(new ErasureRequestDetails()));
 			}
 			for (TaskOwnerTagging.TagAddition update : retainedTasks) {
-				taskDao.metaAddOperation(update.taskId(), update.meta(), new SystemRequestDetails());
+				taskDao.metaAddOperation(update.taskId(), update.meta(), trace.applyTraceIdTo(new SystemRequestDetails()));
 			}
 			// The same tag as a retained Task, so a blocked resource can be found for its review.
 			for (IIdType resource : reviewTags) {
-				daoRegistry.getResourceDao(resource.getResourceType())
-						.metaAddOperation(resource, TaskOwnerTagging.deletedReferenceTag(), new SystemRequestDetails());
+				daoRegistry.getResourceDao(resource.getResourceType()).metaAddOperation(resource,
+						TaskOwnerTagging.deletedReferenceTag(), trace.applyTraceIdTo(new SystemRequestDetails()));
 			}
 			// All of it commits together or none of it does. Completing the Tasks
 			// outside the erase would strand the cycle: a later failure leaves them
@@ -289,10 +292,10 @@ public class ErasureCleanupService implements CleanupService {
 			for (Task task : cycle) {
 				final Task completed = task.copy();
 				completed.setStatus(Task.TaskStatus.COMPLETED);
-				store(completed);
+				store(completed, trace);
 			}
 			eraser.erase(resources, plan.retainedTaskOwners(), blocked);
-			record(DeleteFlowLifecycleEvent.DESTROYED, patientId);
+			record(DeleteFlowLifecycleEvent.DESTROYED, patientId, trace);
 		}
 		LOG.info("{} {} resources for {}", dryRun ? "Would remove" : "Removed", resources.size(), patientId);
 		return Outcome.ERASED;
@@ -386,14 +389,14 @@ public class ErasureCleanupService implements CleanupService {
 				|| task.getStatus() == Task.TaskStatus.ACCEPTED;
 	}
 
-	private void store(Task task) {
-		daoRegistry.getResourceDao(Task.class).update(task, new SystemRequestDetails());
+	private void store(Task task, TraceHeaders trace) {
+		daoRegistry.getResourceDao(Task.class).update(task, trace.applyTraceIdTo(new SystemRequestDetails()));
 	}
 
-	private void record(DeleteFlowLifecycleEvent lifecycleEvent, IIdType patientId) {
+	private void record(DeleteFlowLifecycleEvent lifecycleEvent, IIdType patientId, TraceHeaders trace) {
 		final AuditEvent event = announcementFactory.buildLifecycleEvent(lifecycleEvent, patientId,
-				participatingApps.serverDeviceId(), site);
-		daoRegistry.getResourceDao(AuditEvent.class).create(event, new SystemRequestDetails());
+				participatingApps.serverDeviceId(), site, trace);
+		daoRegistry.getResourceDao(AuditEvent.class).create(event, trace.applyTraceIdTo(new SystemRequestDetails()));
 	}
 
 	private CleanupRunReport report(CleanupRunReport.RunStatus status, Instant startedAt, Instant finishedAt,

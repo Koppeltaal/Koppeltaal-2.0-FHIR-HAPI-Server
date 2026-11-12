@@ -1,6 +1,10 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.cleanup;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -20,6 +24,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import org.hl7.fhir.r4.model.AuditEvent;
 import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.Extension;
 import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.Patient;
 import org.hl7.fhir.r4.model.Reference;
@@ -36,6 +41,10 @@ import org.mockito.quality.Strictness;
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class AnnouncementCleanupServiceTest {
+
+	/** A trace the server started itself: its own prefix and a UUIDv4. */
+	private static final String SERVER_TRACE =
+			"server-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 
 	@Mock private DaoRegistry daoRegistry;
 	@Mock private IFhirResourceDao<Patient> patientDao;
@@ -65,6 +74,52 @@ class AnnouncementCleanupServiceTest {
 				Clock.fixed(Instant.parse("2026-08-21T12:00:00Z"), ZoneOffset.UTC));
 		service = new AnnouncementCleanupService(daoRegistry, participatingApps, eligibilityService,
 				factory, "Koppeltaal domein VZVZ");
+	}
+
+	/** TOP-KT-011: a batch starts a trace of its own, and the notifications about its Tasks send it on. */
+	@Test
+	void aRunWritesEveryPatientUnderOneTraceOfItsOwn() {
+		service.run(false, r -> {});
+
+		List<String> traces = transactionTraces();
+		assertEquals(2, traces.size());
+		assertNotNull(traces.get(0));
+		assertTrue(traces.get(0).matches(SERVER_TRACE), traces.get(0));
+		assertEquals(traces.get(0), traces.get(1));
+	}
+
+	@Test
+	void everyRunStartsATraceOfItsOwn() {
+		service.run(false, r -> {});
+		service.run(false, r -> {});
+
+		List<String> traces = transactionTraces();
+		assertEquals(4, traces.size());
+		assertNotNull(traces.get(0));
+		assertNotEquals(traces.get(0), traces.get(2));
+	}
+
+	/** No request caused the announcement, so there is no request id and nothing to correlate with. */
+	@Test
+	void theArchiveEventRecordsTheTraceOfItsRun() {
+		service.run(false, r -> {});
+
+		AuditEvent archive = (AuditEvent) capturedBundles().get(0).getEntry().stream()
+				.map(Bundle.BundleEntryComponent::getResource)
+				.filter(AuditEvent.class::isInstance)
+				.findFirst().orElseThrow();
+		Extension trace = archive.getExtensionByUrl("http://koppeltaal.nl/fhir/StructureDefinition/trace-id");
+		assertNotNull(trace);
+		assertEquals(transactionTraces().get(0), assertInstanceOf(IdType.class, trace.getValue()).getValue());
+		assertNull(archive.getExtensionByUrl("http://koppeltaal.nl/fhir/StructureDefinition/request-id"));
+		assertNull(archive.getExtensionByUrl("http://koppeltaal.nl/fhir/StructureDefinition/correlation-id"));
+	}
+
+	@SuppressWarnings("unchecked")
+	private List<String> transactionTraces() {
+		ArgumentCaptor<RequestDetails> captor = ArgumentCaptor.forClass(RequestDetails.class);
+		verify(systemDao, org.mockito.Mockito.atLeast(0)).transaction(captor.capture(), any());
+		return captor.getAllValues().stream().map(RequestDetails::getTransactionGuid).toList();
 	}
 
 	@SuppressWarnings("unchecked")

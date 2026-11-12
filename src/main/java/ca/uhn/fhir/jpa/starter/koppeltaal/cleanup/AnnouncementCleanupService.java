@@ -18,6 +18,7 @@ import org.hl7.fhir.r4.model.Task;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.DeleteFlowTaskUtil;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.TraceHeaders;
 
 /**
  * The announcement run: evaluates every patient, and for each eligible one
@@ -50,7 +51,9 @@ public class AnnouncementCleanupService implements CleanupService {
 		Instant startedAt = Instant.now();
 		List<IIdType> apps = participatingApps.participatingDeviceIds();
 		IIdType serverDevice = participatingApps.serverDeviceId();
-		LOG.info("Cleanup announcement run starting (dryRun={}, participating apps={})", dryRun, apps.size());
+		TraceHeaders trace = TraceHeaders.newTrace();
+		LOG.info("Cleanup announcement run starting (dryRun={}, participating apps={}, traceId={})", dryRun,
+				apps.size(), trace.traceId());
 
 		int evaluated = 0;
 		int eligible = 0;
@@ -97,10 +100,10 @@ public class AnnouncementCleanupService implements CleanupService {
 					}
 					if (firstAnnouncement) {
 						bundle.addEntry()
-								.setResource(announcementFactory.buildArchiveEvent(patientId, serverDevice, site))
+								.setResource(announcementFactory.buildArchiveEvent(patientId, serverDevice, site, trace))
 								.getRequest().setMethod(Bundle.HTTPVerb.POST).setUrl("AuditEvent");
 					}
-					daoRegistry.getSystemDao().transaction(new SystemRequestDetails(), bundle);
+					daoRegistry.getSystemDao().transaction(trace.applyTraceIdTo(new SystemRequestDetails()), bundle);
 				}
 				tasksCreated += missingApps.size();
 				if (firstAnnouncement) {

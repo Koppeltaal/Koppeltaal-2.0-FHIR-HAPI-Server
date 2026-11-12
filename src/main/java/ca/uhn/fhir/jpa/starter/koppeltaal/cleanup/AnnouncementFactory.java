@@ -2,14 +2,17 @@ package ca.uhn.fhir.jpa.starter.koppeltaal.cleanup;
 
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.DeleteFlowTaskUtil;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.TraceHeaders;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.AuditEvent;
 import org.hl7.fhir.r4.model.CodeableConcept;
 import org.hl7.fhir.r4.model.Coding;
+import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.Period;
 import org.hl7.fhir.r4.model.Reference;
 import org.hl7.fhir.r4.model.Task;
@@ -28,6 +31,9 @@ public class AnnouncementFactory {
 
 	static final String AUDIT_PROFILE = "http://koppeltaal.nl/fhir/StructureDefinition/KT2AuditEvent";
 	static final String DCM_SYSTEM = "http://dicom.nema.org/resources/ontology/DCM";
+	static final String TRACE_ID = "http://koppeltaal.nl/fhir/StructureDefinition/trace-id";
+	static final String REQUEST_ID = "http://koppeltaal.nl/fhir/StructureDefinition/request-id";
+	static final String CORRELATION_ID = "http://koppeltaal.nl/fhir/StructureDefinition/correlation-id";
 
 	private final CleanupProperties properties;
 	private final Clock clock;
@@ -56,21 +62,25 @@ public class AnnouncementFactory {
 		return task;
 	}
 
-	public AuditEvent buildArchiveEvent(IIdType patientId, IIdType serverDeviceId, String site) {
-		return buildLifecycleEvent(DeleteFlowLifecycleEvent.ANNOUNCED, patientId, serverDeviceId, site);
+	public AuditEvent buildArchiveEvent(IIdType patientId, IIdType serverDeviceId, String site, TraceHeaders trace) {
+		return buildLifecycleEvent(DeleteFlowLifecycleEvent.ANNOUNCED, patientId, serverDeviceId, site, trace);
 	}
 
 	/**
 	 * The aggregated cleanup lifecycle event for one patient. It carries the
 	 * patient, never the Task: the audit trail records the state of the process,
-	 * not the individual application's status write.
+	 * not the individual application's status write. The trace headers are those
+	 * of what caused the event: the application's request, or the cleanup run.
 	 */
 	public AuditEvent buildLifecycleEvent(DeleteFlowLifecycleEvent lifecycleEvent, IIdType patientId,
-			IIdType serverDeviceId, String site) {
+			IIdType serverDeviceId, String site, TraceHeaders trace) {
 		AuditEvent event = new AuditEvent();
 		event.getMeta().addProfile(AUDIT_PROFILE);
 		event.getMeta().addSecurity(deleteFlowLabel());
 		event.addExtension(ResourceOriginUtil.RESOURCE_ORIGIN_SYSTEM, typedReference("Device", serverDeviceId));
+		addId(event, TRACE_ID, trace.traceId());
+		addId(event, REQUEST_ID, trace.requestId());
+		addId(event, CORRELATION_ID, trace.correlationId());
 		event.setType(new Coding(DeleteFlowLifecycleEvent.LIFECYCLE_SYSTEM, lifecycleEvent.getCode(),
 				lifecycleEvent.getDisplay()));
 		event.setAction(lifecycleEvent.getAction());
@@ -88,6 +98,12 @@ public class AnnouncementFactory {
 				.setType(new Coding("http://hl7.org/fhir/resource-types", "Patient", "Patient"))
 				.setRole(new Coding("http://terminology.hl7.org/CodeSystem/object-role", "1", "Patient"));
 		return event;
+	}
+
+	private static void addId(AuditEvent event, String url, String value) {
+		if (StringUtils.isNotBlank(value)) {
+			event.addExtension(url, new IdType(value));
+		}
 	}
 
 	private static Coding deleteFlowLabel() {

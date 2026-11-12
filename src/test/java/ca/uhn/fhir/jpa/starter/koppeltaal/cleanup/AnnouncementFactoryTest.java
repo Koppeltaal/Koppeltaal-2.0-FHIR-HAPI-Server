@@ -1,9 +1,12 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.cleanup;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.TraceHeaders;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -20,6 +23,7 @@ import org.junit.jupiter.api.Test;
 class AnnouncementFactoryTest {
 
 	private static final Instant NOW = Instant.parse("2026-08-21T12:00:00Z");
+	private static final TraceHeaders NO_TRACE = new TraceHeaders(null, null, null);
 
 	private AnnouncementFactory factory;
 
@@ -54,7 +58,7 @@ class AnnouncementFactoryTest {
 	@Test
 	void archiveEventMatchesExampleContract() {
 		AuditEvent event = factory.buildArchiveEvent(new IdType("Patient", "p1"),
-				new IdType("Device", "server-dev"), "Koppeltaal domein VZVZ");
+				new IdType("Device", "server-dev"), "Koppeltaal domein VZVZ", NO_TRACE);
 
 		assertEquals("http://koppeltaal.nl/fhir/StructureDefinition/KT2AuditEvent",
 				event.getMeta().getProfile().get(0).getValue());
@@ -87,11 +91,41 @@ class AnnouncementFactoryTest {
 	@Test
 	void lifecycleEventNamesTheServerDeviceAsResourceOrigin() {
 		AuditEvent event = factory.buildLifecycleEvent(DeleteFlowLifecycleEvent.BLOCKED, new IdType("Patient", "p1"),
-				new IdType("Device", "server-dev"), "Koppeltaal domein VZVZ");
+				new IdType("Device", "server-dev"), "Koppeltaal domein VZVZ", NO_TRACE);
 
 		Reference origin = resourceOrigin(event);
 		assertEquals("Device/server-dev", origin.getReference());
 		assertEquals("Device", origin.getType());
+	}
+
+	@Test
+	void lifecycleEventCarriesTheTraceHeadersOfWhatCausedIt() {
+		AuditEvent event = factory.buildLifecycleEvent(DeleteFlowLifecycleEvent.BLOCKED, new IdType("Patient", "p1"),
+				new IdType("Device", "server-dev"), "Koppeltaal domein VZVZ",
+				new TraceHeaders("trace-1", "request-1", "client-request-1"));
+
+		assertEquals("trace-1", idExtension(event, "http://koppeltaal.nl/fhir/StructureDefinition/trace-id"));
+		assertEquals("request-1", idExtension(event, "http://koppeltaal.nl/fhir/StructureDefinition/request-id"));
+		assertEquals("client-request-1",
+				idExtension(event, "http://koppeltaal.nl/fhir/StructureDefinition/correlation-id"));
+	}
+
+	/** A run the server starts itself has a trace, but no request and nothing to correlate with. */
+	@Test
+	void anAbsentTraceHeaderIsLeftOut() {
+		AuditEvent event = factory.buildLifecycleEvent(DeleteFlowLifecycleEvent.DESTROYED, new IdType("Patient", "p1"),
+				new IdType("Device", "server-dev"), "Koppeltaal domein VZVZ", new TraceHeaders("trace-1", null, ""));
+
+		assertEquals("trace-1", idExtension(event, "http://koppeltaal.nl/fhir/StructureDefinition/trace-id"));
+		assertNull(event.getExtensionByUrl("http://koppeltaal.nl/fhir/StructureDefinition/request-id"));
+		assertNull(event.getExtensionByUrl("http://koppeltaal.nl/fhir/StructureDefinition/correlation-id"));
+	}
+
+	/** KT2AuditEvent's trace header extensions take an id, nothing else. */
+	private static String idExtension(AuditEvent event, String url) {
+		Extension extension = event.getExtensionByUrl(url);
+		assertNotNull(extension, url);
+		return assertInstanceOf(IdType.class, extension.getValue()).getValue();
 	}
 
 	private static Reference resourceOrigin(DomainResource resource) {

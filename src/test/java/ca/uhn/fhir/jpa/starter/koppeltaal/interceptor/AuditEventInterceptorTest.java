@@ -7,6 +7,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.RequestIdHolder;
 import ca.uhn.fhir.rest.api.RequestTypeEnum;
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
+import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceVersionConflictException;
 import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 import com.auth0.jwt.JWT;
@@ -16,12 +17,17 @@ import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -64,11 +70,57 @@ class AuditEventInterceptorTest {
     assertTrue(auditedDiagnostics().contains("Task/99"));
   }
 
-  private String auditedDiagnostics() {
+  /**
+   * No entry hook has to run first: a request refused before the post-processed hooks finish, as one with malformed
+   * JSON is, still carries the request id the server assigned and the client's own.
+   */
+  @Test
+  void anAuditEventCarriesTheClientsRequestIdAsCorrelationId() {
+    ServletRequestDetails request = deleteRequest("system/*.cruds");
+    request.setRequestId("server-request-1");
+    ((MockHttpServletRequest) request.getServletRequest()).addHeader("X-Request-ID", "client-request-1");
+
+    interceptor.preOutgoingException(request, new InvalidRequestException("Invalid JSON syntax"));
+
+    assertEquals("client-request-1", auditedDto().getCorrelationId());
+  }
+
+  /** The correlation-id extension holds a FHIR id: letters, digits, '-' and '.', at most 64 of them. */
+  @ParameterizedTest
+  @MethodSource("clientRequestIdsThatAreNoFhirId")
+  void aClientRequestIdThatIsNoFhirIdStaysOutOfTheAuditEvent(String clientRequestId) {
+    ServletRequestDetails request = deleteRequest("system/*.cruds");
+    ((MockHttpServletRequest) request.getServletRequest()).addHeader("X-Request-ID", clientRequestId);
+
+    request.setRequestId("server-request-1");
+    interceptor.preOutgoingException(request, new ResourceVersionConflictException(CONFLICT));
+
+    assertNull(auditedDto().getCorrelationId());
+  }
+
+  @Test
+  void aRequestIdTheServerKeptIsNoCorrelationId() {
+    ServletRequestDetails request = deleteRequest("system/*.cruds");
+    ((MockHttpServletRequest) request.getServletRequest()).addHeader("X-Request-ID", "server-request-1");
+
+    request.setRequestId("server-request-1");
+    interceptor.preOutgoingException(request, new ResourceVersionConflictException(CONFLICT));
+
+    assertNull(auditedDto().getCorrelationId());
+  }
+
+  static Stream<String> clientRequestIdsThatAreNoFhirId() {
+    return Stream.of("client_request_1", "client request 1", "a".repeat(65));
+  }
+
+  private AuditEventDto auditedDto() {
     ArgumentCaptor<AuditEventDto> dto = ArgumentCaptor.forClass(AuditEventDto.class);
     verify(auditEventService).submitAuditEvent(dto.capture(), any());
+    return dto.getValue();
+  }
 
-    return dto.getValue().getOperationOutcome().getIssue().stream()
+  private String auditedDiagnostics() {
+    return auditedDto().getOperationOutcome().getIssue().stream()
       .map(OperationOutcome.OperationOutcomeIssueComponent::getDiagnostics)
       .collect(Collectors.joining(" "));
   }
