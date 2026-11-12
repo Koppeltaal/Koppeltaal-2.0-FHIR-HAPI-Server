@@ -1,6 +1,8 @@
 package ca.uhn.fhir.jpa.starter.koppeltaal.interceptor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
@@ -20,9 +22,13 @@ import ca.uhn.fhir.rest.api.server.SystemRequestDetails;
 import ca.uhn.fhir.rest.param.ReferenceParam;
 import ca.uhn.fhir.rest.param.TokenParam;
 import ca.uhn.fhir.rest.server.SimpleBundleProvider;
+import ca.uhn.fhir.rest.server.servlet.ServletRequestDetails;
 
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -33,6 +39,7 @@ import java.util.List;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.AuditEvent;
 import org.hl7.fhir.r4.model.Coding;
+import org.hl7.fhir.r4.model.Extension;
 import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.Task;
 import org.junit.jupiter.api.BeforeEach;
@@ -315,6 +322,75 @@ class DeleteFlowLifecycleAuditInterceptorTest {
         ArgumentCaptor<TransactionDefinition> captor = ArgumentCaptor.forClass(TransactionDefinition.class);
         verify(transactionManager).getTransaction(captor.capture());
         assertEquals(TransactionDefinition.PROPAGATION_REQUIRES_NEW, captor.getValue().getPropagationBehavior());
+    }
+
+    @Test
+    void theHoldCarriesTheTraceHeadersOfTheApplicationsRequest() {
+        withSiblings(deleteFlowTask("task-2", Task.TaskStatus.REQUESTED));
+
+        holdBy(applicationRequest());
+
+        AuditEvent event = capturedEvent();
+        assertEquals("trace-1", idExtension(event, "http://koppeltaal.nl/fhir/StructureDefinition/trace-id"));
+        assertEquals("request-1", idExtension(event, "http://koppeltaal.nl/fhir/StructureDefinition/request-id"));
+        assertEquals("client-request-1",
+                idExtension(event, "http://koppeltaal.nl/fhir/StructureDefinition/correlation-id"));
+    }
+
+    /** In production the PUT runs in a transaction, so the event is written once it commits. */
+    @Test
+    void theHoldWrittenOnceThePutCommitsCarriesTheTraceHeadersOfThatPut() {
+        withSiblings(deleteFlowTask("task-2", Task.TaskStatus.REQUESTED));
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            holdBy(applicationRequest());
+            assertNoEventRecorded();
+
+            TransactionSynchronizationManager.getSynchronizations().forEach(TransactionSynchronization::afterCommit);
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+
+        AuditEvent event = capturedEvent();
+        assertEquals("trace-1", idExtension(event, "http://koppeltaal.nl/fhir/StructureDefinition/trace-id"));
+        assertEquals("request-1", idExtension(event, "http://koppeltaal.nl/fhir/StructureDefinition/request-id"));
+        assertEquals("client-request-1",
+                idExtension(event, "http://koppeltaal.nl/fhir/StructureDefinition/correlation-id"));
+    }
+
+    /** A notification about the event sends the trace on, like one about the Task. */
+    @Test
+    void theHoldIsWrittenUnderTheTraceOfTheApplicationsRequest() {
+        withSiblings(deleteFlowTask("task-2", Task.TaskStatus.REQUESTED));
+
+        holdBy(applicationRequest());
+
+        ArgumentCaptor<RequestDetails> write = ArgumentCaptor.forClass(RequestDetails.class);
+        verify(auditEventDao).create(any(AuditEvent.class), write.capture());
+        assertEquals("trace-1", write.getValue().getTransactionGuid());
+    }
+
+    /** An application's PUT as it reaches storage, with the trace and request id the server assigned on entry. */
+    private static ServletRequestDetails applicationRequest() {
+        MockHttpServletRequest put = new MockHttpServletRequest("PUT", "/fhir/DEFAULT/Task/" + UPDATED_TASK_ID);
+        put.addHeader("X-Request-ID", "client-request-1");
+        ServletRequestDetails request = new ServletRequestDetails();
+        request.setServletRequest(put);
+        request.setTransactionGuid("trace-1");
+        request.setRequestId("request-1");
+        return request;
+    }
+
+    private void holdBy(RequestDetails request) {
+        lastUpdatedTask = deleteFlowTask(UPDATED_TASK_ID, Task.TaskStatus.ONHOLD);
+        interceptor.resourceUpdated(deleteFlowTask(UPDATED_TASK_ID, Task.TaskStatus.REQUESTED), lastUpdatedTask,
+                request);
+    }
+
+    private static String idExtension(AuditEvent event, String url) {
+        Extension extension = event.getExtensionByUrl(url);
+        assertNotNull(extension, url);
+        return assertInstanceOf(IdType.class, extension.getValue()).getValue();
     }
 
     @Test

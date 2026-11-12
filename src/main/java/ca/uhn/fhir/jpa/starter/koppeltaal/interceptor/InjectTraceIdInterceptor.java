@@ -4,6 +4,7 @@ import ca.uhn.fhir.interceptor.api.Hook;
 import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.RequestIdHolder;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.TraceHeaders;
 import ca.uhn.fhir.jpa.subscription.model.CanonicalSubscription;
 import ca.uhn.fhir.jpa.subscription.model.ResourceDeliveryMessage;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
@@ -57,14 +58,22 @@ public class InjectTraceIdInterceptor {
 
   @Hook(value = Pointcut.SUBSCRIPTION_BEFORE_DELIVERY, order = Integer.MAX_VALUE)
   public void outgoingSubscriptionBeforeDelivery(ResourceDeliveryMessage message) {
-    String transactionId = message.getTransactionId();
+    // a change the server made without a trace of its own starts one here, rather than sending "null" on
+    String transactionId = StringUtils.isNotBlank(message.getTransactionId())
+      ? message.getTransactionId()
+      : TraceHeaders.newTrace().traceId();
 
     LOG.info("Delivering subscription for traceId {}. Adding tracing headers", transactionId);
 
     CanonicalSubscription canonicalSubscription = message.getSubscription();
     String requestId = UUID.randomUUID().toString(); // async, so always generate a new requestId
 
-    Optional<String> correlationIdOptional = requestIdHolder.getRequestId(transactionId);
+    // The holder knows the last request that carried a trace, not the one that made this change. In a trace the
+    // server started, that request did not cause the server's later changes, so no correlation id is sent - not even
+    // for an application's own write in that trace, until notifications are correlated per write.
+    Optional<String> correlationIdOptional = TraceHeaders.isStartedByTheServer(transactionId)
+      ? Optional.empty()
+      : requestIdHolder.getRequestId(transactionId);
 
     // There is no access to the response headers on the HttpServletResponse for
     // subscriptions. Adding them in-memory to the subscription headers.

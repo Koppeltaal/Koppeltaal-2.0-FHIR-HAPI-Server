@@ -9,6 +9,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventBuilder;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.RequestIdHolder;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ResourceOriginUtil;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.TraceHeaders;
 import ca.uhn.fhir.rest.api.RestOperationTypeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.server.exceptions.BaseServerResponseException;
@@ -135,7 +136,7 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
     requestIdHolder.addMapping(requestDetails.getTransactionGuid(), requestId, requestingDevice);
 
     LOG.info(String.format("Incoming request, traceId='%s', requestId='%s', correlationId='%s'",
-        requestDetails.getTransactionGuid(), requestId, requestDetails.getUserData().get("correlationId")));
+        requestDetails.getTransactionGuid(), requestId, TraceHeaders.fromRequest(requestDetails).correlationId()));
   }
 
   @Hook(Pointcut.STORAGE_PRECOMMIT_RESOURCE_UPDATED)

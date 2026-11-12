@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -37,6 +38,7 @@ import org.hl7.fhir.r4.model.AuditEvent;
 import org.hl7.fhir.r4.model.CareTeam;
 import org.hl7.fhir.r4.model.CodeableConcept;
 import org.hl7.fhir.r4.model.Coding;
+import org.hl7.fhir.r4.model.Extension;
 import org.hl7.fhir.r4.model.Group;
 import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.Meta;
@@ -48,6 +50,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -71,6 +74,9 @@ class ErasureCleanupServiceTest {
 	private static final Instant PASSED = NOW.minus(1, ChronoUnit.DAYS);
 	private static final Instant AHEAD = NOW.plus(10, ChronoUnit.DAYS);
 	private static final IIdType PATIENT = new IdType("Patient", "p1");
+	/** A trace the server started itself: its own prefix and a UUIDv4. */
+	private static final String SERVER_TRACE =
+			"server-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 
 	@Mock private DaoRegistry daoRegistry;
 	@Mock private IFhirResourceDao<Task> taskDao;
@@ -467,6 +473,99 @@ class ErasureCleanupServiceTest {
 
 	private static Logger serviceLogger() {
 		return (Logger) LoggerFactory.getLogger(ErasureCleanupService.class);
+	}
+
+	/**
+	 * TOP-KT-011: a batch starts a trace of its own. The run's Task write carries it, so the notifications about the Task
+	 * send it on, and the lifecycle event records it. No request caused the event, so it has no request or correlation id.
+	 */
+	@ParameterizedTest
+	@EnumSource(value = ErasureCleanupService.Outcome.class, names = { "GRACE_RESET", "ABORTED", "ERASED" })
+	void theRunsTaskWriteAndLifecycleEventShareATraceOfItsOwn(ErasureCleanupService.Outcome outcome) {
+
+		cycle(task("t1", outcome == ErasureCleanupService.Outcome.GRACE_RESET ? Task.TaskStatus.ONHOLD
+				: Task.TaskStatus.REQUESTED, PASSED));
+		when(eligibilityService.hasRenewedEngagement(any(), any()))
+				.thenReturn(outcome == ErasureCleanupService.Outcome.ABORTED);
+
+		assertThat(outcomeOf(run())).isEqualTo(outcome.name());
+
+		final String trace = taskWriteTraces().get(0);
+		assertThat(trace).isNotNull();
+		assertThat(trace).matches(SERVER_TRACE);
+		final var event = ArgumentCaptor.forClass(AuditEvent.class);
+		final var eventWrite = ArgumentCaptor.forClass(RequestDetails.class);
+		verify(auditEventDao).create(event.capture(), eventWrite.capture());
+		assertThat(eventWrite.getValue().getTransactionGuid()).isEqualTo(trace);
+		assertThat(idExtension(event.getValue(), "http://koppeltaal.nl/fhir/StructureDefinition/trace-id"))
+				.isEqualTo(trace);
+		assertThat(event.getValue().getExtensionByUrl("http://koppeltaal.nl/fhir/StructureDefinition/request-id"))
+				.isNull();
+		assertThat(event.getValue().getExtensionByUrl("http://koppeltaal.nl/fhir/StructureDefinition/correlation-id"))
+				.isNull();
+	}
+
+	/** The detached CareTeam and the tagged resources are changes too, and notifications about them send the trace on. */
+	@Test
+	void theWritesAroundAnEraseCarryTheRunsTrace() {
+
+		cycle(task("t1", Task.TaskStatus.REQUESTED, PASSED));
+		final CareTeam team = new CareTeam().setSubject(new Reference("Patient/p2"));
+		team.setId("CareTeam/retained/_history/3");
+		team.addParticipant().setMember(new Reference("Patient/p1"));
+		team.addParticipant().setMember(new Reference("Practitioner/practitioner"));
+		when(careTeamDao.read(any(IIdType.class), any(RequestDetails.class))).thenReturn(team);
+		final Task retained = new Task().setFor(new Reference("Patient/p2")).setOwner(new Reference("Patient/p1"))
+				.setStatus(Task.TaskStatus.READY).setIntent(Task.TaskIntent.ORDER);
+		retained.setId("Task/retained/_history/1");
+		when(taskDao.read(any(IIdType.class), any(RequestDetails.class))).thenReturn(retained);
+		when(deletionScope.planFor(any())).thenReturn(new PatientDeletionScope.Plan(
+				List.of(new IdType("Task", "t1"), PATIENT),
+				List.of(new PatientDeletionScope.ParticipantRemoval(new IdType("CareTeam/retained"), Set.of("Patient/p1"))),
+				List.of(new PatientDeletionScope.RetainedTaskOwner(new IdType("Task/retained"), "Patient/p1")),
+				List.of(new PatientDeletionScope.Blocker(new IdType("Group", "outside"),
+						"Outside the deletion scope: Group.member.entity references Patient/p1."))));
+
+		assertThat(outcomeOf(run())).isEqualTo("ERASED");
+
+		final String trace = taskWriteTraces().get(0);
+		assertThat(trace).isNotNull();
+		final var careTeamWrite = ArgumentCaptor.forClass(RequestDetails.class);
+		verify(careTeamDao).update(any(CareTeam.class), careTeamWrite.capture());
+		final var retainedTagWrite = ArgumentCaptor.forClass(RequestDetails.class);
+		verify(taskDao).metaAddOperation(eq(new IdType("Task/retained")), any(Meta.class), retainedTagWrite.capture());
+		final var reviewTagWrite = ArgumentCaptor.forClass(RequestDetails.class);
+		verify(groupDao).metaAddOperation(eq(new IdType("Group", "outside")), any(Meta.class), reviewTagWrite.capture());
+		assertThat(List.of(careTeamWrite.getValue(), retainedTagWrite.getValue(), reviewTagWrite.getValue()))
+				.extracting(RequestDetails::getTransactionGuid)
+				.containsOnly(trace);
+	}
+
+	@Test
+	void everyRunStartsATraceOfItsOwn() {
+
+		cycle(task("t1", Task.TaskStatus.ONHOLD, PASSED));
+
+		run();
+		run();
+
+		final List<String> traces = taskWriteTraces();
+		assertThat(traces).hasSize(2);
+		assertThat(traces.get(0)).isNotNull().isNotEqualTo(traces.get(1));
+	}
+
+	private List<String> taskWriteTraces() {
+		final var write = ArgumentCaptor.forClass(RequestDetails.class);
+		verify(taskDao, atLeast(0)).update(any(Task.class), write.capture());
+		return write.getAllValues().stream().map(RequestDetails::getTransactionGuid).toList();
+	}
+
+	/** KT2AuditEvent's trace header extensions take an id, nothing else. */
+	private static String idExtension(AuditEvent event, String url) {
+		final Extension extension = event.getExtensionByUrl(url);
+		assertThat(extension).as(url).isNotNull();
+		assertThat(extension.getValue()).isInstanceOf(IdType.class);
+		return ((IdType) extension.getValue()).getValue();
 	}
 
 	private void blocked(PatientDeletionScope.Blocker blocker) {

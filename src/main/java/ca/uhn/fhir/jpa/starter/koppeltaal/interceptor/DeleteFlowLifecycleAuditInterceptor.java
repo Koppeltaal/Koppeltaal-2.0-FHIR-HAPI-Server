@@ -10,6 +10,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.cleanup.DeleteFlowAggregateLock;
 import ca.uhn.fhir.jpa.starter.koppeltaal.cleanup.DeleteFlowLifecycleEvent;
 import ca.uhn.fhir.jpa.starter.koppeltaal.cleanup.ParticipatingApps;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.DeleteFlowTaskUtil;
+import ca.uhn.fhir.jpa.starter.koppeltaal.util.TraceHeaders;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.api.server.SystemRequestDetails;
 import ca.uhn.fhir.rest.param.ReferenceParam;
@@ -121,8 +122,9 @@ public class DeleteFlowLifecycleAuditInterceptor {
 		}
 
 		try {
+			final TraceHeaders trace = TraceHeaders.fromRequest(requestDetails);
 			aggregateTransition(patientId, updated, pullsHandbrake)
-					.ifPresent(lifecycleEvent -> recordOnceCommitted(lifecycleEvent, patientId));
+					.ifPresent(lifecycleEvent -> recordOnceCommitted(lifecycleEvent, patientId, trace));
 		} catch (Exception e) {
 			LOG.error("Could not judge the aggregated cleanup state for Task {}; "
 					+ "the status write itself is kept", updated.getIdElement(), e);
@@ -152,10 +154,10 @@ public class DeleteFlowLifecycleAuditInterceptor {
 		return Optional.of(DeleteFlowLifecycleEvent.UNBLOCKED);
 	}
 
-	private void recordOnceCommitted(DeleteFlowLifecycleEvent lifecycleEvent, IIdType patientId) {
+	private void recordOnceCommitted(DeleteFlowLifecycleEvent lifecycleEvent, IIdType patientId, TraceHeaders trace) {
 
 		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-			record(lifecycleEvent, patientId);
+			record(lifecycleEvent, patientId, trace);
 			return;
 		}
 
@@ -163,7 +165,7 @@ public class DeleteFlowLifecycleAuditInterceptor {
 			@Override
 			public void afterCommit() {
 				try {
-					record(lifecycleEvent, patientId);
+					record(lifecycleEvent, patientId, trace);
 				} catch (Exception e) {
 					LOG.error("Could not record the aggregated cleanup lifecycle event '{}' for {}; "
 							+ "the status write itself is kept", lifecycleEvent.getCode(), patientId, e);
@@ -178,13 +180,13 @@ public class DeleteFlowLifecycleAuditInterceptor {
 	 * never commits again - Spring's own contract for
 	 * {@link TransactionSynchronization#afterCommit()} calls for REQUIRES_NEW.
 	 */
-	private void record(DeleteFlowLifecycleEvent lifecycleEvent, IIdType patientId) {
+	private void record(DeleteFlowLifecycleEvent lifecycleEvent, IIdType patientId, TraceHeaders trace) {
 
 		final AuditEvent event = announcementFactory.buildLifecycleEvent(lifecycleEvent, patientId,
-				serverDeviceId(), site);
+				serverDeviceId(), site, trace);
 
-		ownTransaction.executeWithoutResult(
-				status -> daoRegistry.getResourceDao(AuditEvent.class).create(event, new SystemRequestDetails()));
+		ownTransaction.executeWithoutResult(status -> daoRegistry.getResourceDao(AuditEvent.class)
+				.create(event, trace.applyTraceIdTo(new SystemRequestDetails())));
 
 		LOG.info("Recorded aggregated cleanup lifecycle event '{}' for {}", lifecycleEvent.getCode(), patientId);
 	}
