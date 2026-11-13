@@ -4,6 +4,7 @@ import ca.uhn.fhir.interceptor.api.Hook;
 import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.interceptor.api.Pointcut;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
+import ca.uhn.fhir.jpa.starter.koppeltaal.deactivation.InactiveClientException;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuditEventDto;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventBuilder;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventService;
@@ -52,6 +53,10 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
 
   @Hook(value = Pointcut.SERVER_PRE_PROCESS_OUTGOING_EXCEPTION, order = 100)
   public void preOutgoingException(ServletRequestDetails servletRequestDetails, Throwable originalThrowable) {
+    if (originalThrowable instanceof InactiveClientException) {
+      // refused before anything happened; auditing every refusal would fill the table the refusal protects
+      return;
+    }
 
     // the requester can read this AuditEvent, so it must not contain more than the response
     final BaseServerResponseException withoutDetails =

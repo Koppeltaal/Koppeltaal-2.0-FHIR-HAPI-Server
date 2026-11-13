@@ -2,6 +2,7 @@ package ca.uhn.fhir.jpa.starter.koppeltaal.interceptor;
 
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
+import ca.uhn.fhir.jpa.starter.koppeltaal.deactivation.InactiveClientException;
 import ca.uhn.fhir.jpa.starter.koppeltaal.dto.AuditEventDto;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.AuditEventService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.RequestIdHolder;
@@ -31,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -68,6 +70,13 @@ class AuditEventInterceptorTest {
     interceptor.preOutgoingException(deleteRequest("system/*.cruds"), new ResourceVersionConflictException(CONFLICT));
 
     assertTrue(auditedDiagnostics().contains("Task/99"));
+  }
+
+  @Test
+  void shouldNotAuditARequestRefusedForAnInactiveClient() {
+    interceptor.preOutgoingException(deleteRequest("system/*.cruds"), new InactiveClientException());
+
+    verify(auditEventService, never()).submitAuditEvent(any(), any());
   }
 
   /**

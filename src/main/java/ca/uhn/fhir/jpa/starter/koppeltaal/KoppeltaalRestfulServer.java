@@ -12,6 +12,7 @@ import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerAuditLogConfiguration
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.FhirServerSecurityConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.OpenApiConfiguration;
 import ca.uhn.fhir.jpa.starter.koppeltaal.config.SmartBackendServiceConfiguration;
+import ca.uhn.fhir.jpa.starter.koppeltaal.deactivation.ClientDeactivationInterceptor;
 import ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.*;
 import ca.uhn.fhir.jpa.starter.koppeltaal.service.Oauth2AccessTokenService;
 import ca.uhn.fhir.jpa.starter.koppeltaal.util.ServerDeviceId;
@@ -86,6 +87,9 @@ public class KoppeltaalRestfulServer extends RestfulServer {
   @Autowired
   private Optional<DeleteFlowLifecycleAuditInterceptor> deleteFlowLifecycleAuditInterceptor;
 
+  @Autowired
+  private ClientDeactivationInterceptor clientDeactivationInterceptor;
+
   public KoppeltaalRestfulServer(FhirContext context) {
     super(context);
   }
@@ -103,6 +107,7 @@ public class KoppeltaalRestfulServer extends RestfulServer {
         new ParticipatingApps(daoRegistry, observer.getSystem(), observer.getValue()));
     if (fhirServerSecurityConfiguration.isEnabled()) {
       registerInterceptor(new JwtSecurityInterceptor(oauth2AccessTokenService));
+      registerInterceptor(clientDeactivationInterceptor); // refuses inactive clients right after the token check
 
       registerInterceptor(new InjectResourceOriginInterceptor(daoRegistry, deviceDao, smartBackendServiceConfiguration)); // can only determine this from the Bearer token
       registerInterceptor(new ResourceOriginAuthorizationInterceptor(daoRegistry, deviceDao, smartBackendServiceConfiguration));

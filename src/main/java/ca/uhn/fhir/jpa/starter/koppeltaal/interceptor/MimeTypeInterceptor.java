@@ -24,7 +24,9 @@ import static ca.uhn.fhir.jpa.starter.koppeltaal.interceptor.CapabilityStatement
 public class MimeTypeInterceptor {
   private static final Logger LOG = LoggerFactory.getLogger(MimeTypeInterceptor.class);
 
-  @Hook(Pointcut.SERVER_INCOMING_REQUEST_PRE_PROCESSED)
+  // after the token check (order 0) and the refusal of inactive clients (order 1), so an inactive client cannot
+  // produce error AuditEvents with an unsupported header
+  @Hook(value = Pointcut.SERVER_INCOMING_REQUEST_PRE_PROCESSED, order = 2)
   protected void ensureMimeTypeIsSupported(HttpServletRequest request, HttpServletResponse response) throws IOException {
     validateMineTypeSupport(HttpHeaders.CONTENT_TYPE, request, 415);
     validateMineTypeSupport(HttpHeaders.ACCEPT, request, 406);
