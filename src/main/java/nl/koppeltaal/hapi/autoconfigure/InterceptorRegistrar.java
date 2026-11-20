@@ -70,7 +70,8 @@ public class InterceptorRegistrar implements SmartInitializingSingleton {
     Collection<Object> koppeltaalInterceptors = new ArrayList<>();
     koppeltaalCorsInterceptor.ifPresent(koppeltaalInterceptors::add);
     koppeltaalRepositoryValidatingInterceptor.ifPresent(koppeltaalInterceptors::add);
-    WiringAssertions.verify(restfulServer, servletContext, fhirServletMapping.remappedRegistrations(), koppeltaalInterceptors);
+    WiringAssertions.verify(restfulServer, myInterceptorRegistry, servletContext, fhirServletMapping.remappedRegistrations(),
+      koppeltaalInterceptors);
     // First in our sequence. The fork had it among the starter's own, before the request validator. On their only shared
     // pointcut, SERVER_OUTGOING_RESPONSE, the interceptor's hook has order -1, so it keeps that place.
     cascadingDeleteInterceptor.ifPresent(restfulServer::registerInterceptor);
