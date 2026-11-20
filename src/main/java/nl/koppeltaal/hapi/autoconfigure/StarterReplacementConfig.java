@@ -1,21 +1,29 @@
 package nl.koppeltaal.hapi.autoconfigure;
 
+import ca.uhn.fhir.batch2.config.Batch2JobRegisterer;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.interceptor.api.IInterceptorBroadcaster;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.delete.ThreadSafeResourceDeleterSvc;
 import ca.uhn.fhir.jpa.interceptor.validation.RepositoryValidatingInterceptor;
 import ca.uhn.fhir.jpa.interceptor.validation.RepositoryValidatingRuleBuilder;
+import ca.uhn.fhir.jpa.packages.IPackageInstallerSvc;
+import ca.uhn.fhir.jpa.packages.PackageInstallationSpec;
 import ca.uhn.fhir.rest.server.interceptor.CorsInterceptor;
 import java.util.Arrays;
 import nl.koppeltaal.hapi.config.FhirServerSecurityConfiguration;
 import nl.koppeltaal.hapi.interceptor.ResourceOriginCascadingDeleteInterceptor;
+import nl.koppeltaal.hapi.service.PackageInstallerWithExclusionSvcImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.cors.CorsConfiguration;
 
@@ -72,5 +80,41 @@ public class StarterReplacementConfig {
   public RepositoryValidatingInterceptor koppeltaalRepositoryValidatingInterceptor(
       RepositoryValidatingRuleBuilder ruleBuilder, DaoRegistry daoRegistry) {
     return new KoppeltaalRepositoryValidationRules(ruleBuilder, daoRegistry).buildUsingStoredStructureDefinitions();
+  }
+
+  /** The Koppeltaal IG: the same keys as one entry of hapi.fhir.implementationguides, which stays empty. */
+  @Bean
+  @ConfigurationProperties("koppeltaal.implementationguide")
+  @ConditionalOnProperty("koppeltaal.implementationguide.name")
+  public PackageInstallationSpec koppeltaalImplementationGuide() {
+    return new PackageInstallationSpec();
+  }
+
+  /**
+   * The fork's packageInstaller. It starts Batch2, installs the Koppeltaal IG without example instances, and is the
+   * primary IPackageInstallerSvc. It has its own name, so the starter's packageInstaller, which is also primary, cannot
+   * replace it silently: the two together fail the startup.
+   */
+  @Bean("koppeltaalPackageInstaller")
+  @Primary
+  public IPackageInstallerSvc koppeltaalPackageInstaller(PackageInstallerWithExclusionSvcImpl installer,
+      Batch2JobRegisterer batch2JobRegisterer, ObjectProvider<PackageInstallationSpec> implementationGuide,
+      @Value("${hapi.fhir.install_transitive_ig_dependencies:true}") boolean installTransitiveIgDependencies) {
+    batch2JobRegisterer.start();
+    implementationGuide.ifAvailable(guide -> {
+      if (installTransitiveIgDependencies) {
+        guide.addDependencyExclude("hl7.fhir.r2.core")
+          .addDependencyExclude("hl7.fhir.r3.core")
+          .addDependencyExclude("hl7.fhir.r4.core")
+          .addDependencyExclude("hl7.fhir.r5.core");
+      }
+      // Binary example instances exceed varchar(4000); install configuration and definitions only
+      guide.addInstallResourceTypes("StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter",
+        "CapabilityStatement", "OperationDefinition", "ConceptMap", "NamingSystem");
+      // so the installed version is queryable at runtime
+      guide.addInstallResourceTypes("ImplementationGuide");
+      installer.install(guide);
+    });
+    return installer;
   }
 }

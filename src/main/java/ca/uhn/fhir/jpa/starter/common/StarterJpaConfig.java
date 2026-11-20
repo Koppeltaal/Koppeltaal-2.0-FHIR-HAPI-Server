@@ -31,7 +31,6 @@ import ca.uhn.fhir.jpa.ips.provider.IpsOperationProvider;
 import ca.uhn.fhir.jpa.model.config.SubscriptionSettings;
 import ca.uhn.fhir.jpa.packages.IPackageInstallerSvc;
 import ca.uhn.fhir.jpa.packages.PackageInstallationSpec;
-import nl.koppeltaal.hapi.service.PackageInstallerWithExclusionSvcImpl;
 import ca.uhn.fhir.jpa.provider.DaoRegistryResourceSupportedSvc;
 import ca.uhn.fhir.jpa.provider.DiffProvider;
 import ca.uhn.fhir.jpa.provider.IJpaSystemProvider;
@@ -46,6 +45,7 @@ import ca.uhn.fhir.jpa.search.IStaleSearchDeletingSvc;
 import ca.uhn.fhir.jpa.search.StaleSearchDeletingSvcImpl;
 import ca.uhn.fhir.jpa.starter.AppProperties;
 import ca.uhn.fhir.jpa.starter.annotations.OnCorsPresent;
+import ca.uhn.fhir.jpa.starter.annotations.OnImplementationGuidesPresent;
 import ca.uhn.fhir.jpa.starter.common.validation.IRepositoryValidationInterceptorFactory;
 import ca.uhn.fhir.jpa.starter.ig.IImplementationGuideOperationProvider;
 import ca.uhn.fhir.jpa.starter.util.EnvironmentHelper;
@@ -201,14 +201,12 @@ public class StarterJpaConfig {
 		return loggingInterceptor;
 	}
 
-
-	/* CUSTOMIZATION - Not conditional on configured implementation guides: PackageInstallerWithExclusionSvcImpl is a
-	 * second IPackageInstallerSvc next to HAPI's npmInstallerSvc, so the context needs this primary bean to start */
 	@Bean("packageInstaller")
 	@Primary
+	@Conditional(OnImplementationGuidesPresent.class)
 	public IPackageInstallerSvc packageInstaller(
 			AppProperties appProperties,
-			PackageInstallerWithExclusionSvcImpl packageInstallerSvc,
+			IPackageInstallerSvc packageInstallerSvc,
 			Batch2JobRegisterer batch2JobRegisterer) {
 
 		batch2JobRegisterer.start();
@@ -225,16 +223,6 @@ public class StarterJpaConfig {
 							.addDependencyExclude("hl7.fhir.r4.core")
 							.addDependencyExclude("hl7.fhir.r5.core");
 				}
-
-				// Filter out Binary resources to avoid varchar(4000) database errors
-				// Only install configuration and definition resources, skip example instances
-				packageInstallationSpec.addInstallResourceTypes(
-					"StructureDefinition", "ValueSet", "CodeSystem", "SearchParameter",
-					"CapabilityStatement", "OperationDefinition", "ConceptMap", "NamingSystem"
-				);
-				/* CUSTOM ADDITION START - Include ImplementationGuide so the installed version is queryable at runtime */
-				packageInstallationSpec.addInstallResourceTypes("ImplementationGuide");
-				/* CUSTOM ADDITION END */
 				packageInstallerSvc.install(packageInstallationSpec);
 			}
 		}
