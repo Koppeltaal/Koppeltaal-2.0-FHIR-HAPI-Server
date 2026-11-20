@@ -217,7 +217,7 @@ hapi:
     default_pretty_print: true
     default_page_size: 20
     #    delete_expunge_enabled: true
-    enable_repository_validating_interceptor: true
+    enable_repository_validating_interceptor: false
     enable_index_missing_fields: false
     #    enable_index_of_type: true
     #    enable_index_contained_resource: false
@@ -226,7 +226,7 @@ hapi:
     ###  !!Extended Lucene/Elasticsearch Indexing is still a experimental feature, expect some features (e.g. _total=accurate) to not work as expected!!
     ###  more information here: https://hapifhir.io/hapi-fhir/docs/server_jpa/elastic.html
     advanced_lucene_indexing: true
-    search_index_full_text_enabled: false
+    search_index_full_text_enabled: true
     bulk_export_enabled: false
     bulk_import_enabled: false
     #    language_search_parameter_enabled: true
@@ -269,13 +269,6 @@ hapi:
     #      partitioning_include_in_search_hashes: false
     #      conditional_create_duplicate_identifiers_enabled: false
     #      request_tenant_partitioning_mode: true
-    cors:
-      allow_Credentials: true
-      # These are allowed_origin patterns, see: https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/cors/CorsConfiguration.html#setAllowedOriginPatterns-java.util.List-
-      allowed_origin:
-        - "*"
-      allowed_headers:
-        - "*"
 
     # Search coordinator thread pool sizes
     search-coord-core-pool-size: 20
@@ -449,6 +442,15 @@ smart:
 koppeltaal:
   cascading-deletes:
     # replaces hapi.fhir.allow_cascading_deletes: this one checks the resource origin of every cascaded delete
+    enabled: true
+  cors:
+    # replaces hapi.fhir.cors: the same settings, plus If-Match
+    enabled: true
+    allow-credentials: true
+    allowed-origin:
+      - "*"
+  repository-validation:
+    # replaces hapi.fhir.enable_repository_validating_interceptor, with the KT2 profile rules
     enabled: true
 
 # Patient data cleanup (TOP-KT-028): AVG policy, so on by default.

@@ -10,15 +10,10 @@ fhir:
 hapi:
   fhir:
     server_id_strategy: UUID
-    enable_repository_validating_interceptor: true
     validation:
       requests_enabled: true
     subscription:
       resthook_enabled: true
-    cors:
-      allow_Credentials: true
-      allowed_origin:
-        - "*"
     supported_resource_types:
       - ActivityDefinition
       - AuditEvent
@@ -43,6 +38,15 @@ hapi:
 koppeltaal:
   cascading-deletes:
     # replaces hapi.fhir.allow_cascading_deletes: this one checks the resource origin of every cascaded delete
+    enabled: true
+  cors:
+    # replaces hapi.fhir.cors: the same settings, plus If-Match
+    enabled: true
+    allow-credentials: true
+    allowed-origin:
+      - "*"
+  repository-validation:
+    # replaces hapi.fhir.enable_repository_validating_interceptor, with the KT2 profile rules
     enabled: true
 # Patient data cleanup (TOP-KT-028): AVG policy, so on by default.
 cleanup:
