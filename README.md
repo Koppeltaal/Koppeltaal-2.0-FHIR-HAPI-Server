@@ -24,7 +24,7 @@ scripts/check-dependencies.sh
 ## Runtime settings
 
 - **JVM options:** the image sets `JDK_JAVA_OPTIONS` (heap, GC log, heap dump). Setting `JDK_JAVA_OPTIONS` in an environment replaces all of them. `JAVA_TOOL_OPTIONS` adds flags; for a flag that both set, `JDK_JAVA_OPTIONS` wins.
-- **Extension guards:** the server does not start without the extension jar. `docker/config/application.yaml` imports `nl/koppeltaal/hapi/extension.yaml` from the jar, and `hapi.fhir.custom-interceptor-classes` names the `KoppeltaalExtensionPresent` marker, which also stops a server whose auto-configuration is switched off. An override of that list replaces it, so keep the marker in it.
+- **Extension guards:** the server starts only with an active extension. Without the jar, the import of `nl/koppeltaal/hapi/extension.yaml` in `docker/config/application.yaml` fails. With the jar, `KoppeltaalActivationGuard` refuses a switched-off or excluded `KoppeltaalAutoConfiguration` before the application context starts. The `KoppeltaalExtensionPresent` marker in `hapi.fhir.custom-interceptor-classes` is a third check; an override of that list replaces it, so keep the marker in it.
 
 ## Upgrade HAPI
 
