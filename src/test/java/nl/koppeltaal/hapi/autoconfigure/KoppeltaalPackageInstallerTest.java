@@ -1,11 +1,13 @@
 package nl.koppeltaal.hapi.autoconfigure;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import ca.uhn.fhir.batch2.config.Batch2JobRegisterer;
 import ca.uhn.fhir.jpa.packages.PackageInstallationSpec;
@@ -18,8 +20,12 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.context.annotation.ConditionContext;
 import org.springframework.core.env.StandardEnvironment;
+import java.util.Map;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.mock.env.MockEnvironment;
 
 class KoppeltaalPackageInstallerTest {
 
@@ -68,6 +74,45 @@ class KoppeltaalPackageInstallerTest {
 
     verify(batch2JobRegisterer).start();
     verify(installer, never()).install(any());
+  }
+
+  /** HAPI's installer needs both; the fork failed on such a guide at startup instead of skipping it. */
+  @Test
+  void refusesAGuideWithoutNameOrVersion() {
+    PackageInstallationSpec withoutName = new PackageInstallationSpec().setVersion("0.16.6");
+
+    assertThatThrownBy(() -> new StarterReplacementConfig()
+      .koppeltaalPackageInstaller(installer, batch2JobRegisterer, provider(withoutName), true))
+      .isInstanceOf(IllegalStateException.class)
+      .hasMessageContaining("koppeltaal.implementationguide needs a name and a version");
+    verify(installer, never()).install(any());
+  }
+
+  @Test
+  void createsTheGuideForABlockWithoutAName() {
+    assertThat(guideConfigured(new MockEnvironment().withProperty("koppeltaal.implementationguide.version", "0.16.6")))
+      .isTrue();
+  }
+
+  /** K8S secrets arrive as environment variables. */
+  @Test
+  void createsTheGuideFromAnEnvironmentVariable() {
+    MockEnvironment environment = new MockEnvironment();
+    environment.getPropertySources().addFirst(new SystemEnvironmentPropertySource("systemEnvironment",
+      Map.of("KOPPELTAAL_IMPLEMENTATIONGUIDE_VERSION", "0.16.6")));
+
+    assertThat(guideConfigured(environment)).isTrue();
+  }
+
+  @Test
+  void createsNoGuideWithoutTheBlock() {
+    assertThat(guideConfigured(new MockEnvironment().withProperty("koppeltaal.cors.enabled", "true"))).isFalse();
+  }
+
+  private static boolean guideConfigured(MockEnvironment environment) {
+    ConditionContext context = mock(ConditionContext.class);
+    when(context.getEnvironment()).thenReturn(environment);
+    return new StarterReplacementConfig.ImplementationGuideConfigured().matches(context, null);
   }
 
   static PackageInstallationSpec configuredGuide() throws Exception {

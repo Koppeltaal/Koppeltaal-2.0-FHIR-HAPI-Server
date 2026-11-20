@@ -21,9 +21,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Condition;
+import org.springframework.context.annotation.ConditionContext;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.cors.CorsConfiguration;
 
@@ -85,7 +91,7 @@ public class StarterReplacementConfig {
   /** The Koppeltaal IG: the same keys as one entry of hapi.fhir.implementationguides, which stays empty. */
   @Bean
   @ConfigurationProperties("koppeltaal.implementationguide")
-  @ConditionalOnProperty("koppeltaal.implementationguide.name")
+  @Conditional(ImplementationGuideConfigured.class)
   public PackageInstallationSpec koppeltaalImplementationGuide() {
     return new PackageInstallationSpec();
   }
@@ -102,6 +108,10 @@ public class StarterReplacementConfig {
       @Value("${hapi.fhir.install_transitive_ig_dependencies:true}") boolean installTransitiveIgDependencies) {
     batch2JobRegisterer.start();
     implementationGuide.ifAvailable(guide -> {
+      if (isBlank(guide.getName()) || isBlank(guide.getVersion())) {
+        throw new IllegalStateException("koppeltaal.implementationguide needs a name and a version, as HAPI's package "
+          + "installer does; found name " + guide.getName() + " and version " + guide.getVersion());
+      }
       if (installTransitiveIgDependencies) {
         guide.addDependencyExclude("hl7.fhir.r2.core")
           .addDependencyExclude("hl7.fhir.r3.core")
@@ -116,5 +126,22 @@ public class StarterReplacementConfig {
       installer.install(guide);
     });
     return installer;
+  }
+
+  private static boolean isBlank(String value) {
+    return value == null || value.isBlank();
+  }
+
+  /**
+   * True when koppeltaal.implementationguide holds any key, so that koppeltaalPackageInstaller refuses a block without
+   * a name instead of skipping it.
+   */
+  static class ImplementationGuideConfigured implements Condition {
+
+    @Override
+    public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+      return Binder.get(context.getEnvironment())
+        .bind("koppeltaal.implementationguide", Bindable.mapOf(String.class, Object.class)).isBound();
+    }
   }
 }
