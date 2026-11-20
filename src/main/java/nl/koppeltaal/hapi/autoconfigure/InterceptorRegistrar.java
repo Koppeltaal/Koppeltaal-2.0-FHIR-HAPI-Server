@@ -29,9 +29,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 /**
- * Registers the Koppeltaal interceptors on the starter's RestfulServer and on HAPI's JPA registry, in the fork's order.
- * It runs once all singletons exist, which is before the servlet starts. The starter registered its own interceptors
- * when it created the server; ours follow, as with the fork's KoppeltaalRestfulServer.initialize().
+ * Registers the Koppeltaal interceptors on the starter's RestfulServer and on HAPI's JPA registry. It runs once all
+ * singletons exist, which is before the servlet starts. The starter registered its own interceptors when it created the
+ * server, so ours follow them; ServerWiringContractTest pins the resulting order.
  */
 public class InterceptorRegistrar implements SmartInitializingSingleton {
 
@@ -72,13 +72,13 @@ public class InterceptorRegistrar implements SmartInitializingSingleton {
     koppeltaalRepositoryValidatingInterceptor.ifPresent(koppeltaalInterceptors::add);
     WiringAssertions.verify(restfulServer, myInterceptorRegistry, servletContext, fhirServletMapping.remappedRegistrations(),
       koppeltaalInterceptors);
-    // First in our sequence. The fork had it among the starter's own, before the request validator. On their only shared
-    // pointcut, SERVER_OUTGOING_RESPONSE, the interceptor's hook has order -1, so it keeps that place.
+    // First in our sequence. On its only pointcut shared with the starter's interceptors, SERVER_OUTGOING_RESPONSE, its
+    // hook has order -1, so the cascade message stays ahead of the request validator's messages.
     cascadingDeleteInterceptor.ifPresent(restfulServer::registerInterceptor);
-    registerAsKoppeltaalRestfulServerDid();
+    registerKoppeltaalInterceptors();
   }
 
-  private void registerAsKoppeltaalRestfulServerDid() {
+  private void registerKoppeltaalInterceptors() {
     restfulServer.registerInterceptor(mimeTypeInterceptor);
     restfulServer.registerInterceptor(jsonSyntaxExceptionInterceptor);
 

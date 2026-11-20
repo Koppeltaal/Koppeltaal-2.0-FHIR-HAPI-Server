@@ -42,9 +42,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * Pins the server's wiring with production's switches (profile "contract"): the hook order per registry and pointcut,
- * the repository validation rules, and the HTTP behavior that hangs on the wiring. Moving the wiring out of the starter
- * must keep all of it. The snapshots were generated on the fork (-Dcontract.update=true). Only one regeneration
- * follows: the cascade hook's move to order -1, which Task 5 makes on purpose and proves.
+ * the repository validation rules, the providers, and the HTTP behavior that hangs on the wiring. The snapshots in
+ * src/test/resources/contract change only on purpose, for example with a HAPI upgrade: regenerate them with
+ * -Dcontract.update=true and review the diff.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, classes = {Application.class}, properties = {
   "spring.datasource.url=jdbc:h2:mem:server-wiring-contract",
@@ -189,7 +189,7 @@ class ServerWiringContractTest {
     return buildInfo.getProperty("build-time");
   }
 
-  /** The fork registers its interceptors and the id strategy when the FHIR servlet starts. */
+  /** Makes sure the FHIR servlet has started before its wiring is inspected. */
   private void servletStarted() throws Exception {
     assertEquals(200, get("/fhir/DEFAULT/metadata", Map.of()).statusCode());
   }
@@ -229,7 +229,7 @@ class ServerWiringContractTest {
   /** Only the Koppeltaal package moves; identity hashes and lambda class names get a stable form. Anonymous hooks never
    * get here: describe() fails on them first. */
   private static String normalize(String value) {
-    return value.replace("nl.koppeltaal.hapi.", "kt2.").replace("nl.koppeltaal.hapi.", "kt2.")
+    return value.replace("nl.koppeltaal.hapi.", "kt2.")
       .replaceAll("@[0-9a-f]+", "").replaceAll("\\$\\$Lambda[^.\\s,\\]]*", "\\$\\$Lambda");
   }
 
@@ -239,6 +239,7 @@ class ServerWiringContractTest {
       Files.writeString(snapshot, actual);
     }
     assertEquals(Files.readString(snapshot), actual,
-      "the wiring changed; " + snapshot + " is pinned: only Task 5 regenerates it, for one proven hook move");
+      "the wiring changed; " + snapshot + " is pinned: if the change is intended, regenerate it with "
+        + "-Dcontract.update=true and review the diff");
   }
 }

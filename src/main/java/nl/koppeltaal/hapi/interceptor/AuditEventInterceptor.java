@@ -134,7 +134,7 @@ public class AuditEventInterceptor extends AbstractAuditEventInterceptor {
   @Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)
   public void start(ServletRequestDetails requestDetails) {
 
-    // The requestId is always set @ nl.koppeltaal.hapi.KoppeltaalRestfulServer.getOrCreateRequestId()
+    // The requestId is always set: RequestIdFilter gives every FHIR request a UUID before HAPI reads it
     String requestId = requestDetails.getRequestId();
     Optional<Device> requestingDevice = ResourceOriginUtil.getDevice(requestDetails, deviceDao);
 

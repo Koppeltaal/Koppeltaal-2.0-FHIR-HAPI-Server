@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
 
 import org.hl7.fhir.r4.model.StructureDefinition;
 
-/** The fork's RepositoryValidationInterceptorFactoryR4, ported verbatim: the stored-StructureDefinition rules (skipped when the capped search reports no size) plus the KT2 profile rules. */
+/** The starter customization RepositoryValidationInterceptorFactoryR4 of before the extension, ported verbatim: the stored-StructureDefinition rules (skipped when the capped search reports no size) plus the KT2 profile rules. */
 public class KoppeltaalRepositoryValidationRules {
 
   private final FhirContext fhirContext;

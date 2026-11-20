@@ -76,7 +76,7 @@ class KoppeltaalPackageInstallerTest {
     verify(installer, never()).install(any());
   }
 
-  /** HAPI's installer needs both; the fork failed on such a guide at startup instead of skipping it. */
+  /** HAPI's installer needs both, so such a guide must stop the startup instead of being skipped. */
   @Test
   void refusesAGuideWithoutNameOrVersion() {
     PackageInstallationSpec withoutName = new PackageInstallationSpec().setVersion("0.16.6");

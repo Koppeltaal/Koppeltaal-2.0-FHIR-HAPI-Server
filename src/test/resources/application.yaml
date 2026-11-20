@@ -244,7 +244,7 @@ hapi:
 #  schema_management_strategy: CREATE
 #  username: SomeUsername
 
-# Koppeltaal configuration, as in src/main/resources/application.yaml (security disabled)
+# Koppeltaal configuration, as in docker/config/application.yaml (security disabled)
 fhir:
   server:
     openapi:

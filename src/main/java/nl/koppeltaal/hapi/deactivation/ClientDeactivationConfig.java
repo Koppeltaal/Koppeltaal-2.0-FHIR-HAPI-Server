@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Stops clients that keep resending rejected requests. The KoppeltaalRestfulServer registers the interceptor only with
+ * Stops clients that keep resending rejected requests. InterceptorRegistrar registers the interceptor only with
  * security enabled: it needs the client id from the access token.
  */
 @Configuration

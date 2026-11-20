@@ -23,7 +23,7 @@ public class ServletWiringConfig {
     return registration;
   }
 
-  /** The SMART configuration under the FHIR base path, moved unchanged from the fork's Application. */
+  /** The SMART configuration under the FHIR base path, at /fhir/DEFAULT/.well-known/. */
   @Bean
   public ServletRegistrationBean<DispatcherServlet> smartConfigurationBean() {
     AnnotationConfigWebApplicationContext context = new AnnotationConfigWebApplicationContext();

@@ -1,6 +1,5 @@
-# Production's switches (src/main/resources/application.yaml plus the K8S settings) for ServerWiringContractTest.
-# Tasks 5-7 rename the starter switches to the koppeltaal.* ones; the snapshots in src/test/resources/contract must
-# stay byte-identical, apart from Task 5's proven move of the cascade hook.
+# Production's switches (docker/config/application.yaml plus the K8S settings) for ServerWiringContractTest. Keep them
+# in line with docker/config/application.yaml; the snapshots in src/test/resources/contract pin the wiring they give.
 fhir:
   server:
     security:

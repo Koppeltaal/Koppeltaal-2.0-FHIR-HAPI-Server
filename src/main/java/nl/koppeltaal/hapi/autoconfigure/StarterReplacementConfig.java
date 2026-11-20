@@ -97,7 +97,7 @@ public class StarterReplacementConfig {
   }
 
   /**
-   * The fork's packageInstaller. It starts Batch2, installs the Koppeltaal IG without example instances, and is the
+   * The Koppeltaal packageInstaller. It starts Batch2, installs the Koppeltaal IG without example instances, and is the
    * primary IPackageInstallerSvc. It has its own name, so the starter's packageInstaller, which is also primary, cannot
    * replace it silently: the two together fail the startup.
    */
