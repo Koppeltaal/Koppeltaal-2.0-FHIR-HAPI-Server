@@ -1,0 +1,36 @@
+ * RequireValidationRule[resourceType=Task,rejectOnSeverity=ERROR,tagOnSeverity=[]]
+ * RuleRequireProfileDeclaration[resourceType=ActivityDefinition,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2ActivityDefinition]]
+ * RuleRequireProfileDeclaration[resourceType=AuditEvent,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2AuditEvent]]
+ * RuleRequireProfileDeclaration[resourceType=CareTeam,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2CareTeam]]
+ * RuleRequireProfileDeclaration[resourceType=Device,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2Device]]
+ * RuleRequireProfileDeclaration[resourceType=Endpoint,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2Endpoint]]
+ * RuleRequireProfileDeclaration[resourceType=Organization,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2Organization]]
+ * RuleRequireProfileDeclaration[resourceType=Patient,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2Patient]]
+ * RuleRequireProfileDeclaration[resourceType=Practitioner,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2Practitioner]]
+ * RuleRequireProfileDeclaration[resourceType=RelatedPerson,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2RelatedPerson]]
+ * RuleRequireProfileDeclaration[resourceType=Subscription,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2Subscription]]
+ * RuleRequireProfileDeclaration[resourceType=Task,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2Task, http://koppeltaal.nl/fhir/StructureDefinition/KT2DeletePendingTask]]
+--- evaluation order per resource type
+ActivityDefinition
+  RuleRequireProfileDeclaration[resourceType=ActivityDefinition,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2ActivityDefinition]]
+AuditEvent
+  RuleRequireProfileDeclaration[resourceType=AuditEvent,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2AuditEvent]]
+CareTeam
+  RuleRequireProfileDeclaration[resourceType=CareTeam,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2CareTeam]]
+Device
+  RuleRequireProfileDeclaration[resourceType=Device,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2Device]]
+Endpoint
+  RuleRequireProfileDeclaration[resourceType=Endpoint,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2Endpoint]]
+Organization
+  RuleRequireProfileDeclaration[resourceType=Organization,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2Organization]]
+Patient
+  RuleRequireProfileDeclaration[resourceType=Patient,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2Patient]]
+Practitioner
+  RuleRequireProfileDeclaration[resourceType=Practitioner,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2Practitioner]]
+RelatedPerson
+  RuleRequireProfileDeclaration[resourceType=RelatedPerson,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2RelatedPerson]]
+Subscription
+  RuleRequireProfileDeclaration[resourceType=Subscription,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2Subscription]]
+Task
+  RuleRequireProfileDeclaration[resourceType=Task,profiles=[http://koppeltaal.nl/fhir/StructureDefinition/KT2Task, http://koppeltaal.nl/fhir/StructureDefinition/KT2DeletePendingTask]]
+  RequireValidationRule[resourceType=Task,rejectOnSeverity=ERROR,tagOnSeverity=[]]

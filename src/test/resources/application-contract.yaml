@@ -1,0 +1,51 @@
+# Production's switches (src/main/resources/application.yaml plus the K8S settings) for ServerWiringContractTest.
+# Tasks 5-7 rename the starter switches to the koppeltaal.* ones; the snapshots in src/test/resources/contract must
+# stay byte-identical, apart from Task 5's proven move of the cascade hook.
+fhir:
+  server:
+    security:
+      enabled: true
+    openapi:
+      enabled: false
+hapi:
+  fhir:
+    allow_cascading_deletes: true
+    enable_repository_validating_interceptor: true
+    validation:
+      requests_enabled: true
+    subscription:
+      resthook_enabled: true
+    cors:
+      allow_Credentials: true
+      allowed_origin:
+        - "*"
+    supported_resource_types:
+      - ActivityDefinition
+      - AuditEvent
+      - Binary
+      - Bundle
+      - CapabilityStatement
+      - CareTeam
+      - CodeSystem
+      - Device
+      - Endpoint
+      - NamingSystem
+      - OperationOutcome
+      - Organization
+      - Patient
+      - Practitioner
+      - RelatedPerson
+      - Subscription
+      - StructureDefinition
+      - Task
+      - ValueSet
+      - ImplementationGuide
+# Patient data cleanup (TOP-KT-028): AVG policy, so on by default.
+cleanup:
+  enabled: true
+  # the scheduled run stays off in tests
+  cron: "-"
+  grace-days: 30
+  min-patient-age-days: 730
+  # The transition date C: until C + 2 years recent Task activity also counts as engagement, next to logins.
+  transition-date: 2026-11-05
