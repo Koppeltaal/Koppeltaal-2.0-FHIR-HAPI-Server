@@ -25,8 +25,6 @@ import ca.uhn.fhir.jpa.dao.search.IHSearchSortHelper;
 import ca.uhn.fhir.jpa.delete.ThreadSafeResourceDeleterSvc;
 import ca.uhn.fhir.jpa.graphql.GraphQLProvider;
 import ca.uhn.fhir.jpa.interceptor.CascadingDeleteInterceptor;
-import nl.koppeltaal.hapi.config.FhirServerSecurityConfiguration;
-import nl.koppeltaal.hapi.interceptor.ResourceOriginCascadingDeleteInterceptor;
 import ca.uhn.fhir.jpa.interceptor.UserRequestRetryVersionConflictsInterceptor;
 import ca.uhn.fhir.jpa.interceptor.validation.RepositoryValidatingInterceptor;
 import ca.uhn.fhir.jpa.ips.provider.IpsOperationProvider;
@@ -49,7 +47,6 @@ import ca.uhn.fhir.jpa.search.StaleSearchDeletingSvcImpl;
 import ca.uhn.fhir.jpa.starter.AppProperties;
 import ca.uhn.fhir.jpa.starter.annotations.OnCorsPresent;
 import ca.uhn.fhir.jpa.starter.common.validation.IRepositoryValidationInterceptorFactory;
-import nl.koppeltaal.hapi.KoppeltaalRestfulServer;
 import ca.uhn.fhir.jpa.starter.ig.IImplementationGuideOperationProvider;
 import ca.uhn.fhir.jpa.starter.util.EnvironmentHelper;
 import ca.uhn.fhir.jpa.subscription.util.SubscriptionDebugLogInterceptor;
@@ -308,24 +305,16 @@ public class StarterJpaConfig {
 			ApplicationContext appContext,
 			Optional<IpsOperationProvider> theIpsOperationProvider,
 			Optional<IImplementationGuideOperationProvider> implementationGuideOperationProvider,
-			DiffProvider diffProvider,
-			FhirServerSecurityConfiguration fhirServerSecurityConfiguration) {
-//		RestfulServer fhirServer = new RestfulServer(fhirSystemDao.getContext());
-    RestfulServer fhirServer = new KoppeltaalRestfulServer(fhirSystemDao.getContext());
+			DiffProvider diffProvider) {
+		RestfulServer fhirServer = new RestfulServer(fhirSystemDao.getContext());
 
 		List<String> supportedResourceTypes = appProperties.getSupported_resource_types();
-
-		// Debug logging to check what resource types are configured
-		ourLog.info("Configured supported resource types: {}", supportedResourceTypes);
 
 		if (!supportedResourceTypes.isEmpty()) {
 			if (!supportedResourceTypes.contains("SearchParameter")) {
 				supportedResourceTypes.add("SearchParameter");
 			}
-			ourLog.info("Setting supported resource types in DaoRegistry: {}", supportedResourceTypes);
 			daoRegistry.setSupportedResourceTypes(supportedResourceTypes);
-		} else {
-			ourLog.warn("No supported resource types configured - all resource types will be enabled");
 		}
 
 		if (appProperties.getNarrative_enabled()) {
@@ -427,10 +416,8 @@ public class StarterJpaConfig {
 		}
 
 		if (appProperties.getAllow_cascading_deletes()) {
-			// Koppeltaal: authorizes every cascaded delete against the resource-origin permissions of the requester
-			CascadingDeleteInterceptor cascadingDeleteInterceptor = new ResourceOriginCascadingDeleteInterceptor(
-					fhirSystemDao.getContext(), daoRegistry, interceptorBroadcaster, theThreadSafeResourceDeleterSvc,
-					fhirServerSecurityConfiguration.isEnabled());
+			CascadingDeleteInterceptor cascadingDeleteInterceptor = new CascadingDeleteInterceptor(
+					fhirSystemDao.getContext(), daoRegistry, interceptorBroadcaster, theThreadSafeResourceDeleterSvc);
 			fhirServer.registerInterceptor(cascadingDeleteInterceptor);
 		}
 

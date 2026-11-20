@@ -201,8 +201,8 @@ hapi:
     # Allowed Bundle Types for persistence (defaults are: COLLECTION,DOCUMENT,MESSAGE)
     ##################################################
     #    allowed_bundle_types: COLLECTION,DOCUMENT,MESSAGE,TRANSACTION,TRANSACTIONRESPONSE,BATCH,BATCHRESPONSE,HISTORY,SEARCHSET
-    ### cascaded deletes are authorized per resource by the ResourceOriginCascadingDeleteInterceptor
-    allow_cascading_deletes: true
+    ### off: koppeltaal.cascading-deletes turns on the ResourceOriginCascadingDeleteInterceptor instead
+    allow_cascading_deletes: false
     allow_contains_searches: true
     allow_external_references: true
     ### keep false: deleting multiple resources at once is not supported within Koppeltaal (TOP-KT-002a)
@@ -238,7 +238,7 @@ hapi:
     ### keep false: the definitive deletion is an internal server step, not a REST operation (TOP-KT-028)
     expunge_enabled: false
     #    client_id_strategy: ALPHANUMERIC
-    #    server_id_strategy: SEQUENTIAL_NUMERIC
+    server_id_strategy: UUID
     #    fhirpath_interceptor_enabled: false
     #    filter_search_enabled: true
     #    graphql_enabled: true
@@ -445,6 +445,11 @@ smart:
       baseUrl: "http://127.0.0.1:8086"
       authorizationToken: "c1317ea3-de40-4a1e-be3f-3994fb79f759"
       domainAdminClientId: "5ad7cf6a-9556-4d23-91ca-250dafa1df09"
+
+koppeltaal:
+  cascading-deletes:
+    # replaces hapi.fhir.allow_cascading_deletes: this one checks the resource origin of every cascaded delete
+    enabled: true
 
 # Patient data cleanup (TOP-KT-028): AVG policy, so on by default.
 cleanup:

@@ -37,4 +37,9 @@ public class ServletWiringConfig {
     registration.setLoadOnStartup(1);
     return registration;
   }
+
+  @Bean
+  public InterceptorRegistrar interceptorRegistrar() {
+    return new InterceptorRegistrar();
+  }
 }

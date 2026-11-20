@@ -34,12 +34,12 @@ server SERVER_PRE_PROCESS_OUTGOING_EXCEPTION
   200 kt2.interceptor.ResourceOriginAuthorizationInterceptor.hideDeleteConflictDetails
 server SERVER_OUTGOING_RESPONSE
   -10 kt2.interceptor.ResourceOriginResponseFilterInterceptor.filterResponse
+  -1 kt2.interceptor.ResourceOriginCascadingDeleteInterceptor.outgoingResponse
   0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.outgoingResponse
   0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.outgoingResponse
   0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.outgoingResponse
   0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.outgoingResponse
   0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.outgoingResponse
-  0 kt2.interceptor.ResourceOriginCascadingDeleteInterceptor.outgoingResponse
   0 ca.uhn.fhir.rest.server.interceptor.RequestValidatingInterceptor.addValidationResultsToOperationOutcome
   0 kt2.interceptor.AuditEventInterceptor.outgoingResponse
   0 kt2.interceptor.Oauth2UrisStatementInterceptorForR4.hookOutgoingResponse

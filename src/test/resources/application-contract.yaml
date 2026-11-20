@@ -9,7 +9,7 @@ fhir:
       enabled: false
 hapi:
   fhir:
-    allow_cascading_deletes: true
+    server_id_strategy: UUID
     enable_repository_validating_interceptor: true
     validation:
       requests_enabled: true
@@ -40,6 +40,10 @@ hapi:
       - Task
       - ValueSet
       - ImplementationGuide
+koppeltaal:
+  cascading-deletes:
+    # replaces hapi.fhir.allow_cascading_deletes: this one checks the resource origin of every cascaded delete
+    enabled: true
 # Patient data cleanup (TOP-KT-028): AVG policy, so on by default.
 cleanup:
   enabled: true

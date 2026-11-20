@@ -146,6 +146,7 @@ hapi:
     #    local_base_urls:
     #      - https://hapi.fhir.org/baseR4
     mdm_enabled: false
+    server_id_strategy: UUID
 
     ### Uncomment the following section, and any sub-properties you need in order to enable
     ### partitioning support on this server.

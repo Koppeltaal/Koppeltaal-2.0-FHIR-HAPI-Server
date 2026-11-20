@@ -84,7 +84,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
   RequestIdHolder.class,
   SmartConfigurationController.class,
   // server wiring
-  ServletWiringConfig.class
+  ServletWiringConfig.class,
+  StarterReplacementConfig.class
 })
 public class KoppeltaalAutoConfiguration {
 }

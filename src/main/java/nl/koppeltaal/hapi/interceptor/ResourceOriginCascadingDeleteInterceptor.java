@@ -16,6 +16,7 @@ import nl.koppeltaal.hapi.util.PermissionUtil;
 import nl.koppeltaal.hapi.util.ResourceOriginUtil;
 import ca.uhn.fhir.rest.api.DeleteCascadeModeEnum;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
+import ca.uhn.fhir.rest.api.server.ResponseDetails;
 import ca.uhn.fhir.rest.api.server.SystemRequestDetails;
 import ca.uhn.fhir.rest.api.server.storage.TransactionDetails;
 import ca.uhn.fhir.rest.server.exceptions.ForbiddenOperationException;
@@ -73,6 +74,20 @@ public class ResourceOriginCascadingDeleteInterceptor extends CascadingDeleteInt
     }
 
     return super.handleDeleteConflicts(theConflictList, theRequest, theTransactionDetails);
+  }
+
+  /**
+   * The starter registered HAPI's cascading-delete interceptor before its request validator; the extension registers
+   * this one after all starter interceptors. Order -1 keeps this hook ahead of the request validator's on
+   * SERVER_OUTGOING_RESPONSE, so the cascade message still precedes the validation messages in an OperationOutcome.
+   * With production's switches it only moves past the CORS interceptor's inherited outgoingResponse hooks, which do
+   * nothing.
+   */
+  @Override
+  @Hook(value = Pointcut.SERVER_OUTGOING_RESPONSE, order = -1)
+  public void outgoingResponse(RequestDetails theRequestDetails, ResponseDetails theResponseDetails,
+      IBaseResource theResponse) {
+    super.outgoingResponse(theRequestDetails, theResponseDetails, theResponse);
   }
 
   /**
