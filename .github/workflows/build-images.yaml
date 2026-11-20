@@ -4,12 +4,8 @@ on:
   push:
     tags:
       - "image/v*"
-    paths-ignore:
-      - "charts/**"
   pull_request:
     branches: [master]
-    paths-ignore:
-      - "charts/**"
 env:
   IMAGES: docker.io/jorisheadease/hapi
   # amd64 only: the default stage imports a certificate with the keytool of the amd64 JDK

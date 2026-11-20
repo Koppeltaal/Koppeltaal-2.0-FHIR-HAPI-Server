@@ -12,7 +12,7 @@ on:
 jobs:
   mirror:
     # only the public repository is mirrored, not copies of it
-    if: github.repository == 'Koppeltaal/Koppeltaal-2.0-FHIR-HAPI-Server'
+    if: github.repository == 'Koppeltaal/Koppeltaal-2.0-FHIR-HAPI-Server' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     env:
       GITLAB_REMOTE: git@gitlab.com:headease/koppeltaal/kt2-hapi-server.git
@@ -45,8 +45,9 @@ jobs:
           # 2. fetch all remote branches as remote tracking branches
           git fetch origin '+refs/heads/*:refs/remotes/origin/*'
 
-          # 3. push all branches from origin to gitlab (without --prune to avoid deletion issues)
-          git push gitlab 'refs/remotes/origin/*:refs/heads/*' --force
+          # 3. push all branches from origin to gitlab (without --prune to avoid deletion issues), except Dependabot's
+          git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin | grep -v -e '^HEAD$' -e '^dependabot/' \
+            | while read -r branch; do git push gitlab "refs/remotes/origin/$branch:refs/heads/$branch" --force || exit 1; done
 
           # 4. push all tags
           git push gitlab --tags --force

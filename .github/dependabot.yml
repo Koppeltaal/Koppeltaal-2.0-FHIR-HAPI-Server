@@ -1,0 +1,10 @@
+# Keeps the pinned base images fresh. A new HAPI starter tag is a deliberate upgrade step (adapt the extension, run
+# the tests), so Dependabot leaves hapiproject/hapi alone.
+version: 2
+updates:
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: daily
+    ignore:
+      - dependency-name: hapiproject/hapi
