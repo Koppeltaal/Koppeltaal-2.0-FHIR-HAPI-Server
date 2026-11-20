@@ -3,6 +3,7 @@ package nl.koppeltaal.hapi.contract;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.interceptor.api.IBaseInterceptorBroadcaster.IInvoker;
 import ca.uhn.fhir.interceptor.api.IInterceptorService;
 import ca.uhn.fhir.interceptor.api.Pointcut;
@@ -21,11 +22,15 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
+import java.io.InputStream;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
+import org.hl7.fhir.r4.model.CapabilityStatement;
 import org.hl7.fhir.r4.model.Device;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -159,9 +164,29 @@ class ServerWiringContractTest {
     assertTrue(UUID_FORMAT.matcher(id).matches(), "id " + id);
   }
 
+  /** CapabilityStatement.date identifies the deployed build; the image's WAR is upstream's, so the extension reports its own. */
+  @Test
+  void metadataReportsTheExtensionBuildTime() throws Exception {
+    HttpResponse<String> response = get("/fhir/DEFAULT/metadata", Map.of());
+    assertEquals(200, response.statusCode());
+    CapabilityStatement capabilityStatement =
+      FhirContext.forR4Cached().newJsonParser().parseResource(CapabilityStatement.class, response.body());
+    assertEquals(Instant.parse(extensionBuildTime()),
+      capabilityStatement.getDate().toInstant());
+  }
+
   @Test
   void theRouteWithoutDefaultIsGone() throws Exception {
     assertEquals(404, get("/fhir/metadata", Map.of()).statusCode());
+  }
+
+  private static String extensionBuildTime() throws Exception {
+    Properties buildInfo = new Properties();
+    try (InputStream in = ServerWiringContractTest.class.getResourceAsStream("/nl/koppeltaal/hapi/build-info.properties")) {
+      assertTrue(in != null, "the build writes nl/koppeltaal/hapi/build-info.properties");
+      buildInfo.load(in);
+    }
+    return buildInfo.getProperty("build-time");
   }
 
   /** The fork registers its interceptors and the id strategy when the FHIR servlet starts. */

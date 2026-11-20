@@ -9,6 +9,9 @@
         <hapi.starter.image.version>8.2.0-2</hapi.starter.image.version>
         <clinical-reasoning.version>3.22.0</clinical-reasoning.version>
         <lucene.version>9.11.1</lucene.version>
+        <!-- CapabilityStatement.date: the build time of this jar, in UTC (nl/koppeltaal/hapi/build-info.properties) -->
+        <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ss'Z'</maven.build.timestamp.format>
+        <kt2.build.timestamp>${maven.build.timestamp}</kt2.build.timestamp>
     </properties>
 
     <!-- The starter's parent pins the dependency versions of the starter WAR; scripts/check-dependencies.sh
@@ -474,6 +477,23 @@
         </pluginManagement>
 
         <finalName>kt2-hapi-extension</finalName>
+
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>nl/koppeltaal/hapi/build-info.properties</exclude>
+                </excludes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>nl/koppeltaal/hapi/build-info.properties</include>
+                </includes>
+            </resource>
+        </resources>
 
         <plugins>
             <!-- Tell Maven which Java source version you want to use -->

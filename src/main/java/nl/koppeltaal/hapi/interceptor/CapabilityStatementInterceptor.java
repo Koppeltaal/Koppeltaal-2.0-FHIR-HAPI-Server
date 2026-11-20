@@ -11,17 +11,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
+import java.util.Optional;
+import java.util.Properties;
 import java.util.stream.Collectors;
 
 /**
  * This interceptor customizes the generated {@link CapabilityStatement}. This is used to apply specific Koppeltaal-rules
  * like the `_revinclude` search parameter being forbidden, and to only advertise the interactions and operations that
  * the {@link ResourceOriginAuthorizationInterceptor} allows. The terminology operations require an ALL read
- * permission on ValueSet or CodeSystem.
+ * permission on ValueSet or CodeSystem. The date is the build time of this extension, so it identifies the deployed
+ * build: HAPI takes it from the WAR's manifest, and the WAR in the image is upstream's.
  */
 @Component
 @Interceptor
@@ -55,12 +62,18 @@ public class CapabilityStatementInterceptor {
 
   private static final Logger LOG = LoggerFactory.getLogger(CapabilityStatementInterceptor.class);
 
+  private static final String BUILD_INFO = "/nl/koppeltaal/hapi/build-info.properties";
+
+  private static final Optional<Date> BUILD_TIME = readBuildTime();
+
   @Hook(Pointcut.SERVER_CAPABILITY_STATEMENT_GENERATED)
   public void customize(IBaseConformance theCapabilityStatement) {
 
     LOG.info("Applying Koppeltaal-specific changes to the CapabilityStatement");
 
     CapabilityStatement capabilityStatement = (CapabilityStatement) theCapabilityStatement;
+
+    BUILD_TIME.ifPresent(capabilityStatement::setDate);
 
     List<CodeType> mimeCodeTypes = SUPPORTED_MIME_TYPES.stream()
       .map(CodeType::new)
@@ -91,6 +104,21 @@ public class CapabilityStatementInterceptor {
     capabilityStatement.addImplementationGuide("http://koppeltaal.nl/fhir/ImplementationGuide");
 
     LOG.debug("Applied Koppeltaal-specific changes to the CapabilityStatement");
+  }
+
+  private static Optional<Date> readBuildTime() {
+    try (InputStream in = CapabilityStatementInterceptor.class.getResourceAsStream(BUILD_INFO)) {
+      if (in == null) {
+        LOG.warn("{} is missing; the CapabilityStatement keeps HAPI's date", BUILD_INFO);
+        return Optional.empty();
+      }
+      Properties buildInfo = new Properties();
+      buildInfo.load(in);
+      return Optional.of(Date.from(Instant.parse(buildInfo.getProperty("build-time"))));
+    } catch (IOException | RuntimeException e) {
+      LOG.warn("{} holds no build time; the CapabilityStatement keeps HAPI's date", BUILD_INFO, e);
+      return Optional.empty();
+    }
   }
 
   /**
