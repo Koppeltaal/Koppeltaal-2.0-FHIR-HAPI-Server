@@ -70,3 +70,16 @@ if ! grep -qi '^access-control-allow-headers:.*if-match' <<< "$preflight_headers
   echo "FAIL: a CORS preflight does not allow If-Match"; echo "$preflight_headers"; exit 1
 fi
 echo "OK: a CORS preflight allows If-Match"
+
+# CapabilityStatement.date identifies the deployed build: it must be the build time of the extension jar in this image,
+# not the Build-Time of the upstream WAR.
+JAR_DIR="$(mktemp -d)"
+"${COMPOSE[@]}" cp hapi-fhir-jpaserver-start:/app/extra-classes/kt2-hapi-extension.jar "$JAR_DIR/" > /dev/null
+BUILD_TIME="$(unzip -p "$JAR_DIR/kt2-hapi-extension.jar" nl/koppeltaal/hapi/build-info.properties | sed -n 's/^build-time=//p')"
+rm -rf "$JAR_DIR"
+SERVED_DATE="$(curl -s -H 'Accept: application/fhir+json' "$BASE_URL/metadata" | jq -r '.date')"
+if ! jq -n -e --arg served "$SERVED_DATE" --arg built "$BUILD_TIME" \
+  '($served | sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601) == ($built | fromdateiso8601)' > /dev/null; then
+  echo "FAIL: the CapabilityStatement date is $SERVED_DATE, the extension was built at $BUILD_TIME"; exit 1
+fi
+echo "OK: the CapabilityStatement date is the extension's build time ($BUILD_TIME)"
