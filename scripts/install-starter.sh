@@ -9,7 +9,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 JAR="${JAVA_HOME:+$JAVA_HOME/bin/}jar"
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+CONTAINER=""
+cleanup() {
+  rm -rf "$WORK"
+  if [ -n "$CONTAINER" ]; then docker rm -f "$CONTAINER" > /dev/null 2>&1 || true; fi
+}
+trap cleanup EXIT
 
 WAR="${1:-}"
 if [ -z "$WAR" ]; then
@@ -17,7 +22,6 @@ if [ -z "$WAR" ]; then
   [ -n "$IMAGE" ] || { echo "No digest-pinned 'FROM hapiproject/hapi:...@sha256:... AS hapi' line in the Dockerfile" >&2; exit 1; }
   CONTAINER="$(docker create "$IMAGE")"
   docker cp "$CONTAINER:/app/main.war" "$WORK/main.war" > /dev/null
-  docker rm "$CONTAINER" > /dev/null
   WAR="$WORK/main.war"
 fi
 WAR="$(cd "$(dirname "$WAR")" && pwd)/$(basename "$WAR")"
