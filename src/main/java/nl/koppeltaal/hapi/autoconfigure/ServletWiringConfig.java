@@ -42,4 +42,9 @@ public class ServletWiringConfig {
   public InterceptorRegistrar interceptorRegistrar() {
     return new InterceptorRegistrar();
   }
+
+  @Bean
+  public KoppeltaalExtensionPresent koppeltaalExtensionPresent() {
+    return new KoppeltaalExtensionPresent();
+  }
 }

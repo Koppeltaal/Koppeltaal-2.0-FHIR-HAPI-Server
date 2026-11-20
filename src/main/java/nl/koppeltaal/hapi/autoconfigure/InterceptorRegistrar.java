@@ -5,9 +5,14 @@ import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.api.dao.IFhirResourceDao;
 import ca.uhn.fhir.jpa.interceptor.OverridePathBasedReferentialIntegrityForDeletesInterceptor;
+import ca.uhn.fhir.jpa.interceptor.validation.RepositoryValidatingInterceptor;
 import ca.uhn.fhir.rest.openapi.OpenApiInterceptor;
 import ca.uhn.fhir.rest.server.RestfulServer;
 import ca.uhn.fhir.rest.server.interceptor.CaptureResourceSourceFromHeaderInterceptor;
+import ca.uhn.fhir.rest.server.interceptor.CorsInterceptor;
+import jakarta.servlet.ServletContext;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Optional;
 import nl.koppeltaal.hapi.cleanup.ParticipatingApps;
 import nl.koppeltaal.hapi.config.FhirServerAuditLogConfiguration;
@@ -21,6 +26,7 @@ import nl.koppeltaal.hapi.util.ServerDeviceId;
 import org.hl7.fhir.r4.model.Device;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 /**
  * Registers the Koppeltaal interceptors on the starter's RestfulServer and on HAPI's JPA registry, in the fork's order.
@@ -51,9 +57,20 @@ public class InterceptorRegistrar implements SmartInitializingSingleton {
   @Autowired private Optional<DeleteFlowLifecycleAuditInterceptor> deleteFlowLifecycleAuditInterceptor;
   @Autowired private ClientDeactivationInterceptor clientDeactivationInterceptor;
   @Autowired private Optional<ResourceOriginCascadingDeleteInterceptor> cascadingDeleteInterceptor;
+  @Autowired private FhirServletMapping fhirServletMapping;
+  @Autowired @Qualifier("koppeltaalCorsInterceptor") private Optional<CorsInterceptor> koppeltaalCorsInterceptor;
+  @Autowired @Qualifier("koppeltaalRepositoryValidatingInterceptor")
+  private Optional<RepositoryValidatingInterceptor> koppeltaalRepositoryValidatingInterceptor;
+  @Autowired private ServletContext servletContext;
 
   @Override
   public void afterSingletonsInstantiated() {
+    // The starter has registered its interceptors and Tomcat has mapped the servlets: check them before adding ours, so a
+    // starter switch set next to ours stops the startup with its own message.
+    Collection<Object> koppeltaalInterceptors = new ArrayList<>();
+    koppeltaalCorsInterceptor.ifPresent(koppeltaalInterceptors::add);
+    koppeltaalRepositoryValidatingInterceptor.ifPresent(koppeltaalInterceptors::add);
+    WiringAssertions.verify(restfulServer, servletContext, fhirServletMapping.remappedRegistrations(), koppeltaalInterceptors);
     // First in our sequence. The fork had it among the starter's own, before the request validator. On their only shared
     // pointcut, SERVER_OUTGOING_RESPONSE, the interceptor's hook has order -1, so it keeps that place.
     cascadingDeleteInterceptor.ifPresent(restfulServer::registerInterceptor);

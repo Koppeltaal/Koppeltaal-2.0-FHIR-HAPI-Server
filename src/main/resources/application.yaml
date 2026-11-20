@@ -232,6 +232,8 @@ hapi:
     expunge_enabled: false
     #    client_id_strategy: ALPHANUMERIC
     server_id_strategy: UUID
+    # the starter refuses to start without the Koppeltaal extension and its auto-configuration
+    custom-interceptor-classes: nl.koppeltaal.hapi.autoconfigure.KoppeltaalExtensionPresent
     #    fhirpath_interceptor_enabled: false
     #    filter_search_enabled: true
     #    graphql_enabled: true
