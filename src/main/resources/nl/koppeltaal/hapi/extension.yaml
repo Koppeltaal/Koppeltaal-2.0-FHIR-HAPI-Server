@@ -1,0 +1,6 @@
+# docker/config/application.yaml imports this file (spring.config.import). Only the Koppeltaal extension jar holds it,
+# so without the jar Spring Boot stops before anything starts. Unlike the KoppeltaalExtensionPresent marker, this holds
+# even when an environment variable replaces hapi.fhir.custom-interceptor-classes. The value below is informational.
+koppeltaal:
+  extension:
+    present: true

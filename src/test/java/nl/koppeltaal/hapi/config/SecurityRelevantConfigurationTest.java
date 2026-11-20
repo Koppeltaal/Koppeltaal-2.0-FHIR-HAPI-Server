@@ -62,6 +62,9 @@ class SecurityRelevantConfigurationTest {
       assertEquals("nl.koppeltaal.hapi.autoconfigure.KoppeltaalExtensionPresent",
         configuration.getProperty("hapi.fhir.custom-interceptor-classes"), profile);
       assertEquals("UUID", configuration.getProperty("hapi.fhir.server_id_strategy"), profile);
+      // also when an environment variable replaces the custom-interceptor list, and so the marker
+      assertEquals("classpath:nl/koppeltaal/hapi/extension.yaml", configuration.getProperty("spring.config.import"),
+        profile);
     }
   }
 

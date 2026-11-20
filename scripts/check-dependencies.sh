@@ -26,6 +26,8 @@ grep -qx "nl/koppeltaal/hapi/autoconfigure/KoppeltaalAutoConfiguration.class" <<
   || { echo "the jar lacks KoppeltaalAutoConfiguration.class"; exit 1; }
 grep -qx "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports" <<< "$ENTRIES" \
   || { echo "the jar lacks the AutoConfiguration.imports file"; exit 1; }
+grep -qx "nl/koppeltaal/hapi/extension.yaml" <<< "$ENTRIES" \
+  || { echo "the jar lacks nl/koppeltaal/hapi/extension.yaml, which docker/config imports"; exit 1; }
 if grep -E "^ca/|application[^/]*\.ya?ml$" <<< "$ENTRIES"; then echo "starter classes or yaml in the jar"; exit 1; fi
 echo "the jar holds the auto-configuration and only Koppeltaal classes"
 

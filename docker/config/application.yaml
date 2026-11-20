@@ -33,6 +33,9 @@ management:
       export:
         enabled: true
 spring:
+  config:
+    # only the Koppeltaal extension jar holds this file: without the jar the server does not start
+    import: classpath:nl/koppeltaal/hapi/extension.yaml
   main:
     allow-circular-references: true
     allow-bean-definition-overriding: true

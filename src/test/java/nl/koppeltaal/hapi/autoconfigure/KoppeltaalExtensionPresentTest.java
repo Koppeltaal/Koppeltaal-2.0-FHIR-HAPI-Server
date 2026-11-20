@@ -12,6 +12,12 @@ import org.junit.jupiter.api.Test;
  */
 class KoppeltaalExtensionPresentTest {
 
+  /** docker/config imports it, so the server does not start without the jar, whatever the custom-interceptor list holds. */
+  @Test
+  void shipsTheResourceTheConfigurationImports() {
+    assertThat(KoppeltaalExtensionPresent.class.getResource("/nl/koppeltaal/hapi/extension.yaml")).isNotNull();
+  }
+
   @Test
   void hasNoPublicConstructor() {
     assertThat(Arrays.stream(KoppeltaalExtensionPresent.class.getDeclaredConstructors())
