@@ -59,3 +59,14 @@ expect "SMART configuration" 200 "$BASE_URL/.well-known/smart-configuration" '.t
 expect "Koppeltaal ImplementationGuide installed" 200 "$BASE_URL/ImplementationGuide" \
   '[.entry[]?.resource.packageId] | index("koppeltaalv2.00") != null'
 expect "search without a token is rejected" 401 "$BASE_URL/Patient"
+SERVER_URL="http://localhost:$KT2_E2E_PORT"
+expect "the route without DEFAULT is gone" 404 "$SERVER_URL/fhir/metadata"
+expect "only our configuration is read (a raw | is rejected)" 400 "$BASE_URL/Patient?identifier=a|b"
+expect "the SMART configuration at the root, as before" 200 "$SERVER_URL/smart-configuration" '.token_endpoint != null'
+
+preflight_headers="$(curl -s -D - -o /dev/null -X OPTIONS -H 'Origin: https://app.example.org' \
+  -H 'Access-Control-Request-Method: PUT' -H 'Access-Control-Request-Headers: if-match' "$BASE_URL/Patient/x")"
+if ! grep -qi '^access-control-allow-headers:.*if-match' <<< "$preflight_headers"; then
+  echo "FAIL: a CORS preflight does not allow If-Match"; echo "$preflight_headers"; exit 1
+fi
+echo "OK: a CORS preflight allows If-Match"
