@@ -4,6 +4,8 @@
 
 This is a HAPI FHIR Server (version 8.2.0) deployment for the Koppeltaal 2.0 project. It serves as the central FHIR repository for the Dutch healthcare integration platform.
 
+The HAPI starter runs unmodified; all Koppeltaal code is an extension jar on top of it, described in `README.md`.
+
 **Related Repository**: [Koppeltaal-2.0-FHIR](https://github.com/vzvznl/Koppeltaal-2.0-FHIR) (FHIR Implementation Guide)
 
 ### Key Components
@@ -137,7 +139,7 @@ export PGPASSWORD=staging_password
 
 ### How HAPI Loads Packages
 
-1. **Startup**: HAPI reads `hapi.fhir.implementationguides` from application.yaml
+1. **Startup**: the Koppeltaal extension reads `koppeltaal.implementationguide` from `docker/config/application.yaml`
 2. **Download**: Fetches package .tgz from URL or local path
 3. **Extract**: Unzips and reads package.json, resources
 4. **Cache**: Stores in `NPM_PACKAGE` and `NPM_PACKAGE_VER` tables
@@ -175,7 +177,7 @@ psql -h HOST -p PORT -U USER -d DB -f sql-scripts/preview-ig-removal.sql
 ./sql-scripts/remove-ig.sh HOST PORT USER DB --yes
 
 # 4. Restart HAPI server
-# Package will auto-reinstall from implementationguides config
+# Package will auto-reinstall from koppeltaal.implementationguide in docker/config/application.yaml
 ```
 
 ### Workflow: Investigate Startup Crash
@@ -267,21 +269,20 @@ GROUP BY vs.url, vs.expansion_status;
 
 ### Package Auto-Load Config
 
-Check `application.yaml` or environment variables:
+Check `docker/config/application.yaml` or environment variables:
 
 ```yaml
-hapi:
-  fhir:
-    implementationguides:
-      koppeltaalv2:
-        name: koppeltaalv2.00
-        version: 0.15.0-beta.7d
-        url: https://github.com/vzvznl/Koppeltaal-2.0-FHIR/releases/download/v0.15.0-beta.7d/koppeltaalv2-0.15.0-beta.7d-minimal.tgz
+koppeltaal:
+  implementationguide:
+    name: koppeltaalv2.00
+    version: 0.16.6
+    fetchDependencies: true
+    installMode: STORE_AND_INSTALL
 ```
 
 ### Database Connection
 
-Environment variables or application.yaml:
+Environment variables or `docker/config/application.yaml`:
 - `spring.datasource.url`
 - `spring.datasource.username`
 - `spring.datasource.password`

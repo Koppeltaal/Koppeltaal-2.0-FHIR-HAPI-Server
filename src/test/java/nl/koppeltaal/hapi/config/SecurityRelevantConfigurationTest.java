@@ -29,7 +29,7 @@ class SecurityRelevantConfigurationTest {
 
   @Test
   void shouldDisableFeaturesThatBypassTheResourceOriginChecks() {
-    Properties configuration = load("src/main/resources/application.yaml");
+    Properties configuration = load("docker/config/application.yaml");
 
     for (String feature : DISABLED_FEATURES) {
       assertEquals("false", configuration.getProperty(feature), feature + " must be false");
@@ -38,7 +38,7 @@ class SecurityRelevantConfigurationTest {
 
   @Test
   void shouldNotEnableThemInAnEnvironmentProfile() {
-    for (String profile : List.of("src/main/resources/application-staging.yaml", "src/main/resources/application-prd.yaml")) {
+    for (String profile : List.of("docker/config/application-staging.yaml", "docker/config/application-prd.yaml")) {
       Properties configuration = load(profile);
 
       for (String feature : DISABLED_FEATURES) {
@@ -50,8 +50,8 @@ class SecurityRelevantConfigurationTest {
   @Test
   void shouldLeaveTheStarterSwitchesOfReplacedFeaturesOffInEveryEnvironment() {
     for (String profile : List.of("staging", "prd")) {
-      Properties configuration = loadAll("src/main/resources/application.yaml",
-        "src/main/resources/application-" + profile + ".yaml");
+      Properties configuration = loadAll("docker/config/application.yaml",
+        "docker/config/application-" + profile + ".yaml");
       assertEquals("false", configuration.getProperty("hapi.fhir.allow_cascading_deletes"), profile);
       assertEquals("false", configuration.getProperty("hapi.fhir.enable_repository_validating_interceptor"), profile);
       assertTrue(configuration.keySet().stream().map(String::valueOf)

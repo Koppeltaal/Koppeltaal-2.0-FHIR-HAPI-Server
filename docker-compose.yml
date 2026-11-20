@@ -15,7 +15,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./heapdumps:/tmp
+      - heapdumps:/tmp
     deploy:
       resources:
         limits:
@@ -31,3 +31,5 @@ services:
     # No volume mount - database will be clean on each restart
     ports:
       - "5432:5432"
+volumes:
+  heapdumps:

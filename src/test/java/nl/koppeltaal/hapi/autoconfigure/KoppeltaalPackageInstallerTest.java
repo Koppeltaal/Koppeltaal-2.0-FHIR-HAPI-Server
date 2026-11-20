@@ -23,7 +23,7 @@ import org.springframework.core.io.FileSystemResource;
 
 class KoppeltaalPackageInstallerTest {
 
-  static final Path CONFIG = Path.of("src/main/resources/application.yaml");
+  static final Path CONFIG = Path.of("docker/config/application.yaml");
 
   private final PackageInstallerWithExclusionSvcImpl installer = mock(PackageInstallerWithExclusionSvcImpl.class);
   private final Batch2JobRegisterer batch2JobRegisterer = mock(Batch2JobRegisterer.class);

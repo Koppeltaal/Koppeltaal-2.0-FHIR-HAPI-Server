@@ -1,84 +1,28 @@
-FROM docker.io/library/maven:3.9.9-eclipse-temurin-17 AS build-hapi
-WORKDIR /tmp/hapi-fhir-jpaserver-starter
+# The vanilla HAPI FHIR starter with the Koppeltaal extension jar on top. Only the WAR comes from the official image;
+# the Java runtime is our own base image, so JRE fixes do not wait for a HAPI release.
+FROM hapiproject/hapi:v8.2.0-2@sha256:df3ec210294f711ac0f89780c449ca843a450b5b5ca6c9a09f5f80509d9d07af AS hapi
 
-ARG OPENTELEMETRY_JAVA_AGENT_VERSION=1.33.3
-RUN curl -LSsO https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OPENTELEMETRY_JAVA_AGENT_VERSION}/opentelemetry-javaagent.jar
-
+FROM docker.io/library/maven:3.9.9-eclipse-temurin-17 AS build
+WORKDIR /build
+COPY --from=hapi /app/main.war /tmp/main.war
+COPY scripts/ scripts/
 COPY pom.xml .
-COPY server.xml .
-RUN mvn -ntp dependency:go-offline
+RUN scripts/install-starter.sh /tmp/main.war && mvn -B -ntp dependency:go-offline
+COPY src/ src/
+RUN mvn -B -ntp -DskipTests package
 
-COPY src/ /tmp/hapi-fhir-jpaserver-starter/src/
-RUN mvn clean install -DskipTests -Djdk.lang.Process.launchMechanism=vfork
-
-FROM build-hapi AS build-distroless
-RUN mvn package -DskipTests spring-boot:repackage -Pboot
-RUN mkdir /app && cp /tmp/hapi-fhir-jpaserver-starter/target/ROOT.war /app/main.war
-
-
-########### bitnami tomcat version is suitable for debugging and comes with a shell
-########### it can be built using eg. `docker build --target tomcat .`
-FROM bitnami/tomcat:10.1 AS tomcat
-
-USER root
-RUN rm -rf /opt/bitnami/tomcat/webapps/ROOT && \
-    mkdir -p /opt/bitnami/hapi/data/hapi/lucenefiles && \
-    chown -R 1001:1001 /opt/bitnami/hapi/data/hapi/lucenefiles && \
-    chmod 775 /opt/bitnami/hapi/data/hapi/lucenefiles
-
-RUN mkdir -p /target && chown -R 1001:1001 target
-USER 1001
-
-COPY --chown=1001:1001 catalina.properties /opt/bitnami/tomcat/conf/catalina.properties
-COPY --chown=1001:1001 server.xml /opt/bitnami/tomcat/conf/server.xml
-COPY --from=build-hapi --chown=1001:1001 /tmp/hapi-fhir-jpaserver-starter/target/ROOT.war /opt/bitnami/tomcat/webapps/ROOT.war
-COPY --from=build-hapi --chown=1001:1001 /tmp/hapi-fhir-jpaserver-starter/opentelemetry-javaagent.jar /app
-
-ENV ALLOW_EMPTY_PASSWORD=yes
-
-########### distroless brings focus on security and runs on plain spring boot - this is the default image
-#FROM gcr.io/distroless/java17-debian12:nonroot as default
-#COPY --chown=nonroot:nonroot --from=build-distroless /app /app
-FROM gcr.io/distroless/java17-debian12:latest AS default
-COPY --from=build-distroless /app /app
-
-COPY certificates/notificaties.lsp.orangeclicks.nl.cer /tmp/notificaties.lsp.orangeclicks.nl.cer
-
-# tmp swap to root user to install a certificate
-#USER 0
-RUN [\
- "/usr/lib/jvm/java-17-openjdk-amd64/bin/keytool",\
- "-import",\
- "-trustcacerts",\
- "-cacerts",\
- "-noprompt",\
- "-storepass",\
- "changeit",\
- "-alias",\
- "notificaties.lsp.orangeclicks.nl",\
- "-file",\
- "/tmp/notificaties.lsp.orangeclicks.nl.cer"\
-]
-
-# 65532 is the nonroot user's uid
-# used here instead of the name to allow Kubernetes to easily detect that the container
-# is running as a non-root (uid != 0) user.
-#USER 65532:65532
+FROM gcr.io/distroless/java17-debian13:nonroot@sha256:5a09afc2ecb9453a60bd0f071a5e0b5e180cbafa23e53976a4e610b3d28f6288 AS default
+USER 0
+COPY certificates/notificaties.lsp.orangeclicks.nl.cer /tmp/subscriber.cer
+RUN ["java", "sun.security.tools.keytool.Main", "-importcert", "-noprompt", "-cacerts", "-storepass", "changeit", \
+     "-alias", "notificaties.lsp.orangeclicks.nl", "-file", "/tmp/subscriber.cer"]
+USER 65532:65532
 WORKDIR /app
-
-#COPY --chown=nonroot:nonroot --from=build-distroless /app /app
-#COPY --chown=nonroot:nonroot --from=build-hapi /tmp/hapi-fhir-jpaserver-starter/opentelemetry-javaagent.jar /app
-COPY --chown=nonroot:nonroot --from=build-distroless /app /app
-COPY --chown=nonroot:nonroot --from=build-hapi /tmp/hapi-fhir-jpaserver-starter/opentelemetry-javaagent.jar /app
-
-ENTRYPOINT ["java", \
-  "-Xms4g", \
-  "-Xmx8g", \
-  "-Xlog:gc*:file=/tmp/gc.log:time,uptime,level,tags:filecount=10,filesize=10M", \
-  "-XX:+HeapDumpOnOutOfMemoryError", \
-  "-XX:HeapDumpPath=/tmp/heapdump.hprof", \
-  "-XX:+ExitOnOutOfMemoryError", \
-  "-XX:NativeMemoryTracking=summary", \
-  "--class-path", "/app/main.war", \
-  "-Dloader.path=main.war!/WEB-INF/classes/,main.war!/WEB-INF/,/app/extra-classes", \
-  "org.springframework.boot.loader.PropertiesLauncher"]
+COPY --from=hapi /app/main.war /app/opentelemetry-javaagent.jar /app/
+COPY --from=build /build/target/kt2-hapi-extension.jar /app/extra-classes/
+COPY --from=build /build/target/extra-libs/java-jwt-4.5.0.jar /build/target/extra-libs/jwks-rsa-0.22.1.jar \
+     /build/target/extra-libs/lucene-backward-codecs-9.11.1.jar /app/extra-classes/
+COPY docker/config/ /app/config/
+ENV SPRING_CONFIG_LOCATION=file:/app/config/ \
+    JDK_JAVA_OPTIONS="-Xms4g -Xmx8g -Xlog:gc*:file=/tmp/gc.log:time,uptime,level,tags:filecount=10,filesize=10M -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp/heapdump.hprof -XX:+ExitOnOutOfMemoryError -XX:NativeMemoryTracking=summary"
+ENTRYPOINT ["java", "--class-path", "/app/main.war", "-Dloader.path=main.war!/WEB-INF/classes/,main.war!/WEB-INF/,/app/extra-classes", "org.springframework.boot.loader.PropertiesLauncher"]
