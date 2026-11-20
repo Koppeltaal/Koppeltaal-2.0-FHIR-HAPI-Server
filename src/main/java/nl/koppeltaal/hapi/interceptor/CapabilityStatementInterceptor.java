@@ -1,0 +1,106 @@
+package nl.koppeltaal.hapi.interceptor;
+
+import ca.uhn.fhir.interceptor.api.Hook;
+import ca.uhn.fhir.interceptor.api.Interceptor;
+import ca.uhn.fhir.interceptor.api.Pointcut;
+
+import org.hl7.fhir.instance.model.api.IBaseConformance;
+import org.hl7.fhir.r4.model.CapabilityStatement;
+import org.hl7.fhir.r4.model.CodeType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * This interceptor customizes the generated {@link CapabilityStatement}. This is used to apply specific Koppeltaal-rules
+ * like the `_revinclude` search parameter being forbidden, and to only advertise the interactions and operations that
+ * the {@link ResourceOriginAuthorizationInterceptor} allows. The terminology operations require an ALL read
+ * permission on ValueSet or CodeSystem.
+ */
+@Component
+@Interceptor
+public class CapabilityStatementInterceptor {
+  public static final List<String> SUPPORTED_PATCH_MIME_TYPES = Arrays.asList(
+    "*/*",
+    "application/fhir+json",
+    "application/fhir+xml",
+    "application/json-patch+json",
+    "application/xml-patch+xml"
+  );
+
+  public static final List<String> SUPPORTED_MIME_TYPES = Arrays.asList(
+    "*/*",
+    "xml",
+    "json",
+    "application/fhir+xml",
+    "application/xml",
+    "application/fhir+json",
+    "application/json",
+    "html/json",
+    "html/xml"
+  );
+
+  public static final List<String> UNSUPPORTED_MIME_TYPES = Arrays.asList(
+    "application/x-turtle",
+    "application/fhir+turtle",
+    "ttl",
+    "html/turtle"
+  );
+
+  private static final Logger LOG = LoggerFactory.getLogger(CapabilityStatementInterceptor.class);
+
+  @Hook(Pointcut.SERVER_CAPABILITY_STATEMENT_GENERATED)
+  public void customize(IBaseConformance theCapabilityStatement) {
+
+    LOG.info("Applying Koppeltaal-specific changes to the CapabilityStatement");
+
+    CapabilityStatement capabilityStatement = (CapabilityStatement) theCapabilityStatement;
+
+    List<CodeType> mimeCodeTypes = SUPPORTED_MIME_TYPES.stream()
+      .map(CodeType::new)
+      .collect(Collectors.toList());
+
+    capabilityStatement.setFormat(mimeCodeTypes);
+
+    capabilityStatement.setContained(Collections.emptyList());
+
+    // only advertise what the ResourceOriginAuthorizationInterceptor allows
+    List<CapabilityStatement.CapabilityStatementRestComponent> restComponents = capabilityStatement.getRest();
+    for (CapabilityStatement.CapabilityStatementRestComponent restComponent : restComponents) {
+      // no system level interactions (transaction, batch, history, search) or operations, see TOP-KT-002a
+      restComponent.setInteraction(new ArrayList<>());
+      restComponent.setOperation(new ArrayList<>());
+
+      List<CapabilityStatement.CapabilityStatementRestResourceComponent> resources = restComponent.getResource();
+      for (CapabilityStatement.CapabilityStatementRestResourceComponent resource : resources) {
+        // _include is supported, the response filter removes included resources of other resource-origins
+        resource.setSearchRevInclude(Collections.emptyList());
+        resource.getInteraction().removeIf((interaction) -> interaction.getCode() == CapabilityStatement.TypeRestfulInteraction.PATCH
+          || interaction.getCode() == CapabilityStatement.TypeRestfulInteraction.HISTORYTYPE);
+        resource.setConditionalCreate(false);
+        resource.getOperation().removeIf((operation) -> !isOfferedOperation(resource.getType(), operation.getName()));
+      }
+    }
+
+    capabilityStatement.addImplementationGuide("http://koppeltaal.nl/fhir/ImplementationGuide");
+
+    LOG.debug("Applied Koppeltaal-specific changes to the CapabilityStatement");
+  }
+
+  /**
+   * The operations that applications may use. The maintenance operations of the domain admin are not advertised.
+   */
+  private static boolean isOfferedOperation(String resourceType, String operationName) {
+    final String operation = "$" + operationName;
+
+    return ResourceOriginAuthorizationInterceptor.OPERATION_VALIDATE.equals(operation)
+      || (ResourceOriginAuthorizationInterceptor.TERMINOLOGY_RESOURCE_TYPES.contains(resourceType)
+        && ResourceOriginAuthorizationInterceptor.TERMINOLOGY_OPERATIONS.contains(operation));
+  }
+}
