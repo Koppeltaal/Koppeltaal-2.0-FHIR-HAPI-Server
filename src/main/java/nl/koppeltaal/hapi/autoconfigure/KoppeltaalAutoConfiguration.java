@@ -82,7 +82,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
   Oauth2AccessTokenService.class,
   PackageInstallerWithExclusionSvcImpl.class,
   RequestIdHolder.class,
-  SmartConfigurationController.class
+  SmartConfigurationController.class,
+  // server wiring
+  ServletWiringConfig.class
 })
 public class KoppeltaalAutoConfiguration {
 }

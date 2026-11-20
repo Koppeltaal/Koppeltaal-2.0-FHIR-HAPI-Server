@@ -159,6 +159,11 @@ class ServerWiringContractTest {
     assertTrue(UUID_FORMAT.matcher(id).matches(), "id " + id);
   }
 
+  @Test
+  void theRouteWithoutDefaultIsGone() throws Exception {
+    assertEquals(404, get("/fhir/metadata", Map.of()).statusCode());
+  }
+
   /** The fork registers its interceptors and the id strategy when the FHIR servlet starts. */
   private void servletStarted() throws Exception {
     assertEquals(200, get("/fhir/DEFAULT/metadata", Map.of()).statusCode());

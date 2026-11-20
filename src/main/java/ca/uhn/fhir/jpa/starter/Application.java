@@ -3,10 +3,6 @@ package ca.uhn.fhir.jpa.starter;
 import ca.uhn.fhir.batch2.jobs.config.Batch2JobsConfig;
 import ca.uhn.fhir.jpa.batch2.JpaBatch2Config;
 import ca.uhn.fhir.jpa.starter.annotations.OnEitherVersion;
-import nl.koppeltaal.hapi.KoppeltaalRestfulServer;
-import nl.koppeltaal.hapi.config.FhirServerSecurityConfiguration;
-import ca.uhn.fhir.jpa.starter.common.FhirTesterConfig;
-import nl.koppeltaal.hapi.controller.SmartConfigurationController;
 import ca.uhn.fhir.jpa.starter.cdshooks.StarterCdsHooksConfig;
 import ca.uhn.fhir.jpa.starter.cr.StarterCrDstu3Config;
 import ca.uhn.fhir.jpa.starter.cr.StarterCrR4Config;
@@ -28,22 +24,10 @@ import org.springframework.boot.web.servlet.support.SpringBootServletInitializer
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Import;
-import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
-import org.springframework.web.servlet.DispatcherServlet;
 
-@EnableScheduling
-@ServletComponentScan(basePackageClasses = {RestfulServer.class, KoppeltaalRestfulServer.class})
+@ServletComponentScan(basePackageClasses = {RestfulServer.class})
 @SpringBootApplication(exclude = {ElasticsearchRestClientAutoConfiguration.class, ThymeleafAutoConfiguration.class})
 @Import({
-  SubscriptionSubmitterConfig.class,
-  SubscriptionProcessorConfig.class,
-  SubscriptionChannelConfig.class,
-  WebsocketDispatcherConfig.class,
-  MdmConfig.class,
-  JpaBatch2Config.class,
-  Batch2JobsConfig.class,
-  FhirServerSecurityConfiguration.class,
 	StarterCrR4Config.class,
 	StarterCrDstu3Config.class,
 	StarterCdsHooksConfig.class,
@@ -74,27 +58,9 @@ public class Application extends SpringBootServletInitializer {
 		ServletRegistrationBean servletRegistrationBean = new ServletRegistrationBean();
 		beanFactory.autowireBean(restfulServer);
 		servletRegistrationBean.setServlet(restfulServer);
-		servletRegistrationBean.addUrlMappings("/fhir/DEFAULT/*"); //Partitioning got changed massively in newer versions - disable it and map the servlet to our default partition
+		servletRegistrationBean.addUrlMappings("/fhir/*");
 		servletRegistrationBean.setLoadOnStartup(1);
 
-    return servletRegistrationBean;
-  }
-
-  @Bean
-  public ServletRegistrationBean smartConfigurationBean() {
-
-    AnnotationConfigWebApplicationContext annotationConfigWebApplicationContext = new AnnotationConfigWebApplicationContext();
-    DispatcherServlet dispatcherServlet = new DispatcherServlet(annotationConfigWebApplicationContext);
-    dispatcherServlet.setContextClass(AnnotationConfigWebApplicationContext.class);
-    dispatcherServlet.setContextConfigLocation(SmartConfigurationController.class.getName());
-
-    ServletRegistrationBean registrationBean = new ServletRegistrationBean();
-    registrationBean.setName("wellknown");
-    registrationBean.setServlet(dispatcherServlet);
-
-    //TODO: Read all partitions and add a mapping in the varargs below
-    registrationBean.addUrlMappings("/fhir/DEFAULT/.well-known/*");
-    registrationBean.setLoadOnStartup(1);
-    return registrationBean;
-  }
+		return servletRegistrationBean;
+	}
 }

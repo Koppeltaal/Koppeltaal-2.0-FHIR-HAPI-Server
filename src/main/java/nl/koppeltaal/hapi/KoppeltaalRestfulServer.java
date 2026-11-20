@@ -19,7 +19,6 @@ import nl.koppeltaal.hapi.util.ServerDeviceId;
 import ca.uhn.fhir.rest.openapi.OpenApiInterceptor;
 import ca.uhn.fhir.rest.server.RestfulServer;
 import ca.uhn.fhir.rest.server.interceptor.CaptureResourceSourceFromHeaderInterceptor;
-import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.hl7.fhir.r4.model.Device;
@@ -32,7 +31,6 @@ import java.util.UUID;
 import static ca.uhn.fhir.rest.server.ServletRequestTracing.ATTRIBUTE_REQUEST_ID;
 import java.util.Optional;
 
-@WebServlet(urlPatterns = {"/fhir/*"}, displayName = "Koppeltaal Resource Service")
 public class KoppeltaalRestfulServer extends RestfulServer {
   private static final Logger ourLog = LoggerFactory.getLogger(KoppeltaalRestfulServer.class);
   private static final long serialVersionUID = 1L;
