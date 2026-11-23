@@ -454,13 +454,14 @@ koppeltaal:
   repository-validation:
     # replaces hapi.fhir.enable_repository_validating_interceptor, with the KT2 profile rules
     enabled: true
-  implementationguide:
-    # replaces hapi.fhir.implementationguides.kt2; the same keys (HAPI's PackageInstallationSpec)
-    name: koppeltaalv2.00
-    version: 0.16.6
-    # packageUrl: https://github.com/vzvznl/Koppeltaal-2.0-FHIR/releases/download/v0.16.6/koppeltaalv2-0.16.6-minimal.tgz
-    fetchDependencies: true
-    installMode: STORE_AND_INSTALL
+  implementationguides:
+    # replaces hapi.fhir.implementationguides: one entry per guide, installed in this order, with the same keys (HAPI's PackageInstallationSpec)
+    kt2:
+      name: koppeltaalv2.00
+      version: 0.16.6
+      # packageUrl: https://github.com/vzvznl/Koppeltaal-2.0-FHIR/releases/download/v0.16.6/koppeltaalv2-0.16.6-minimal.tgz
+      fetchDependencies: true
+      installMode: STORE_AND_INSTALL
 
 # Patient data cleanup (TOP-KT-028): AVG policy, so on by default.
 cleanup:

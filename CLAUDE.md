@@ -139,7 +139,7 @@ export PGPASSWORD=staging_password
 
 ### How HAPI Loads Packages
 
-1. **Startup**: the Koppeltaal extension reads `koppeltaal.implementationguide` from `docker/config/application.yaml`
+1. **Startup**: the Koppeltaal extension reads `koppeltaal.implementationguides` from `docker/config/application.yaml` and installs the guides in that order
 2. **Download**: Fetches package .tgz from URL or local path
 3. **Extract**: Unzips and reads package.json, resources
 4. **Cache**: Stores in `NPM_PACKAGE` and `NPM_PACKAGE_VER` tables
@@ -177,7 +177,7 @@ psql -h HOST -p PORT -U USER -d DB -f sql-scripts/preview-ig-removal.sql
 ./sql-scripts/remove-ig.sh HOST PORT USER DB --yes
 
 # 4. Restart HAPI server
-# Package will auto-reinstall from koppeltaal.implementationguide in docker/config/application.yaml
+# Package will auto-reinstall from koppeltaal.implementationguides in docker/config/application.yaml
 ```
 
 ### Workflow: Investigate Startup Crash
@@ -269,16 +269,19 @@ GROUP BY vs.url, vs.expansion_status;
 
 ### Package Auto-Load Config
 
-Check `docker/config/application.yaml` or environment variables:
+Check `docker/config/application.yaml` or environment variables (for example `KOPPELTAAL_IMPLEMENTATIONGUIDES_KT2_VERSION`):
 
 ```yaml
 koppeltaal:
-  implementationguide:
-    name: koppeltaalv2.00
-    version: 0.16.6
-    fetchDependencies: true
-    installMode: STORE_AND_INSTALL
+  implementationguides:
+    kt2:
+      name: koppeltaalv2.00
+      version: 0.16.6
+      fetchDependencies: true
+      installMode: STORE_AND_INSTALL
 ```
+
+`koppeltaal.implementationguides` replaces the starter's `hapi.fhir.implementationguides`, with the same keys; the server refuses to start when the starter key is set.
 
 ### Database Connection
 

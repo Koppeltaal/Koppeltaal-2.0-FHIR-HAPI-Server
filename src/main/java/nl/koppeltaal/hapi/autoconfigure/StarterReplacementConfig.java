@@ -11,25 +11,20 @@ import ca.uhn.fhir.jpa.packages.IPackageInstallerSvc;
 import ca.uhn.fhir.jpa.packages.PackageInstallationSpec;
 import ca.uhn.fhir.rest.server.interceptor.CorsInterceptor;
 import java.util.Arrays;
+import java.util.Map;
 import nl.koppeltaal.hapi.config.FhirServerSecurityConfiguration;
 import nl.koppeltaal.hapi.interceptor.ResourceOriginCascadingDeleteInterceptor;
 import nl.koppeltaal.hapi.service.PackageInstallerWithExclusionSvcImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Condition;
-import org.springframework.context.annotation.ConditionContext;
-import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.core.type.AnnotatedTypeMetadata;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.cors.CorsConfiguration;
 
@@ -94,29 +89,28 @@ public class StarterReplacementConfig {
     return new KoppeltaalRepositoryValidationRules(ruleBuilder, daoRegistry).buildUsingStoredStructureDefinitions();
   }
 
-  /** The Koppeltaal IG: the same keys as one entry of hapi.fhir.implementationguides, which stays empty. */
-  @Bean
-  @ConfigurationProperties("koppeltaal.implementationguide")
-  @Conditional(ImplementationGuideConfigured.class)
-  public PackageInstallationSpec koppeltaalImplementationGuide() {
-    return new PackageInstallationSpec();
-  }
-
   /**
-   * The Koppeltaal packageInstaller. It starts Batch2, installs the Koppeltaal IG without example instances, and is the
-   * primary IPackageInstallerSvc. It has its own name, so the starter's packageInstaller, which is also primary, cannot
-   * replace it silently: the two together fail the startup.
+   * The Koppeltaal packageInstaller. It starts Batch2, then installs every entry of koppeltaal.implementationguides in
+   * configuration order, each without example instances, as the fork did with hapi.fhir.implementationguides. The entries
+   * take the same keys (HAPI's PackageInstallationSpec). It is the primary IPackageInstallerSvc and has its own name, so
+   * the starter's packageInstaller, which is also primary, cannot replace it silently: the two together fail the startup.
    */
   @Bean("koppeltaalPackageInstaller")
   @Primary
   public IPackageInstallerSvc koppeltaalPackageInstaller(PackageInstallerWithExclusionSvcImpl installer,
-      Batch2JobRegisterer batch2JobRegisterer, ObjectProvider<PackageInstallationSpec> implementationGuide,
-      @Value("${hapi.fhir.install_transitive_ig_dependencies:true}") boolean installTransitiveIgDependencies) {
+      Batch2JobRegisterer batch2JobRegisterer, Environment environment) {
     batch2JobRegisterer.start();
-    implementationGuide.ifAvailable(guide -> {
+    Binder binder = Binder.get(environment);
+    Map<String, PackageInstallationSpec> guides = binder
+      .bind("koppeltaal.implementationguides", Bindable.mapOf(String.class, PackageInstallationSpec.class))
+      .orElse(Map.of());
+    boolean installTransitiveIgDependencies = binder
+      .bind("hapi.fhir.install-transitive-ig-dependencies", Boolean.class)
+      .orElse(true);
+    guides.forEach((key, guide) -> {
       if (isBlank(guide.getName()) || isBlank(guide.getVersion())) {
-        throw new IllegalStateException("koppeltaal.implementationguide needs a name and a version, as HAPI's package "
-          + "installer does; found name " + guide.getName() + " and version " + guide.getVersion());
+        throw new IllegalStateException("koppeltaal.implementationguides." + key + " needs a name and a version, as "
+          + "HAPI's package installer does; found name " + guide.getName() + " and version " + guide.getVersion());
       }
       if (installTransitiveIgDependencies) {
         guide.addDependencyExclude("hl7.fhir.r2.core")
@@ -136,18 +130,5 @@ public class StarterReplacementConfig {
 
   private static boolean isBlank(String value) {
     return value == null || value.isBlank();
-  }
-
-  /**
-   * True when koppeltaal.implementationguide holds any key, so that koppeltaalPackageInstaller refuses a block without
-   * a name instead of skipping it.
-   */
-  static class ImplementationGuideConfigured implements Condition {
-
-    @Override
-    public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
-      return Binder.get(context.getEnvironment())
-        .bind("koppeltaal.implementationguide", Bindable.mapOf(String.class, Object.class)).isBound();
-    }
   }
 }

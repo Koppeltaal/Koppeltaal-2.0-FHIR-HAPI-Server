@@ -6,71 +6,93 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import ca.uhn.fhir.batch2.config.Batch2JobRegisterer;
 import ca.uhn.fhir.jpa.packages.PackageInstallationSpec;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 import nl.koppeltaal.hapi.service.PackageInstallerWithExclusionSvcImpl;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.support.StaticListableBeanFactory;
-import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.env.YamlPropertySourceLoader;
-import org.springframework.context.annotation.ConditionContext;
-import org.springframework.core.env.StandardEnvironment;
-import java.util.Map;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.mock.env.MockEnvironment;
 
+/**
+ * The fork installed every entry of hapi.fhir.implementationguides, in configuration order, each without example
+ * instances. koppeltaal.implementationguides takes the same keys.
+ */
 class KoppeltaalPackageInstallerTest {
 
   static final Path CONFIG = Path.of("docker/config/application.yaml");
+
+  private static final List<String> INSTALL_TYPES = List.of("StructureDefinition", "ValueSet", "CodeSystem",
+    "SearchParameter", "CapabilityStatement", "OperationDefinition", "ConceptMap", "NamingSystem", "ImplementationGuide");
 
   private final PackageInstallerWithExclusionSvcImpl installer = mock(PackageInstallerWithExclusionSvcImpl.class);
   private final Batch2JobRegisterer batch2JobRegisterer = mock(Batch2JobRegisterer.class);
 
   @Test
-  void bindsTheConfiguredGuideLikeTheStarterBoundItsOwn() throws Exception {
-    PackageInstallationSpec guide = configuredGuide();
+  void installsTheShippedGuideLikeTheStarterInstalledItsOwn() throws Exception {
+    install(shippedConfiguration());
 
+    PackageInstallationSpec guide = installed(1).get(0);
     assertThat(guide.getName()).isEqualTo("koppeltaalv2.00");
     assertThat(guide.isFetchDependencies()).isTrue();
     assertThat(guide.getInstallMode()).isEqualTo(PackageInstallationSpec.InstallModeEnum.STORE_AND_INSTALL);
   }
 
   @Test
-  void installsTheConfiguredGuideAfterStartingBatch2() throws Exception {
-    new StarterReplacementConfig().koppeltaalPackageInstaller(installer, batch2JobRegisterer, provider(configuredGuide()), true);
+  void installsEveryGuideAfterStartingBatch2InConfigurationOrder() throws Exception {
+    install(configuration("""
+      koppeltaal:
+        implementationguides:
+          other:
+            name: example.fhir.other
+            version: 1.0.0
+          kt2:
+            name: koppeltaalv2.00
+            version: 0.16.6
+      """));
 
     InOrder order = inOrder(batch2JobRegisterer, installer);
     order.verify(batch2JobRegisterer).start();
-    ArgumentCaptor<PackageInstallationSpec> installed = ArgumentCaptor.forClass(PackageInstallationSpec.class);
-    order.verify(installer).install(installed.capture());
-    assertThat(installed.getValue().isFetchDependencies()).isTrue();
-    assertThat(installed.getValue().getDependencyExcludes())
-      .contains("hl7.fhir.r2.core", "hl7.fhir.r3.core", "hl7.fhir.r4.core", "hl7.fhir.r5.core");
-    assertThat(installed.getValue().getInstallResourceTypes()).containsExactly("StructureDefinition", "ValueSet",
-      "CodeSystem", "SearchParameter", "CapabilityStatement", "OperationDefinition", "ConceptMap", "NamingSystem",
-      "ImplementationGuide");
+    order.verify(installer, times(2)).install(any());
+    List<PackageInstallationSpec> guides = installed(2);
+    assertThat(guides).extracting(PackageInstallationSpec::getName).containsExactly("example.fhir.other", "koppeltaalv2.00");
+    guides.forEach(guide -> {
+      assertThat(guide.getDependencyExcludes())
+        .contains("hl7.fhir.r2.core", "hl7.fhir.r3.core", "hl7.fhir.r4.core", "hl7.fhir.r5.core");
+      assertThat(guide.getInstallResourceTypes()).containsExactlyElementsOf(INSTALL_TYPES);
+    });
   }
 
   @Test
   void keepsTheCoreDependenciesWhenTransitiveInstallationIsOff() throws Exception {
-    new StarterReplacementConfig().koppeltaalPackageInstaller(installer, batch2JobRegisterer, provider(configuredGuide()), false);
+    install(shippedConfiguration().withProperty("hapi.fhir.install_transitive_ig_dependencies", "false"));
 
-    ArgumentCaptor<PackageInstallationSpec> installed = ArgumentCaptor.forClass(PackageInstallationSpec.class);
-    verify(installer).install(installed.capture());
-    assertThat(installed.getValue().getDependencyExcludes()).isEmpty();
+    assertThat(installed(1).get(0).getDependencyExcludes()).isEmpty();
+  }
+
+  /** The starter bound the flag with relaxed binding, so the kebab-case spelling switched it off too. */
+  @Test
+  void readsTheTransitiveFlagInEverySpellingTheStarterRead() throws Exception {
+    install(shippedConfiguration().withProperty("hapi.fhir.install-transitive-ig-dependencies", "false"));
+
+    assertThat(installed(1).get(0).getDependencyExcludes()).isEmpty();
   }
 
   @Test
-  void installsNothingWithoutAGuideButStillStartsBatch2() {
-    new StarterReplacementConfig().koppeltaalPackageInstaller(installer, batch2JobRegisterer, provider(null), true);
+  void installsNothingWithoutGuidesButStillStartsBatch2() {
+    install(new MockEnvironment());
 
     verify(batch2JobRegisterer).start();
     verify(installer, never()).install(any());
@@ -79,54 +101,46 @@ class KoppeltaalPackageInstallerTest {
   /** HAPI's installer needs both, so such a guide must stop the startup instead of being skipped. */
   @Test
   void refusesAGuideWithoutNameOrVersion() {
-    PackageInstallationSpec withoutName = new PackageInstallationSpec().setVersion("0.16.6");
+    MockEnvironment environment = new MockEnvironment().withProperty("koppeltaal.implementationguides.kt2.version", "0.16.6");
 
-    assertThatThrownBy(() -> new StarterReplacementConfig()
-      .koppeltaalPackageInstaller(installer, batch2JobRegisterer, provider(withoutName), true))
+    assertThatThrownBy(() -> install(environment))
       .isInstanceOf(IllegalStateException.class)
-      .hasMessageContaining("koppeltaal.implementationguide needs a name and a version");
+      .hasMessageContaining("koppeltaal.implementationguides.kt2 needs a name and a version");
     verify(installer, never()).install(any());
-  }
-
-  @Test
-  void createsTheGuideForABlockWithoutAName() {
-    assertThat(guideConfigured(new MockEnvironment().withProperty("koppeltaal.implementationguide.version", "0.16.6")))
-      .isTrue();
   }
 
   /** K8S secrets arrive as environment variables. */
   @Test
-  void createsTheGuideFromAnEnvironmentVariable() {
+  void refusesAGuideFromAnEnvironmentVariableWithoutAName() {
     MockEnvironment environment = new MockEnvironment();
     environment.getPropertySources().addFirst(new SystemEnvironmentPropertySource("systemEnvironment",
-      Map.of("KOPPELTAAL_IMPLEMENTATIONGUIDE_VERSION", "0.16.6")));
+      Map.of("KOPPELTAAL_IMPLEMENTATIONGUIDES_KT2_VERSION", "0.16.6")));
 
-    assertThat(guideConfigured(environment)).isTrue();
+    assertThatThrownBy(() -> install(environment)).hasMessageContaining("koppeltaal.implementationguides.kt2");
   }
 
-  @Test
-  void createsNoGuideWithoutTheBlock() {
-    assertThat(guideConfigured(new MockEnvironment().withProperty("koppeltaal.cors.enabled", "true"))).isFalse();
+  private void install(org.springframework.core.env.Environment environment) {
+    new StarterReplacementConfig().koppeltaalPackageInstaller(installer, batch2JobRegisterer, environment);
   }
 
-  private static boolean guideConfigured(MockEnvironment environment) {
-    ConditionContext context = mock(ConditionContext.class);
-    when(context.getEnvironment()).thenReturn(environment);
-    return new StarterReplacementConfig.ImplementationGuideConfigured().matches(context, null);
+  private List<PackageInstallationSpec> installed(int count) {
+    ArgumentCaptor<PackageInstallationSpec> captor = ArgumentCaptor.forClass(PackageInstallationSpec.class);
+    verify(installer, times(count)).install(captor.capture());
+    return captor.getAllValues();
   }
 
-  static PackageInstallationSpec configuredGuide() throws Exception {
-    StandardEnvironment environment = new StandardEnvironment();
-    new YamlPropertySourceLoader().load("config", new FileSystemResource(CONFIG))
-      .forEach(environment.getPropertySources()::addLast);
-    return Binder.get(environment).bind("koppeltaal.implementationguide", PackageInstallationSpec.class).get();
+  static MockEnvironment shippedConfiguration() throws Exception {
+    return configuration(new FileSystemResource(CONFIG));
   }
 
-  private static ObjectProvider<PackageInstallationSpec> provider(PackageInstallationSpec guide) {
-    StaticListableBeanFactory beans = new StaticListableBeanFactory();
-    if (guide != null) {
-      beans.addBean("koppeltaalImplementationGuide", guide);
-    }
-    return beans.getBeanProvider(PackageInstallationSpec.class);
+  /** A configuration file keeps its order; MockEnvironment.withProperty does not. */
+  private static MockEnvironment configuration(String yaml) throws Exception {
+    return configuration(new ByteArrayResource(yaml.getBytes(StandardCharsets.UTF_8)));
+  }
+
+  private static MockEnvironment configuration(Resource yaml) throws Exception {
+    MockEnvironment environment = new MockEnvironment();
+    new YamlPropertySourceLoader().load("config", yaml).forEach(environment.getPropertySources()::addLast);
+    return environment;
   }
 }
