@@ -53,14 +53,14 @@ final class WiringAssertions {
     List<Object> storageInterceptors = new ArrayList<>(serverInterceptors);
     storageInterceptors.addAll(jpaRegistry.getAllRegisteredInterceptors());
     if (storageInterceptors.stream().anyMatch(interceptor -> interceptor.getClass() == CascadingDeleteInterceptor.class)) {
-      problems.add("hapi.fhir.allow_cascading_deletes must be false: Koppeltaal registers its own "
+      problems.add("hapi.fhir.allow_cascading_deletes must not be set: Koppeltaal registers its own "
         + "resource-origin-aware cascading deletes (koppeltaal.cascading-deletes)");
     }
     if (hasForeign(serverInterceptors, CorsInterceptor.class, koppeltaalInterceptors)) {
       problems.add("hapi.fhir.cors must not be set: Koppeltaal registers its own CorsInterceptor (koppeltaal.cors)");
     }
     if (hasForeign(storageInterceptors, RepositoryValidatingInterceptor.class, koppeltaalInterceptors)) {
-      problems.add("hapi.fhir.enable_repository_validating_interceptor must be false: Koppeltaal registers its own "
+      problems.add("hapi.fhir.enable_repository_validating_interceptor must not be set: Koppeltaal registers its own "
         + "rules (koppeltaal.repository-validation)");
     }
     if (serverInterceptors.stream().filter(RequestValidatingInterceptor.class::isInstance).count() > 1) {

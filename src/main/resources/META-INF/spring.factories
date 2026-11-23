@@ -1,1 +1,2 @@
-org.springframework.boot.env.EnvironmentPostProcessor=nl.koppeltaal.hapi.autoconfigure.KoppeltaalActivationGuard
+org.springframework.boot.env.EnvironmentPostProcessor=nl.koppeltaal.hapi.autoconfigure.KoppeltaalActivationGuard,\
+  nl.koppeltaal.hapi.autoconfigure.ReplacedStarterSwitchGuard

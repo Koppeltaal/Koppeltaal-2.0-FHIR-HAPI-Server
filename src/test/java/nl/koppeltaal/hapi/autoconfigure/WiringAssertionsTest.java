@@ -66,7 +66,7 @@ class WiringAssertionsTest {
   void refusesThePlainCascadeOnTheServer() {
     server.registerInterceptor(plainCascade());
 
-    assertThatThrownBy(this::verify).hasMessageContaining("hapi.fhir.allow_cascading_deletes must be false");
+    assertThatThrownBy(this::verify).hasMessageContaining("hapi.fhir.allow_cascading_deletes must not be set");
   }
 
   /** Storage hooks run on both registries (CompositeInterceptorBroadcaster), so a plain cascade there counts too. */
@@ -74,7 +74,7 @@ class WiringAssertionsTest {
   void refusesThePlainCascadeOnTheJpaRegistry() {
     jpaRegistry.registerInterceptor(plainCascade());
 
-    assertThatThrownBy(this::verify).hasMessageContaining("hapi.fhir.allow_cascading_deletes must be false");
+    assertThatThrownBy(this::verify).hasMessageContaining("hapi.fhir.allow_cascading_deletes must not be set");
   }
 
   @Test
@@ -89,7 +89,7 @@ class WiringAssertionsTest {
     server.registerInterceptor(new RepositoryValidatingInterceptor(fhirContext, List.of()));
 
     assertThatThrownBy(this::verify)
-      .hasMessageContaining("hapi.fhir.enable_repository_validating_interceptor must be false");
+      .hasMessageContaining("hapi.fhir.enable_repository_validating_interceptor must not be set");
   }
 
   @Test
@@ -97,7 +97,7 @@ class WiringAssertionsTest {
     jpaRegistry.registerInterceptor(new RepositoryValidatingInterceptor(fhirContext, List.of()));
 
     assertThatThrownBy(this::verify)
-      .hasMessageContaining("hapi.fhir.enable_repository_validating_interceptor must be false");
+      .hasMessageContaining("hapi.fhir.enable_repository_validating_interceptor must not be set");
   }
 
   @Test

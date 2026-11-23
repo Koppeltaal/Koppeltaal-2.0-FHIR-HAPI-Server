@@ -17,10 +17,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * These HAPI features bypass the resource-origin checks of the ResourceOriginAuthorizationInterceptor, so they must
  * stay disabled. Cascading deletes are allowed, those are authorized per resource by the
  * ResourceOriginCascadingDeleteInterceptor. The test resources contain another application.yaml, hence the explicit
- * paths. The starter's switches for features Koppeltaal replaces stay off in every environment; WiringAssertions
- * refuses them at startup too.
+ * paths. The starter's keys for features Koppeltaal replaces stay unset in every environment, so they keep the starter's
+ * defaults (off); ReplacedStarterSwitchGuard refuses them at startup.
  */
 class SecurityRelevantConfigurationTest {
+
+  private static final List<String> REPLACED_STARTER_KEYS = List.of("hapi.fhir.allow_cascading_deletes",
+    "hapi.fhir.enable_repository_validating_interceptor", "hapi.fhir.cors", "hapi.fhir.implementationguides");
 
   private static final List<String> DISABLED_FEATURES = List.of(
     "hapi.fhir.expunge_enabled",
@@ -52,10 +55,8 @@ class SecurityRelevantConfigurationTest {
     for (String profile : List.of("staging", "prd")) {
       Properties configuration = loadAll("docker/config/application.yaml",
         "docker/config/application-" + profile + ".yaml");
-      assertEquals("false", configuration.getProperty("hapi.fhir.allow_cascading_deletes"), profile);
-      assertEquals("false", configuration.getProperty("hapi.fhir.enable_repository_validating_interceptor"), profile);
       assertTrue(configuration.keySet().stream().map(String::valueOf)
-        .noneMatch(key -> key.startsWith("hapi.fhir.cors") || key.startsWith("hapi.fhir.implementationguides")), profile);
+        .noneMatch(key -> REPLACED_STARTER_KEYS.stream().anyMatch(key::startsWith)), profile);
       assertEquals("true", configuration.getProperty("koppeltaal.cascading-deletes.enabled"), profile);
       assertEquals("true", configuration.getProperty("koppeltaal.cors.enabled"), profile);
       assertEquals("true", configuration.getProperty("koppeltaal.repository-validation.enabled"), profile);

@@ -199,8 +199,7 @@ hapi:
     # Allowed Bundle Types for persistence (defaults are: COLLECTION,DOCUMENT,MESSAGE)
     ##################################################
     #    allowed_bundle_types: COLLECTION,DOCUMENT,MESSAGE,TRANSACTION,TRANSACTIONRESPONSE,BATCH,BATCHRESPONSE,HISTORY,SEARCHSET
-    ### off: koppeltaal.cascading-deletes turns on the ResourceOriginCascadingDeleteInterceptor instead
-    allow_cascading_deletes: false
+    ### allow_cascading_deletes: replaced by koppeltaal.cascading-deletes (the ResourceOriginCascadingDeleteInterceptor); the server refuses it
     allow_contains_searches: true
     allow_external_references: true
     ### keep false: deleting multiple resources at once is not supported within Koppeltaal (TOP-KT-002a)
@@ -215,7 +214,7 @@ hapi:
     default_pretty_print: true
     default_page_size: 20
     #    delete_expunge_enabled: true
-    enable_repository_validating_interceptor: false
+    ### enable_repository_validating_interceptor: replaced by koppeltaal.repository-validation; the server refuses it
     enable_index_missing_fields: false
     #    enable_index_of_type: true
     #    enable_index_contained_resource: false
@@ -446,7 +445,7 @@ koppeltaal:
     # replaces hapi.fhir.allow_cascading_deletes: this one checks the resource origin of every cascaded delete
     enabled: true
   cors:
-    # replaces hapi.fhir.cors: the same settings, plus If-Match
+    # replaces hapi.fhir.cors: the same settings, plus If-Match; they take effect only with enabled: true, where the presence of hapi.fhir.cors switched CORS on
     enabled: true
     allow-credentials: true
     allowed-origin:

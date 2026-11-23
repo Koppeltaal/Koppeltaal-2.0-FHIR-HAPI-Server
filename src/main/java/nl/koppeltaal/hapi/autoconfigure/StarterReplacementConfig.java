@@ -29,8 +29,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.web.cors.CorsConfiguration;
 
 /**
- * Koppeltaal's replacements for features the starter builds itself. Each has its own koppeltaal.* switch; the starter's
- * switch for the same feature stays off, and WiringAssertions refuses both.
+ * Koppeltaal's replacements for features the starter builds itself. Each has its own koppeltaal.* switch. The starter's
+ * key for the same feature stays unset: ReplacedStarterSwitchGuard refuses it, and WiringAssertions refuses the starter's
+ * own interceptor.
  */
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(KoppeltaalCorsProperties.class)
