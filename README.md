@@ -19,7 +19,10 @@ scripts/check-dependencies.sh
 
 ## Run locally
 
-`docker compose up --build` starts the server with a fresh Postgres. The FHIR base is `http://localhost:8080/fhir/DEFAULT`.
+- **From Maven, for development:** `mvn spring-boot:run` starts the starter's `Application` with this extension and `docker/config/`, without building an image. It needs JDK 17 and the starter classes from `scripts/install-starter.sh`. It connects to the datasource in `docker/config/application.yaml` (`127.0.0.1:5432/hapi_fhir_server_dev`); override that with environment variables such as `SPRING_DATASOURCE_URL` and `SPRING_DATASOURCE_USERNAME`. Security is off in that configuration; `FHIR_SERVER_SECURITY_ENABLED=true` switches the token checks on. For a debugger, add `-Dspring-boot.run.jvmArguments="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"`.
+- **In Docker:** `docker compose up --build` starts the image with a Postgres container on host port 5432. That container has no volume, so `docker compose down` discards its data.
+
+The FHIR base is `http://localhost:8080/fhir/DEFAULT` in both cases.
 
 ## Runtime settings
 

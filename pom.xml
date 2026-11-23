@@ -506,6 +506,20 @@
                 </configuration>
             </plugin>
 
+            <!-- Development: mvn spring-boot:run starts the pinned starter, whose classes are a test-scope dependency, with
+                 this extension and docker/config. No goal is bound to the build, so the jar stays a plain jar for the image. -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>ca.uhn.fhir.jpa.starter.Application</mainClass>
+                    <useTestClasspath>true</useTestClasspath>
+                    <systemPropertyVariables>
+                        <spring.config.location>file:${project.basedir}/docker/config/</spring.config.location>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-dependency-plugin</artifactId>
