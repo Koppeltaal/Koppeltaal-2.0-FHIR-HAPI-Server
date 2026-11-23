@@ -17,6 +17,17 @@ import org.springframework.web.filter.OncePerRequestFilter;
  */
 public class RequestIdFilter extends OncePerRequestFilter {
 
+  /** HAPI's RestfulServer used to create the id for every dispatch; a request can also reach FHIR through these. */
+  @Override
+  protected boolean shouldNotFilterAsyncDispatch() {
+    return false;
+  }
+
+  @Override
+  protected boolean shouldNotFilterErrorDispatch() {
+    return false;
+  }
+
   @Override
   protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
       throws ServletException, IOException {
