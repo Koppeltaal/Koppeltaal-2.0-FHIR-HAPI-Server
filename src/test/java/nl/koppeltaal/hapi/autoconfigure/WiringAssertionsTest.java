@@ -9,6 +9,7 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.interceptor.api.IInterceptorBroadcaster;
 import ca.uhn.fhir.interceptor.api.IInterceptorService;
 import ca.uhn.fhir.interceptor.executor.InterceptorService;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
 import ca.uhn.fhir.jpa.api.dao.DaoRegistry;
 import ca.uhn.fhir.jpa.delete.ThreadSafeResourceDeleterSvc;
 import ca.uhn.fhir.jpa.interceptor.CascadingDeleteInterceptor;
@@ -35,8 +36,11 @@ class WiringAssertionsTest {
   private final ServletContext servletContext = mock(ServletContext.class);
   private final List<ServletRegistrationBean<?>> remapped = new ArrayList<>();
   private final Collection<Object> koppeltaalInterceptors = new ArrayList<>();
+  private final JpaStorageSettings storageSettings = new JpaStorageSettings();
 
   WiringAssertionsTest() {
+    storageSettings.setResourceServerIdStrategy(JpaStorageSettings.IdStrategyEnum.UUID);
+    storageSettings.setHibernateSearchIndexFullText(true);
     ServletRegistrationBean<RestfulServer> registration =
       new ServletRegistrationBean<>(server, FhirServletMapping.FHIR_URL_MAPPING);
     registration.setName(SERVLET_NAME);
@@ -122,6 +126,21 @@ class WiringAssertionsTest {
       .hasMessageContaining("embedded server");
   }
 
+  /** KoppeltaalStorageSettings forces both as the fork's code did; a bean created before it would keep the configuration. */
+  @Test
+  void refusesResourceIdsThatAreNoUuids() {
+    storageSettings.setResourceServerIdStrategy(JpaStorageSettings.IdStrategyEnum.SEQUENTIAL_NUMERIC);
+
+    assertThatThrownBy(this::verify).hasMessageContaining("resource ids must be UUIDs, found SEQUENTIAL_NUMERIC");
+  }
+
+  @Test
+  void refusesFullTextIndexingSwitchedOff() {
+    storageSettings.setHibernateSearchIndexFullText(false);
+
+    assertThatThrownBy(this::verify).hasMessageContaining("full-text indexing must be on");
+  }
+
   @Test
   void refusesWhenNoFhirServletWasRemapped() {
     remapped.clear();
@@ -130,7 +149,7 @@ class WiringAssertionsTest {
   }
 
   private void verify() {
-    WiringAssertions.verify(server, jpaRegistry, servletContext, remapped, koppeltaalInterceptors);
+    WiringAssertions.verify(server, jpaRegistry, servletContext, remapped, koppeltaalInterceptors, storageSettings);
   }
 
   private void mapTheFhirServletTo(String mapping) {

@@ -43,6 +43,12 @@ public class StarterReplacementConfig {
 
   private static final Logger ourLog = LoggerFactory.getLogger(StarterReplacementConfig.class);
 
+  /** UUID resource ids and full-text indexing, fixed as the fork's code fixed them. */
+  @Bean
+  public static KoppeltaalStorageSettings koppeltaalStorageSettings() {
+    return new KoppeltaalStorageSettings();
+  }
+
   /** Authorizes every cascaded delete against the requester's resource-origin permissions. */
   @Bean
   @ConditionalOnProperty(name = "koppeltaal.cascading-deletes.enabled", havingValue = "true")

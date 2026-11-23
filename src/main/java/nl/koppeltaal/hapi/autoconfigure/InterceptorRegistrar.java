@@ -71,7 +71,7 @@ public class InterceptorRegistrar implements SmartInitializingSingleton {
     koppeltaalCorsInterceptor.ifPresent(koppeltaalInterceptors::add);
     koppeltaalRepositoryValidatingInterceptor.ifPresent(koppeltaalInterceptors::add);
     WiringAssertions.verify(restfulServer, myInterceptorRegistry, servletContext, fhirServletMapping.remappedRegistrations(),
-      koppeltaalInterceptors);
+      koppeltaalInterceptors, jpaStorageSettings);
     // First in our sequence. On its only pointcut shared with the starter's interceptors, SERVER_OUTGOING_RESPONSE, its
     // hook has order -1, so the cascade message stays ahead of the request validator's messages.
     cascadingDeleteInterceptor.ifPresent(restfulServer::registerInterceptor);

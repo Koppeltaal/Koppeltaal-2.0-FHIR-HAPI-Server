@@ -1,6 +1,7 @@
 package nl.koppeltaal.hapi.autoconfigure;
 
 import ca.uhn.fhir.interceptor.api.IInterceptorService;
+import ca.uhn.fhir.jpa.api.config.JpaStorageSettings;
 import ca.uhn.fhir.jpa.interceptor.CascadingDeleteInterceptor;
 import ca.uhn.fhir.jpa.interceptor.validation.RepositoryValidatingInterceptor;
 import ca.uhn.fhir.rest.server.RestfulServer;
@@ -13,15 +14,27 @@ import java.util.Collection;
 import java.util.List;
 import org.springframework.boot.web.servlet.ServletRegistrationBean;
 
-/** Stops the startup when the starter wires a feature Koppeltaal replaces, or the FHIR servlet is not remapped. */
+/**
+ * Stops the startup when the starter wires a feature Koppeltaal replaces, the FHIR servlet is not remapped, or the
+ * storage settings lack the UUID resource ids and full-text indexing that KoppeltaalStorageSettings forces.
+ */
 final class WiringAssertions {
 
   private WiringAssertions() {
   }
 
   static void verify(RestfulServer server, IInterceptorService jpaRegistry, ServletContext servletContext,
-      List<ServletRegistrationBean<?>> remapped, Collection<Object> koppeltaalInterceptors) {
+      List<ServletRegistrationBean<?>> remapped, Collection<Object> koppeltaalInterceptors,
+      JpaStorageSettings storageSettings) {
     List<String> problems = new ArrayList<>();
+    // A JpaStorageSettings created before the post-processor registered would keep the configured values.
+    if (storageSettings.getResourceServerIdStrategy() != JpaStorageSettings.IdStrategyEnum.UUID) {
+      problems.add("resource ids must be UUIDs, found " + storageSettings.getResourceServerIdStrategy()
+        + ": KoppeltaalStorageSettings did not reach JpaStorageSettings");
+    }
+    if (!storageSettings.isHibernateSearchIndexFullText()) {
+      problems.add("full-text indexing must be on: KoppeltaalStorageSettings did not reach JpaStorageSettings");
+    }
     if (remapped.size() != 1) {
       problems.add("expected one FHIR servlet registration to remap, found " + remapped.size());
     } else {
