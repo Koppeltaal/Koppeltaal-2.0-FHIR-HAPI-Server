@@ -507,16 +507,14 @@
             </plugin>
 
             <!-- Development: mvn spring-boot:run starts the pinned starter, whose classes are a test-scope dependency, with
-                 this extension and docker/config. No goal is bound to the build, so the jar stays a plain jar for the image. -->
+                 this extension and docker/config (profile docker-config). No goal is bound to the build, so the jar stays
+                 a plain jar for the image. -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <mainClass>ca.uhn.fhir.jpa.starter.Application</mainClass>
                     <useTestClasspath>true</useTestClasspath>
-                    <systemPropertyVariables>
-                        <spring.config.location>file:${project.basedir}/docker/config/</spring.config.location>
-                    </systemPropertyVariables>
                 </configuration>
             </plugin>
 
@@ -647,5 +645,34 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <!-- mvn spring-boot:run reads docker/config, plus Spring Boot's own overlays in the working directory
+                 (./application.yaml, ./config/) as one location group, as Spring Boot's default has them. It passes
+                 them as SPRING_CONFIG_LOCATION, the lowest-ranking way, so a developer's spring.config.location in
+                 JDK_JAVA_OPTIONS, JAVA_TOOL_OPTIONS or the arguments still wins; a developer's own
+                 SPRING_CONFIG_LOCATION switches this profile off. -->
+            <id>docker-config</id>
+            <activation>
+                <property>
+                    <name>!env.SPRING_CONFIG_LOCATION</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <configuration>
+                            <environmentVariables>
+                                <SPRING_CONFIG_LOCATION>file:${project.basedir}/docker/config/,optional:file:./;optional:file:./config/;optional:file:./config/*/</SPRING_CONFIG_LOCATION>
+                            </environmentVariables>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>
