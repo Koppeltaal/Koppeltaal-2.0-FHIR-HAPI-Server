@@ -22,9 +22,13 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Condition;
+import org.springframework.context.annotation.ConditionContext;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
+import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.cors.CorsConfiguration;
 
@@ -47,7 +51,7 @@ public class StarterReplacementConfig {
 
   /** Authorizes every cascaded delete against the requester's resource-origin permissions. */
   @Bean
-  @ConditionalOnProperty(name = "koppeltaal.cascading-deletes.enabled", havingValue = "true")
+  @Conditional(CascadingDeletesEnabled.class)
   public ResourceOriginCascadingDeleteInterceptor koppeltaalCascadingDeleteInterceptor(FhirContext fhirContext,
       DaoRegistry daoRegistry, IInterceptorBroadcaster interceptorBroadcaster,
       ThreadSafeResourceDeleterSvc resourceDeleter, FhirServerSecurityConfiguration security) {
@@ -131,5 +135,19 @@ public class StarterReplacementConfig {
 
   private static boolean isBlank(String value) {
     return value == null || value.isBlank();
+  }
+
+  /**
+   * Reads koppeltaal.cascading-deletes.enabled as a Boolean, as the starter read hapi.fhir.allow_cascading_deletes: on,
+   * yes and 1 switch it on, and a value that is no Boolean stops the startup. The fork read the repository-validation
+   * switch as the string "true", so koppeltaal.repository-validation.enabled keeps @ConditionalOnProperty.
+   */
+  static class CascadingDeletesEnabled implements Condition {
+
+    @Override
+    public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+      return Binder.get(context.getEnvironment()).bind("koppeltaal.cascading-deletes.enabled", Boolean.class)
+        .orElse(false);
+    }
   }
 }
