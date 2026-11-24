@@ -11,7 +11,7 @@ RUN scripts/install-starter.sh /tmp/main.war && mvn -B -ntp dependency:go-offlin
 COPY src/ src/
 RUN mvn -B -ntp -DskipTests package
 
-FROM gcr.io/distroless/java17-debian13:nonroot@sha256:5a09afc2ecb9453a60bd0f071a5e0b5e180cbafa23e53976a4e610b3d28f6288 AS default
+FROM gcr.io/distroless/java17-debian13:nonroot@sha256:cbbf140705ea2bd2157840d713ba54fe3435e84223aa450c6a8c2fec69fd8409 AS default
 USER 0
 COPY certificates/notificaties.lsp.orangeclicks.nl.cer /tmp/subscriber.cer
 RUN ["java", "sun.security.tools.keytool.Main", "-importcert", "-noprompt", "-cacerts", "-storepass", "changeit", \
