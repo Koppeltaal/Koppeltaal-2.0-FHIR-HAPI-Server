@@ -2,7 +2,7 @@
 # the Java runtime is our own base image, so JRE fixes do not wait for a HAPI release.
 FROM hapiproject/hapi:v8.2.0-2@sha256:df3ec210294f711ac0f89780c449ca843a450b5b5ca6c9a09f5f80509d9d07af AS hapi
 
-FROM docker.io/library/maven:3.9.9-eclipse-temurin-17 AS build
+FROM docker.io/library/maven:3.9-eclipse-temurin-26 AS build
 WORKDIR /build
 COPY --from=hapi /app/main.war /tmp/main.war
 COPY scripts/ scripts/
