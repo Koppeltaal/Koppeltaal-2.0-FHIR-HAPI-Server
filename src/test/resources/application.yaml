@@ -129,7 +129,7 @@ hapi:
     ###  !!Extended Lucene/Elasticsearch Indexing is still a experimental feature, expect some features (e.g. _total=accurate) to not work as expected!!
     ###  more information here: https://hapifhir.io/hapi-fhir/docs/server_jpa/elastic.html
     advanced_lucene_indexing: false
-    search_index_full_text_enabled: false
+    search_index_full_text_enabled: true
     #    enforce_referential_integrity_on_delete: false
     # This is an experimental feature, and does not fully support _total and other FHIR features.
     #    enforce_referential_integrity_on_delete: false
@@ -146,6 +146,7 @@ hapi:
     #    local_base_urls:
     #      - https://hapi.fhir.org/baseR4
     mdm_enabled: false
+    server_id_strategy: UUID
 
     ### Uncomment the following section, and any sub-properties you need in order to enable
     ### partitioning support on this server.
@@ -243,7 +244,7 @@ hapi:
 #  schema_management_strategy: CREATE
 #  username: SomeUsername
 
-# Koppeltaal configuration, as in src/main/resources/application.yaml (security disabled)
+# Koppeltaal configuration, as in docker/config/application.yaml (security disabled)
 fhir:
   server:
     openapi:

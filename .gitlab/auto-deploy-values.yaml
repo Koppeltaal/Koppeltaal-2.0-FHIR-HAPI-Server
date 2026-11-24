@@ -48,5 +48,3 @@ resources:
   limits:
     memory: 10G
 
-envVars:
-  JAVA_OPTS: "-Xmx6g -Xms3g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExitOnOutOfMemoryError"

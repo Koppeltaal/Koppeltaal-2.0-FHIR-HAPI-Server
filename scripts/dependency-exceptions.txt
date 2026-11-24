@@ -1,0 +1,17 @@
+# The only allowed differences between the resolved runtime jars of this build and the pinned starter WAR's
+# WEB-INF/lib (scripts/check-dependencies.sh). A HAPI upgrade updates these lines on purpose, after review.
+#
+# Only in the WAR: our pom drops the two drivers; the Boot repackager adds jarmode-tools.
+war h2-2.3.232.jar
+war mssql-jdbc-12.4.2.jre11.jar
+war spring-boot-jarmode-tools-3.3.11.jar
+# Only in this build: the extension's three libraries, and the manifest-only starters the repackager leaves out.
+ours java-jwt-4.5.0.jar
+ours jwks-rsa-0.22.1.jar
+ours lucene-backward-codecs-9.11.1.jar
+ours spring-boot-starter-3.3.11.jar
+ours spring-boot-starter-actuator-3.3.11.jar
+ours spring-boot-starter-json-3.3.11.jar
+ours spring-boot-starter-logging-3.3.11.jar
+ours spring-boot-starter-tomcat-3.3.11.jar
+ours spring-boot-starter-web-3.3.11.jar

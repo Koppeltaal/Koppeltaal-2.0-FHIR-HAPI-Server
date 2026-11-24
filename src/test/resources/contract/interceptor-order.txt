@@ -1,0 +1,128 @@
+server SERVER_CAPABILITY_STATEMENT_GENERATED
+  0 ca.uhn.fhir.rest.server.interceptor.ResponseHighlighterInterceptor.capabilityStatementGenerated
+  0 kt2.interceptor.CapabilityStatementInterceptor.customize
+server SERVER_INCOMING_REQUEST_PRE_PROCESSED
+  0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.incomingRequestPreProcessed
+  0 kt2.interceptor.JwtSecurityInterceptor.incomingRequestPreProcessed
+  1 kt2.deactivation.ClientDeactivationInterceptor.refuseInactiveClient
+  2 kt2.interceptor.MimeTypeInterceptor.ensureMimeTypeIsSupported
+server SERVER_HANDLE_EXCEPTION
+  0 ca.uhn.fhir.rest.server.interceptor.LoggingInterceptor.handleException
+  0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.handleException
+  10000 ca.uhn.fhir.rest.server.interceptor.ResponseHighlighterInterceptor.handleException
+server SERVER_INCOMING_REQUEST_PRE_HANDLER_SELECTED
+  0 ca.uhn.fhir.rest.openapi.OpenApiInterceptor.serveSwaggerUi
+server SERVER_INCOMING_REQUEST_POST_PROCESSED
+  -2147483648 kt2.interceptor.JsonSyntaxExceptionInterceptor.validateJsonSyntax
+  -10 kt2.interceptor.InjectTraceIdInterceptor.incomingRequestPreHandled
+  -9 kt2.interceptor.ResourceOriginAuthorizationInterceptor.authorizeRequest
+  0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.incomingRequestPostProcessed
+  0 ca.uhn.fhir.rest.server.interceptor.RequestValidatingInterceptor.incomingRequestPostProcessed
+  0 kt2.interceptor.ResourceOriginSearchNarrowingInterceptor.narrowSearch
+  0 kt2.interceptor.AuditEventInterceptor.start
+  0 kt2.interceptor.DefaultDescendingSortInterceptor.ensureDefaultSort
+server SERVER_INCOMING_REQUEST_PRE_HANDLED
+  0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.incomingRequestPreHandled
+  0 ca.uhn.fhir.rest.server.interceptor.CaptureResourceSourceFromHeaderInterceptor.extractSource
+  0 kt2.interceptor.DeleteFlowMarkerInterceptor.incomingRequestPreHandled
+  2147483647 kt2.interceptor.InjectResourceOriginInterceptor.incomingRequestPreHandled
+  2147483647 kt2.interceptor.TaskValidationInterceptor.incomingRequestPreHandled
+server SERVER_PRE_PROCESS_OUTGOING_EXCEPTION
+  0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.preProcessOutgoingException
+  0 kt2.deactivation.ClientDeactivationInterceptor.countRejectedWrite
+  100 kt2.interceptor.AuditEventInterceptor.preOutgoingException
+  200 kt2.interceptor.ResourceOriginAuthorizationInterceptor.hideDeleteConflictDetails
+server SERVER_OUTGOING_RESPONSE
+  -10 kt2.interceptor.ResourceOriginResponseFilterInterceptor.filterResponse
+  -1 kt2.interceptor.ResourceOriginCascadingDeleteInterceptor.outgoingResponse
+  0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.outgoingResponse
+  0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.outgoingResponse
+  0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.outgoingResponse
+  0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.outgoingResponse
+  0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.outgoingResponse
+  0 ca.uhn.fhir.rest.server.interceptor.RequestValidatingInterceptor.addValidationResultsToOperationOutcome
+  0 kt2.interceptor.AuditEventInterceptor.outgoingResponse
+  0 kt2.interceptor.Oauth2UrisStatementInterceptorForR4.hookOutgoingResponse
+  10000 ca.uhn.fhir.rest.server.interceptor.ResponseHighlighterInterceptor.outgoingResponse
+  2147483647 kt2.interceptor.InjectCorrelationIdInterceptor.injectCorrelationIdOnSuccess
+  2147483647 kt2.interceptor.InjectTraceIdInterceptor.injectTraceIdOnSuccess
+server SERVER_OUTGOING_GRAPHQL_RESPONSE
+  10000 ca.uhn.fhir.rest.server.interceptor.ResponseHighlighterInterceptor.outgoingGraphqlResponse
+server SERVER_OUTGOING_FAILURE_OPERATIONOUTCOME
+  0 kt2.interceptor.ResourceOriginCascadingDeleteInterceptor.outgoingFailureOperationOutcome
+  2147483647 kt2.interceptor.InjectCorrelationIdInterceptor.injectCorrelationIdOnError
+  2147483647 kt2.interceptor.InjectTraceIdInterceptor.injectTraceIdOnError
+server SERVER_PROCESSING_COMPLETED_NORMALLY
+  0 ca.uhn.fhir.rest.server.interceptor.LoggingInterceptor.processingCompletedNormally
+  0 ca.uhn.fhir.rest.server.interceptor.CorsInterceptor.processingCompletedNormally
+server SUBSCRIPTION_RESOURCE_MODIFIED
+  0 ca.uhn.fhir.jpa.subscription.util.SubscriptionDebugLogInterceptor.step10_resourceModified
+server SUBSCRIPTION_RESOURCE_MATCHED
+  0 ca.uhn.fhir.jpa.subscription.util.SubscriptionDebugLogInterceptor.step30_subscriptionMatched
+server SUBSCRIPTION_RESOURCE_DID_NOT_MATCH_ANY_SUBSCRIPTIONS
+  0 ca.uhn.fhir.jpa.subscription.util.SubscriptionDebugLogInterceptor.step35_subscriptionNotMatched
+server SUBSCRIPTION_BEFORE_DELIVERY
+  0 ca.uhn.fhir.jpa.subscription.util.SubscriptionDebugLogInterceptor.step40_beforeDelivery
+  0 kt2.interceptor.SubscriptionNarrowingInterceptor.subscriptionBeforeDelivery
+  2147483647 kt2.interceptor.InjectTraceIdInterceptor.outgoingSubscriptionBeforeDelivery
+server SUBSCRIPTION_AFTER_DELIVERY
+  0 ca.uhn.fhir.jpa.subscription.util.SubscriptionDebugLogInterceptor.step50_afterDelivery
+  2147483647 kt2.interceptor.AuditEventSubscriptionInterceptor.outgoingSubscriptionSucceeded
+server SUBSCRIPTION_AFTER_DELIVERY_FAILED
+  0 ca.uhn.fhir.jpa.subscription.util.SubscriptionDebugLogInterceptor.step45_deliveryFailed
+  2147483647 kt2.interceptor.AuditEventSubscriptionInterceptor.outgoingSubscriptionFailed
+server SUBSCRIPTION_BEFORE_PERSISTED_RESOURCE_CHECKED
+  0 ca.uhn.fhir.jpa.subscription.util.SubscriptionDebugLogInterceptor.step20_beforeChecked
+server STORAGE_CASCADE_DELETE
+  0 kt2.interceptor.ResourceOriginCascadingDeleteInterceptor.authorizeCascadedDelete
+server STORAGE_PRESTORAGE_RESOURCE_CREATED
+  0 ca.uhn.fhir.jpa.interceptor.validation.RepositoryValidatingInterceptor.create
+  0 kt2.interceptor.DeleteFlowMarkerInterceptor.resourceCreating
+  0 kt2.interceptor.EnforceHttpsSubscriptionEndpointInterceptor.ensureHttpsOnCreate
+  2147483647 kt2.interceptor.TaskValidationInterceptor.resourceCreating
+server STORAGE_PRESTORAGE_RESOURCE_UPDATED
+  0 ca.uhn.fhir.jpa.interceptor.validation.RepositoryValidatingInterceptor.update
+  0 kt2.interceptor.AuditEventIntergityInterceptor.restrictAuditEventUpdate
+  0 kt2.interceptor.EnforceIfMatchHeaderInterceptor.ensureIfMatchIsSet
+  0 kt2.interceptor.DeleteFlowMarkerInterceptor.resourceUpdating
+  0 kt2.interceptor.EnforceHttpsSubscriptionEndpointInterceptor.ensureHttpsOnUpdate
+  2147483647 kt2.interceptor.TaskValidationInterceptor.resourceUpdating
+server STORAGE_PRESTORAGE_RESOURCE_DELETED
+  0 kt2.interceptor.DeleteFlowMarkerInterceptor.resourceDeleting
+server STORAGE_PRECOMMIT_RESOURCE_CREATED
+  0 kt2.interceptor.AuditEventInterceptor.creating
+server STORAGE_PRECOMMIT_RESOURCE_UPDATED
+  0 kt2.interceptor.AuditEventInterceptor.updating
+server STORAGE_PRECOMMIT_RESOURCE_DELETED
+  0 kt2.interceptor.AuditEventInterceptor.deleting
+server STORAGE_PRESTORAGE_DELETE_CONFLICTS
+  0 ca.uhn.fhir.jpa.interceptor.OverridePathBasedReferentialIntegrityForDeletesInterceptor.handleDeleteConflicts
+  1 kt2.interceptor.ResourceOriginCascadingDeleteInterceptor.handleDeleteConflicts
+jpa SERVER_INCOMING_REQUEST_POST_PROCESSED
+  -10 kt2.interceptor.InjectTraceIdInterceptor.incomingRequestPreHandled
+jpa SERVER_OUTGOING_RESPONSE
+  2147483647 kt2.interceptor.InjectTraceIdInterceptor.injectTraceIdOnSuccess
+jpa SERVER_OUTGOING_FAILURE_OPERATIONOUTCOME
+  2147483647 kt2.interceptor.InjectTraceIdInterceptor.injectTraceIdOnError
+jpa SUBSCRIPTION_BEFORE_DELIVERY
+  0 kt2.interceptor.SubscriptionNarrowingInterceptor.subscriptionBeforeDelivery
+  2147483647 kt2.interceptor.InjectTraceIdInterceptor.outgoingSubscriptionBeforeDelivery
+jpa SUBSCRIPTION_AFTER_DELIVERY
+  2147483647 kt2.interceptor.AuditEventSubscriptionInterceptor.outgoingSubscriptionSucceeded
+jpa SUBSCRIPTION_AFTER_DELIVERY_FAILED
+  2147483647 kt2.interceptor.AuditEventSubscriptionInterceptor.outgoingSubscriptionFailed
+jpa STORAGE_PRESTORAGE_RESOURCE_CREATED
+  -1000 kt2.interceptor.PatientAssignmentValidationInterceptor.resourceCreating
+  100 ca.uhn.fhir.jpa.subscription.submit.interceptor.SubscriptionValidatingInterceptor.resourcePreCreate
+jpa STORAGE_PRESTORAGE_RESOURCE_UPDATED
+  -1000 kt2.interceptor.PatientAssignmentValidationInterceptor.resourceUpdating
+  100 ca.uhn.fhir.jpa.subscription.submit.interceptor.SubscriptionValidatingInterceptor.resourceUpdated
+jpa STORAGE_PRECOMMIT_RESOURCE_CREATED
+  -1000 kt2.interceptor.PatientAssignmentValidationInterceptor.resourceCreated
+  0 ca.uhn.fhir.jpa.subscription.submit.interceptor.SubscriptionMatcherInterceptor.resourceCreated
+jpa STORAGE_PRECOMMIT_RESOURCE_UPDATED
+  -1000 kt2.interceptor.PatientAssignmentValidationInterceptor.resourceUpdated
+  0 ca.uhn.fhir.jpa.subscription.submit.interceptor.SubscriptionMatcherInterceptor.resourceUpdated
+  0 kt2.interceptor.DeleteFlowLifecycleAuditInterceptor.resourceUpdated
+jpa STORAGE_PRECOMMIT_RESOURCE_DELETED
+  0 ca.uhn.fhir.jpa.subscription.submit.interceptor.SubscriptionMatcherInterceptor.resourceDeleted

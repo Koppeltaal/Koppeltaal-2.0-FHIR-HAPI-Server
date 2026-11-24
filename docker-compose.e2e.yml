@@ -9,17 +9,9 @@
 services:
   hapi-fhir-jpaserver-start:
     container_name: kt2-e2e-hapi-fhir-jpaserver
-    # same as the image entrypoint, with a heap that fits a developer machine
-    entrypoint:
-      - java
-      - -Xms1g
-      - -Xmx${KT2_E2E_HEAP:-4g}
-      - -XX:+ExitOnOutOfMemoryError
-      - --class-path
-      - /app/main.war
-      - -Dloader.path=main.war!/WEB-INF/classes/,main.war!/WEB-INF/,/app/extra-classes
-      - org.springframework.boot.loader.PropertiesLauncher
     environment:
+      # the image's own entrypoint, with a heap that fits a developer machine
+      JDK_JAVA_OPTIONS: "-Xms1g -Xmx${KT2_E2E_HEAP:-4g} -XX:+ExitOnOutOfMemoryError"
       FHIR_SERVER_SECURITY_ENABLED: "${KT2_E2E_SECURITY_ENABLED:-true}"
       FHIR_SERVER_SECURITY_ISSUER: "${KT2_E2E_ISSUER:-https://staging-auth-service.koppeltaal.headease.nl}"
       FHIR_SERVER_SECURITY_AUDIENCE: "${KT2_E2E_AUDIENCE:-fhir-server}"

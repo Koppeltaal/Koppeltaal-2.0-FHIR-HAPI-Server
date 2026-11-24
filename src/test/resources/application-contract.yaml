@@ -1,0 +1,58 @@
+# Production's switches (docker/config/application.yaml plus the K8S settings) for ServerWiringContractTest. Keep them
+# in line with docker/config/application.yaml; the snapshots in src/test/resources/contract pin the wiring they give.
+fhir:
+  server:
+    security:
+      enabled: true
+    openapi:
+      enabled: false
+hapi:
+  fhir:
+    server_id_strategy: UUID
+    validation:
+      requests_enabled: true
+    subscription:
+      resthook_enabled: true
+    supported_resource_types:
+      - ActivityDefinition
+      - AuditEvent
+      - Binary
+      - Bundle
+      - CapabilityStatement
+      - CareTeam
+      - CodeSystem
+      - Device
+      - Endpoint
+      - NamingSystem
+      - OperationOutcome
+      - Organization
+      - Patient
+      - Practitioner
+      - RelatedPerson
+      - Subscription
+      - StructureDefinition
+      - Task
+      - ValueSet
+      - ImplementationGuide
+koppeltaal:
+  cascading-deletes:
+    # replaces hapi.fhir.allow_cascading_deletes: this one checks the resource origin of every cascaded delete
+    enabled: true
+  cors:
+    # replaces hapi.fhir.cors: the same settings, plus If-Match
+    enabled: true
+    allow-credentials: true
+    allowed-origin:
+      - "*"
+  repository-validation:
+    # replaces hapi.fhir.enable_repository_validating_interceptor, with the KT2 profile rules
+    enabled: true
+# Patient data cleanup (TOP-KT-028): AVG policy, so on by default.
+cleanup:
+  enabled: true
+  # the scheduled run stays off in tests
+  cron: "-"
+  grace-days: 30
+  min-patient-age-days: 730
+  # The transition date C: until C + 2 years recent Task activity also counts as engagement, next to logins.
+  transition-date: 2026-11-05

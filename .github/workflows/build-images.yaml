@@ -4,15 +4,11 @@ on:
   push:
     tags:
       - "image/v*"
-    paths-ignore:
-      - "charts/**"
   pull_request:
     branches: [master]
-    paths-ignore:
-      - "charts/**"
 env:
   IMAGES: docker.io/jorisheadease/hapi
-  # amd64 only: the default stage imports a certificate with the keytool of the amd64 JDK
+  # amd64 only, as before; the Dockerfile has no amd64-specific step any more, so arm64 could be added
   PLATFORMS: linux/amd64
 
 jobs:

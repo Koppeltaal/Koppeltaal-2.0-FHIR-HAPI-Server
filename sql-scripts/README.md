@@ -148,7 +148,7 @@ psql -h HOST -p PORT -U USERNAME -d DATABASE -f preview-ig-removal.sql
 ./remove-ig.sh HOST PORT USERNAME DATABASE --yes
 
 # 4. Restart HAPI server to allow clean reinstallation
-# (The package will be automatically reinstalled on startup from the configured implementationguides)
+# (The package will be automatically reinstalled on startup from koppeltaal.implementationguides in docker/config/application.yaml)
 ```
 
 ### Workflow 2: Troubleshooting Package Upload Issues
